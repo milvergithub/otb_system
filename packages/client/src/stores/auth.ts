@@ -1,0 +1,53 @@
+import { create } from "zustand"
+import { api, clearTokens, setTokens, getAccessToken } from "@/lib/api"
+import { ApiPath } from "@/lib/apiPath"
+import type { User, AuthResponse } from "@/lib/types"
+
+interface AuthState {
+  user: User | null
+  loading: boolean
+  loadUser: () => Promise<void>
+  login: (email: string, password: string) => Promise<void>
+  logout: () => void
+  hasPermission: (permission: string) => boolean
+}
+
+export const useAuthStore = create<AuthState>((set, get) => ({
+  user: null,
+  loading: true,
+
+  loadUser: async () => {
+    if (!getAccessToken()) {
+      set({ loading: false })
+      return
+    }
+    try {
+      const res = await api.get<User>(ApiPath.Auth.ME)
+      set({ user: res.data })
+    } catch {
+      clearTokens()
+    } finally {
+      set({ loading: false })
+    }
+  },
+
+  login: async (email: string, password: string) => {
+    const res = await api.post<AuthResponse>(ApiPath.Auth.LOGIN, { email, password })
+    const data = res.data
+    setTokens(data.accessToken, data.refreshToken)
+    set({ user: data.user })
+  },
+
+  logout: () => {
+    clearTokens()
+    set({ user: null })
+    window.location.href = "/login"
+  },
+
+  hasPermission: (permission: string) => {
+    const { user } = get()
+    if (!user) return false
+    if (user.role === "admin") return true
+    return user.permissions?.includes(permission) ?? false
+  },
+}))

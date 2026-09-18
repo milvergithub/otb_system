@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="340" height="176" viewBox="0 0 340 176">
+  <defs>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity=".18"/>
+    </filter>
+    <clipPath id="mapClip">
+      <rect width="340" height="176" rx="0"/>
+    </clipPath>
+  </defs>
+
+  <!-- Map background -->
+  <rect width="340" height="176" fill="#f6f5f4"/>
+
+  <g clip-path="url(#mapClip)">
+    <!-- Main roads -->
+    <path d="M14 -8 L4 65 Q1 91 -3 112 Q-7 143 -12 184"
+          fill="none" stroke="#d1d9dd" stroke-width="14"/>
+    <path d="M91 -10 L88 42 Q87 63 77 78 Q66 93 45 103 Q24 113 13 129 Q4 142 -2 178"
+          fill="none" stroke="#d1d9dd" stroke-width="13"/>
+    <path d="M93 -10 L91 43 Q90 64 79 79 Q68 94 47 104 Q26 114 15 130 Q6 142 0 178"
+          fill="none" stroke="#eef0f0" stroke-width="4"/>
+
+    <!-- Buildings / blocks -->
+    <g fill="#e9eaec" stroke="#d5d9df" stroke-width="1.5">
+      <path d="M136 1 h40 v18 h-40z"/>
+      <path d="M177 7 h28 v14 h-28z"/>
+      <path d="M145 27 h17 v12 h-17z"/>
+      <path d="M167 26 h24 v14 h-24z"/>
+      <path d="M199 25 h30 v17 h-30z"/>
+      <path d="M240 0 h47 v20 h-47z"/>
+      <path d="M289 2 h31 v18 h-31z"/>
+      <path d="M326 0 h26 v24 h-26z"/>
+      <path d="M116 53 h35 v13 h-35z" transform="rotate(-7 133 59)"/>
+      <path d="M166 47 h29 v16 h-29z" transform="rotate(-8 180 55)"/>
+      <path d="M208 57 h37 v18 h-37z"/>
+      <path d="M271 44 h44 v17 h-44z"/>
+      <path d="M80 64 h24 v14 h-24z"/>
+      <path d="M19 73 h26 v17 h-26z"/>
+      <path d="M96 92 h25 v18 h-25z"/>
+      <path d="M144 91 h39 v22 h-39z"/>
+      <path d="M196 92 h29 v19 h-29z"/>
+      <path d="M247 89 h35 v18 h-35z"/>
+      <path d="M294 88 h29 v21 h-29z"/>
+      <path d="M24 118 h22 v17 h-22z"/>
+      <path d="M72 126 h35 v20 h-35z"/>
+      <path d="M121 125 h28 v16 h-28z"/>
+      <path d="M169 126 h39 v21 h-39z"/>
+      <path d="M224 124 h33 v18 h-33z"/>
+      <path d="M275 124 h47 v20 h-47z"/>
+      <path d="M49 151 h31 v19 h-31z"/>
+      <path d="M96 153 h44 v19 h-44z"/>
+      <path d="M154 151 h27 v21 h-27z"/>
+      <path d="M203 152 h42 v18 h-42z"/>
+      <path d="M259 151 h31 v22 h-31z"/>
+      <path d="M305 151 h38 v20 h-38z"/>
+    </g>
+
+    <!-- Small map details -->
+    <g fill="#f3f3f3" stroke="#d8dce1" stroke-width="1.5">
+      <rect x="80" y="31" width="16" height="11" transform="rotate(4 88 36)"/>
+      <rect x="153" y="9" width="10" height="13" transform="rotate(5 158 15)"/>
+      <rect x="331" y="39" width="12" height="15"/>
+      <rect x="63" y="109" width="14" height="12"/>
+    </g>
+
+    <!-- Location pin shadow -->
+    <ellipse cx="58" cy="113" rx="14" ry="5" fill="#000" opacity=".12"/>
+
+    <!-- Location pin -->
+    <g filter="url(#shadow)">
+      <path d="M58 68
+               C44.2 68 33 79.2 33 93
+               C33 111.2 51.2 126.7 58 133
+               C64.8 126.7 83 111.2 83 93
+               C83 79.2 71.8 68 58 68 Z"
+            fill="#8ba3ad" stroke="#ffffff" stroke-width="5"/>
+      <circle cx="58" cy="91" r="8.5" fill="#ffffff"/>
+    </g>
+
+    <!-- Label -->
+    <text x="92" y="103"
+          font-family="Arial, Helvetica, sans-serif"
+          font-size="27"
+          font-weight="400"
+          letter-spacing=".2"
+          fill="#536d78">O.T.B. Don Bosco</text>
+  </g>
+</svg>

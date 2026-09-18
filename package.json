@@ -1,0 +1,28 @@
+{
+  "name": "otb-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Water billing system for OTB community organizations",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,green \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm run start:dev --workspace=@otb/server",
+    "dev:client": "npm run dev --workspace=@otb/client",
+    "dev:landing": "npm run dev --workspace=@otb/landing",
+    "build": "npm run build --workspace=@otb/server && npm run build --workspace=@otb/client",
+    "build:landing": "npm run build --workspace=@otb/landing",
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f db",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

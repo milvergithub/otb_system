@@ -1,0 +1,65 @@
+import 'reflect-metadata';
+import { DataSource } from 'typeorm';
+import { User } from '../modules/users/entities/user.entity';
+import { Member } from '../modules/members/entities/member.entity';
+import { Meter } from '../modules/meters/entities/meter.entity';
+import { MeterTypeEntity } from '../modules/meters/entities/meter-type.entity';
+import { Tariff } from '../modules/tariffs/entities/tariff.entity';
+import { BaseTariff } from '../modules/tariffs/entities/base-tariff.entity';
+import { Setting } from '../modules/settings/entities/setting.entity';
+import { Consumption } from '../modules/consumption/entities/consumption.entity';
+import { Payment } from '../modules/billing/entities/payment.entity';
+import { PaymentHistory } from '../modules/billing/entities/payment-history.entity';
+import { PaymentDiscount } from '../modules/billing/entities/payment-discount.entity';
+import { Discount } from '../modules/billing/entities/discount.entity';
+import { Notification } from '../modules/notifications/entities/notification.entity';
+import { Role } from '../modules/roles/entities/role.entity';
+import { Permission } from '../modules/roles/entities/permission.entity';
+import { SharePayment } from '../modules/shares/entities/share-payment.entity';
+import { WaterShare } from '../modules/shares/entities/water-share.entity';
+import { AuditLog } from '../modules/audit/entities/audit-log.entity';
+import { Zone } from '../modules/zones/zone.entity';
+import { ZoneTypeEntity } from '../modules/zones/entities/zone-type.entity';
+import { Activity } from '../modules/activities/entities/activity.entity';
+import { ActivityShare } from '../modules/activities/entities/activity-share.entity';
+import { FineType } from '../modules/activities/entities/fine-type.entity';
+import { Attendance } from '../modules/activities/entities/attendance.entity';
+import { Fine } from '../modules/activities/entities/fine.entity';
+
+export const AppDataSource = new DataSource({
+  type: 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '5433', 10),
+  username: process.env.DB_USERNAME || 'postgres',
+  password: process.env.DB_PASSWORD || 'postgres',
+  database: process.env.DB_NAME || 'otb_system',
+  entities: [
+    User,
+    Member,
+    Meter,
+    MeterTypeEntity,
+    Tariff,
+    BaseTariff,
+    Setting,
+    Consumption,
+    Payment,
+    PaymentHistory,
+    PaymentDiscount,
+    Discount,
+    Notification,
+    Role,
+    Permission,
+    SharePayment,
+    WaterShare,
+    AuditLog,
+    Zone,
+    ZoneTypeEntity,
+    Activity,
+    ActivityShare,
+    FineType,
+    Attendance,
+    Fine,
+  ],
+  migrations: ['src/database/migrations/*.ts'],
+  synchronize: process.env.NODE_ENV !== 'production',
+});
