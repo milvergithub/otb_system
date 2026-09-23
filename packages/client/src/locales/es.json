@@ -43,6 +43,7 @@
     "method": {
       "cash": "Efectivo",
       "transfer": "Transferencia",
+      "transferQR": "Transferencia/QR",
       "card": "Tarjeta"
     },
     "system": "Sistema",
@@ -210,6 +211,13 @@
     "latitude": "Latitud",
     "longitude": "Longitud",
     "googleMapsLink": "Enlace de Google Maps:",
+    "location": "Ubicación",
+    "useMyLocation": "Mi ubicación",
+    "locationDenied": "Permiso de ubicación denegado",
+    "selectOnMap": "Seleccionar en mapa",
+    "editLocation": "Editar ubicación",
+    "confirmLocation": "Confirmar ubicación",
+    "locationDialogHint": "Haz clic en el mapa o arrastra el marcador",
     "sharePayment": "Pago de acción (acción de agua)",
     "sharePaymentTitle": "Pago de acción (acción de agua)",
     "amountBob": "Monto (BOB)",

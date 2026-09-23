@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useTranslation } from "react-i18next"
 import type { TFunction } from "i18next"
+import { MapPin } from "lucide-react"
 import { requiredString } from "@/lib/validation"
 import { getApiErrorMessage } from "@/lib/api"
 import type { Meter } from "@/lib/types"
@@ -27,6 +28,7 @@ import { toast } from "sonner"
 import ImageCropDialog from "@/components/ImageCropDialog"
 import { PAYMENT_METHODS } from "./constants"
 import { useMeterTypes } from "@/hooks/meterTypes"
+import MeterLocationDialog from "./MeterLocationDialog"
 
 const meterFormSchema = (t: TFunction) =>
   z.object({
@@ -89,6 +91,7 @@ export default function MeterFormDialog({
   const [imageSrc, setImageSrc] = useState<string | null>(null)
   const [croppedBase64, setCroppedBase64] = useState<string | null>(null)
   const [cropDialogOpen, setCropDialogOpen] = useState(false)
+  const [locationOpen, setLocationOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const closeDialog = () => {
@@ -174,6 +177,7 @@ export default function MeterFormDialog({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
@@ -223,34 +227,27 @@ export default function MeterFormDialog({
               <p className="text-sm text-destructive">{meterForm.formState.errors.member_id.message}</p>
             )}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="address">{t("meters.address")}</Label>
-            <Input
-              id="address"
-              {...meterForm.register("address")}
-            />
-            {meterForm.formState.errors.address && (
-              <p className="text-sm text-destructive">{meterForm.formState.errors.address.message}</p>
-            )}
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
             <div className="space-y-2">
-              <Label htmlFor="latitude">{t("meters.latitude")}</Label>
+              <Label htmlFor="address">{t("meters.address")}</Label>
               <Input
-                id="latitude"
-                type="number"
-                step="any"
-                {...meterForm.register("latitude")}
+                id="address"
+                {...meterForm.register("address")}
               />
+              {meterForm.formState.errors.address && (
+                <p className="text-sm text-destructive">{meterForm.formState.errors.address.message}</p>
+              )}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="longitude">{t("meters.longitude")}</Label>
-              <Input
-                id="longitude"
-                type="number"
-                step="any"
-                {...meterForm.register("longitude")}
-              />
+            <div className="flex items-center">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                title={watchLatitude && watchLongitude ? t("meters.editLocation") : t("meters.selectOnMap")}
+                onClick={() => setLocationOpen(true)}
+              >
+                <MapPin className="size-4" />
+              </Button>
             </div>
           </div>
           {watchLatitude && watchLongitude ? (
@@ -362,5 +359,16 @@ export default function MeterFormDialog({
         />
       </DialogContent>
     </Dialog>
+    <MeterLocationDialog
+      open={locationOpen}
+      initialLatitude={watchLatitude}
+      initialLongitude={watchLongitude}
+      onConfirm={(lat, lng) => {
+        meterForm.setValue("latitude", lat)
+        meterForm.setValue("longitude", lng)
+      }}
+      onOpenChange={setLocationOpen}
+    />
+    </>
   )
 }

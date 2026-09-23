@@ -95,9 +95,8 @@ export default function MemberFinesPage() {
   const pendingFines = (fines ?? []).filter((f) => f.status === "pending")
   const allPendingSelected =
     pendingFines.length > 0 && pendingFines.every((f) => selected.has(f.id))
-  const selectedTotal = (fines ?? [])
-    .filter((f) => selected.has(f.id))
-    .reduce((sum, f) => sum + parseFloat(f.amount), 0)
+  const selectedFines = (fines ?? []).filter((f) => selected.has(f.id))
+  const selectedTotal = selectedFines.reduce((sum, f) => sum + parseFloat(f.amount), 0)
 
   const memberName = member
     ? `${member.first_name} ${member.last_name}`
@@ -375,6 +374,26 @@ export default function MemberFinesPage() {
                 amount: paying ? formatCurrency(parseFloat(paying.amount)) : "",
               })}
             </p>
+            {paying && (
+              <div className="rounded-md border p-3 text-sm space-y-1">
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground">{t("activities.finesActivity")}</span>
+                  <span className="text-right font-medium">{paying.activity?.name ?? paying.activity_id}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground">{t("activities.finesType")}</span>
+                  <span className="text-right font-medium">{paying.fineType?.name ?? "-"}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground">{t("activities.finesDate")}</span>
+                  <span className="text-right font-medium">{new Date(paying.created_at).toLocaleDateString()}</span>
+                </div>
+                <div className="flex justify-between gap-2 border-t pt-1 font-semibold">
+                  <span>{t("activities.finesAmount")}</span>
+                  <span className="text-right tabular-nums">{formatCurrency(parseFloat(paying.amount))}</span>
+                </div>
+              </div>
+            )}
             <Input
               placeholder={t("activities.notesOptional")}
               value={payNotes}
@@ -401,6 +420,32 @@ export default function MemberFinesPage() {
                 amount: formatCurrency(selectedTotal),
               })}
             </p>
+            <div className="max-h-64 space-y-3 overflow-y-auto rounded-md border p-3">
+              {selectedFines.map((f) => (
+                <div key={f.id} className="rounded-md border p-3 text-sm space-y-1">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground">{t("activities.finesActivity")}</span>
+                    <span className="text-right font-medium">{f.activity?.name ?? f.activity_id}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground">{t("activities.finesType")}</span>
+                    <span className="text-right font-medium">{f.fineType?.name ?? "-"}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground">{t("activities.finesDate")}</span>
+                    <span className="text-right font-medium">{new Date(f.created_at).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex justify-between gap-2 border-t pt-1 font-semibold">
+                    <span>{t("activities.finesAmount")}</span>
+                    <span className="text-right tabular-nums">{formatCurrency(parseFloat(f.amount))}</span>
+                  </div>
+                </div>
+              ))}
+              <div className="flex items-center justify-between border-t pt-2 text-sm font-semibold">
+                <span>{t("activities.total")}</span>
+                <span className="tabular-nums">{formatCurrency(selectedTotal)}</span>
+              </div>
+            </div>
             <Input
               placeholder={t("activities.notesOptional")}
               value={bulkNotes}

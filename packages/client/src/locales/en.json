@@ -43,6 +43,7 @@
     "method": {
       "cash": "Cash",
       "transfer": "Transfer",
+      "transferQR": "Transfer/QR",
       "card": "Card"
     },
     "system": "System",
@@ -210,6 +211,13 @@
     "latitude": "Latitude",
     "longitude": "Longitude",
     "googleMapsLink": "Google Maps link:",
+    "location": "Location",
+    "useMyLocation": "My location",
+    "locationDenied": "Location permission denied",
+    "selectOnMap": "Select on map",
+    "editLocation": "Edit location",
+    "confirmLocation": "Confirm location",
+    "locationDialogHint": "Click on the map or drag the marker",
     "sharePayment": "Share payment (water action)",
     "sharePaymentTitle": "Share payment (water action)",
     "amountBob": "Amount (BOB)",

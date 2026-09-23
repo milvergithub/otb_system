@@ -29,8 +29,7 @@ export const SHARE_STATUS_LABEL: Record<ShareStatus, string> = {
 
 export const PAYMENT_METHODS = [
   { value: "cash", label: "common.method.cash" },
-  { value: "transfer", label: "common.method.transfer" },
-  { value: "card", label: "common.method.card" },
+  { value: "transfer", label: "common.method.transferQR" },
 ] as const
 
 export const DEFAULT_CENTER: [number, number] = [-17.359527, -66.241607]
