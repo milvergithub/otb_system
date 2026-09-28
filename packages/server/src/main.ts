@@ -65,7 +65,7 @@ async function bootstrap() {
   );
 
   const port = configService.get<number>('PORT') || 3001;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
   logger.log(`Server running on http://localhost:${port}/api`, 'Bootstrap');
   logger.log(`Scalar docs: http://localhost:${port}/api/docs`, 'Bootstrap');
 }
