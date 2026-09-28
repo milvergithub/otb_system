@@ -1,39 +1,41 @@
 # AGENTS.md
 
-## Quick Start
-1. Copy `.env.example` values into `packages/server/.env` (the server actually loads `.env` from `packages/server/`, NOT the repo root) and adjust secrets
-2. Start database: `npm run db:up`
-3. Run both services: `npm run dev`
-   - Server: http://localhost:3001/api
-   - Client: http://localhost:5173
-   - Swagger docs: http://localhost:3001/api/docs
+## Quick Start (desarrollo local)
+1. Copy `packages/server/.env.example` values into `packages/server/.env` and adjust secrets
+2. Copy `packages/client/.env.example` values into `packages/client/.env`
+3. Run `npm run dev` (starts both server and client with watch)
+4. API: http://localhost:3001/api — Docs: http://localhost:3001/api/docs
+
+## Quick Start (Docker, local DB)
+1. Ensure PostgreSQL is running (port 5433 → 5432)
+2. `cd packages/server && npm run docker:up` (builds + runs migrations automatically)
+3. API: http://localhost:3001/api
 
 ## Repository Structure
 - Monorepo using npm workspaces
-- `packages/server` - NestJS 11 backend with TypeORM
-- `packages/client` - React 19 + Vite 6 frontend (PWA via `vite-plugin-pwa`)
-- `packages/landing` - Next.js 16 landing page (port 3002, static content)
+- `packages/server` — NestJS 11 backend with TypeORM
+- `packages/client` — React 19 + Vite 6 frontend (PWA via `vite-plugin-pwa`)
+- `packages/landing` — Next.js 16 landing page (port 3002, static content)
 - Root scripts orchestrate both packages; `npm run build` builds server then client (not landing)
 
 ## Critical Commands
-- `npm run db:up` / `npm run db:down` - Docker Postgres (port 5433 → 5432)
-- `npm run dev` - concurrently starts server (`npm:dev:server`) and client (`npm:dev:client`)
-- `npm run build` - builds both packages (server then client)
-- `npm run lint` - runs ESLint across all workspaces
+- `npm run dev` — concurrently starts server (`npm:dev:server`) and client (`npm:dev:client`)
+- `npm run build` — builds both packages (server then client)
+- `npm run lint` — runs ESLint across all workspaces
   - Server lint (`eslint ... --fix`) **rewrites files in place** with `--fix`; client lint does not
-  - Client lint fails on `react-hooks/set-state-in-effect` (calling setState synchronously in an effect body is an ERROR) and a few other rules; see Client Specifics
-- `npm run test` - runs Jest (server only; client has no test setup)
-  - **Currently exits with code 1 "No tests found"** because the server has no test files yet (0 matches in testMatch); this is expected, not a real failure
+  - Client lint fails on `react-hooks/set-state-in-effect` (ERROR) and a few other rules; see Client Specifics
+- `npm run test` — runs Jest (server only; client has no test setup)
+  - **Currently exits with code 1 "No tests found"** because the server has no test files yet; this is expected
 
 ## Server Specifics
 - Entry: `packages/server/src/main.ts`
 - Global prefix: `/api` (e.g., `/api/auth/login`)
-- CORS: allows `http://localhost:5173` by default (configurable via `CORS_ORIGIN`)
+- CORS: `CORS_ORIGIN=*` reflects any origin with credentials; comma-separated list = whitelist
 - Express body parsers are DISABLED by default; `main.ts` reads `BODY_LIMIT` (default `10mb`) and re-adds `express.json`/`express.urlencoded` with that limit. Base64 images are sent in JSON body, so keep `BODY_LIMIT` high
-- Swagger UI: `/api/docs` (requires Bearer token)
+- Swagger UI: `/api/docs` (Scalar API reference, requires Bearer token)
 - Auth: JWT with access (15m) and refresh (7d) tokens
 - Database: TypeORM with auto-sync in development (`NODE_ENV !== production`)
-- Migrations: `npm run migration:generate`, `migration:run`, `migration:revert` (via `typeorm-ts-node-commonjs -d src/database/data-source.ts`)
+- Migrations: `npm run migration:generate`, `migration:run`, `migration:revert` (via `typeorm-ts-node-commonjs -d src/database/data-source.ts`); `migration:run:prod` runs compiled migrations from `dist/`
 - Config modules: `src/config/*.config.ts` using `registerAs` pattern (`app`, `database`, `audit`, `openwa`, `logger`; EnvironmentVariables in `.env`)
 - Logging: uses nest-winston (winston), JSON format, Console + daily rotate `logs/backend-%DATE%.log` in server cwd; level from `LOG_LEVEL`
 - Global providers: `JwtAuthGuard`, `RolesGuard`, `AuditContextInterceptor`, `HttpLogInterceptor`
@@ -55,7 +57,7 @@
 - Alias: `@` → `./src`
 
 ## Environment Variables
-Required (see `.env.example` — but the running values live in `packages/server/.env`):
+Required (see `packages/server/.env.example` and `packages/client/.env.example` — the running values live in each package's `.env`):
 - Database: `DB_HOST`, `DB_PORT` (default 5433), `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`
 - Server: `PORT` (3001), `NODE_ENV`, `CORS_ORIGIN` (optional), `BODY_LIMIT` (default `10mb`)
 - JWT: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `JWT_ACCESS_EXPIRES_IN` (15m), `JWT_REFRESH_EXPIRES_IN` (7d)
@@ -63,7 +65,7 @@ Required (see `.env.example` — but the running values live in `packages/server
 - Logging: `LOG_LEVEL` (default info)
 - OpenWA (WhatsApp): `OPENWA_ENABLED`, `OPENWA_BASE_URL`, `OPENWA_SESSION_ID`, `OPENWA_API_KEY`, `OPENWA_CONSUMPTION_TEMPLATE_ID`, `OPENWA_WELCOME_TEMPLATE_ID`, `OPENWA_METER_REGISTERED_TEMPLATE_ID`, `OPENWA_TIMEOUT_MS`
 - Image storage (S3-compatible, used by `StorageService`): `RUSTFS_ENDPOINT`, `RUSTFS_REGION`, `RUSTFS_ACCESS_KEY`, `RUSTFS_SECRET_KEY`, `RUSTFS_BUCKET`, `RUSTFS_PUBLIC_URL` — **not present in `.env.example`**; copy from `packages/server/.env`
-- Client: `VITE_API_URL`
+- Client: `VITE_API_URL` (in `packages/client/.env.example`)
 
 ## Testing
 - Server: `npm run test` (unit), `npm run test:e2e` (e2e with `jest-e2e.json`)
@@ -77,8 +79,8 @@ Required (see `.env.example` — but the running values live in `packages/server
 - Prettier: `"prettier/prettier": "warn"` rule enabled
 
 ## TypeScript Configuration
-- Server: `tsconfig.json` - CommonJS, decorators enabled, outDir `./dist`
-- Client: `tsconfig.json` - ESNext, `moduleResolution: bundler`, `noEmit: true`, `jsx: react-jsx`, `strict: true`
+- Server: `tsconfig.json` — CommonJS, decorators enabled, outDir `./dist`
+- Client: `tsconfig.json` — ESNext, `moduleResolution: bundler`, `noEmit: true`, `jsx: react-jsx`, `strict: true`
 - Client also has `tsconfig.app.json` (includes `vite.config.ts`) and `tsconfig.node.json`
 
 ## Database
@@ -97,8 +99,8 @@ Required (see `.env.example` — but the running values live in `packages/server
 
 ## Important Gotchas
 - Server global prefix `/api` means all routes include it (Swagger setup at `api/docs`)
-- CORS defaults to client origin; change `CORS_ORIGIN` for production
-- The server loads `.env` from `packages/server/.env`, NOT the repo root; the root `.env.example` is just a template copy
+- CORS: `*` reflects any origin; comma-separated list = whitelist; `credentials: true` always
+- The server loads `.env` from `packages/server/.env`, NOT the repo root
 - `synchronize: true` in dev auto-creates/alters tables from entities on boot, so `migration:run` is not needed for schema in dev. The dev DB also has a **pre-existing broken migration backlog**: scripts `1755000000007`–`1755000000010` were already applied manually but aren't recorded in the `migrations` table, so running `migration:run` fails (duplicate key on `permissions`). New migrations are fine on a fresh DB
 - Image uploads: client sends `imageBase64` (data URL) → server `StorageService.uploadOptimizedImage()` resizes to 1024px JPEG q80 and stores only the object KEY in the DB (`consumptions.image_key`, `payment_history.evidence_key`), not the URL. Keys look like `consumptions/{uuid}.jpg` or `water-actions/evidence/{uuid}.jpg`; full URL = `RUSTFS_PUBLIC_URL/bucket/key`
 - `BODY_LIMIT` must stay high (default 10mb) or base64 image payloads get rejected (413)
@@ -118,16 +120,15 @@ Required (see `.env.example` — but the running values live in `packages/server
 
 ## Development Workflow
 1. Ensure Docker is running for database
-2. Copy `.env.example` values into `packages/server/.env` and review secrets
-3. Run `npm run db:up` and wait for healthcheck
+2. Copy `packages/server/.env.example` values into `packages/server/.env` and review secrets
+3. Start database: `cd packages/server && docker compose up -d` (or run your own Postgres)
 4. Run `npm run dev` (starts both server and client with watch)
 5. Access client at http://localhost:5173; API at http://localhost:3001/api
 6. Use Swagger UI for API testing (login first to get Bearer token)
 
 ## Production Notes
-- Set `NODE_ENV=production` to disable TypeORM auto-sync
-- Run `npm run build` in both packages before deploying
-- Server start: `npm run start:prod` (uses `dist/main`)
-- Ensure all env vars are set, especially JWT secrets and DB credentials
-- Consider setting `AUDIT_LOG_RETENTION_DAYS` to a positive number
-- Configure `CORS_ORIGIN` to actual client URL
+- Local production: `cd packages/server && docker compose up -d --build` (uses `.env`)
+- Server migrations run automatically on container start (via `run-migrations.ts`)
+- Set `CORS_ORIGIN` to actual client URL (e.g. `http://<IP>:8081`) or `*` for any origin
+- To run migrations manually: `npm run migration:run:prod` (loads `.env` by default; use `ENV_FILE=.env.prod` for prod)
+- Docker DB_HOST override: compose overrides `.env` with `host.docker.internal` (Docker Desktop) so the container connects to your host's PostgreSQL instead of itself. `DOCKER_DB_HOST` env var can override this

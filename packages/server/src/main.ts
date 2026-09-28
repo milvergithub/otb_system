@@ -23,8 +23,12 @@ async function bootstrap() {
   );
   app.use(express.json({ limit: config.bodyLimit }));
   app.use(express.urlencoded({ extended: true, limit: config.bodyLimit }));
+  // CORS: * reflects any origin with credentials; comma-separated list = whitelist
+  const raw = config.corsOrigin;
+  const corsOrigin =
+    !raw || raw === '*' ? true : raw.split(',').map((o) => o.trim());
   app.enableCors({
-    origin: config.corsOrigin,
+    origin: corsOrigin,
     credentials: true,
   });
 

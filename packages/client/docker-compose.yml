@@ -1,0 +1,13 @@
+# docker-compose.yml — Client (nginx) for local production preview
+# Run from packages/client/: docker compose up -d
+# Override build arg: VITE_API_URL=http://34.224.88.243:3001/api docker compose up -d
+services:
+  web:
+    build:
+      context: ../../
+      dockerfile: packages/client/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3001/api}
+    ports:
+      - "${PORT:-8080}:80"
+    restart: unless-stopped

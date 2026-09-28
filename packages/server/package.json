@@ -14,7 +14,12 @@
     "typeorm": "typeorm-ts-node-commonjs -d src/database/data-source.ts",
     "migration:generate": "npm run typeorm -- migration:generate",
     "migration:run": "npm run typeorm -- migration:run",
-    "migration:revert": "npm run typeorm -- migration:revert"
+    "migration:revert": "npm run typeorm -- migration:revert",
+    "migration:run:prod": "node dist/database/run-migrations.js",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:logs:prod": "docker compose -f docker-compose.yml -f docker-compose.prod.yml -p server-prod logs -f"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1122.0",

@@ -1,0 +1,21 @@
+# docker-compose.yml — Server (API) only
+# Run from packages/server/: docker compose up -d
+services:
+  api:
+    build:
+      context: ../../
+      dockerfile: packages/server/Dockerfile
+    env_file: .env
+    environment:
+      # Override DB_HOST: inside Docker, "localhost" is the container itself.
+      # host.docker.internal resolves to your host machine (Docker Desktop).
+      - DB_HOST=${DOCKER_DB_HOST:-host.docker.internal}
+    ports:
+      - "${PORT:-3001}:3001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/docs"]
+      interval: 30s
+      timeout: 3s
+      start_period: 20s
+      retries: 3

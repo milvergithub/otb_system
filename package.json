@@ -13,9 +13,6 @@
     "dev:landing": "npm run dev --workspace=@otb/landing",
     "build": "npm run build --workspace=@otb/server && npm run build --workspace=@otb/client",
     "build:landing": "npm run build --workspace=@otb/landing",
-    "db:up": "docker compose up -d db",
-    "db:down": "docker compose down",
-    "db:logs": "docker compose logs -f db",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
   },

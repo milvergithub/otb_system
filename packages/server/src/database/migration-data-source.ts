@@ -66,5 +66,5 @@ export const AppDataSource = new DataSource({
     Fine,
   ],
   migrations: migrationsPath,
-  synchronize: process.env.NODE_ENV !== 'production',
+  synchronize: false,
 });
