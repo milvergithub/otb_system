@@ -11,7 +11,6 @@ if (fs.existsSync(envFile)) {
 } else {
   console.log('No .env file — using process environment (normal in Docker)');
 }
-
 // All migrations in order — used for baseline marking on fresh databases.
 const MIGRATIONS = [
   { timestamp: 1755000000000, name: 'CreateAuditLogsTable1755000000000' },
