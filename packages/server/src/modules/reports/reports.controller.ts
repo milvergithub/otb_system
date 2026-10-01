@@ -8,11 +8,11 @@ export class ReportsController {
 
   @Get('dashboard')
   @Roles('reports.dashboard')
-  dashboard(@Query('month') month?: string, @Query('year') year?: string) {
-    return this.reportsService.getDashboard(
-      month ? parseInt(month, 10) : undefined,
-      year ? parseInt(year, 10) : undefined,
-    );
+  dashboard(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.reportsService.getDashboard(startDate, endDate);
   }
 
   @Get('revenue')

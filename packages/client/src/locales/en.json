@@ -113,7 +113,7 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "overview": "Overview for {{month}} {{year}}",
+    "overview": "Overview for {{startDate}} - {{endDate}}",
     "members": "Members",
     "meters": "Meters",
     "collected": "Collected",
@@ -211,7 +211,6 @@
     "latitude": "Latitude",
     "longitude": "Longitude",
     "googleMapsLink": "Google Maps link:",
-    "location": "Location",
     "useMyLocation": "My location",
     "locationDenied": "Location permission denied",
     "selectOnMap": "Select on map",

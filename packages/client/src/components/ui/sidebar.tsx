@@ -29,7 +29,7 @@ import { useSidebarStore } from "@/stores/sidebar"
 
 const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
-const SIDEBAR_WIDTH_ICON = "3rem"
+const SIDEBAR_WIDTH_ICON = "4rem"
 
 function useSidebar() {
   const isMobile = useIsMobile()

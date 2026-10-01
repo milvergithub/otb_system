@@ -8,8 +8,10 @@ import {
   Post,
   Req,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthUser } from './interfaces/auth-user.interface';
@@ -24,6 +26,8 @@ export class AuthController {
   ) {}
 
   @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 10000, limit: 5 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto) {
@@ -55,6 +59,8 @@ export class AuthController {
   }
 
   @Public()
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { ttl: 10000, limit: 5 } })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(@Body() dto: RefreshTokenDto, @Req() req: any) {

@@ -4,10 +4,13 @@ import { ApiPath } from "@/lib/apiPath"
 import { queryKeys } from "@/lib/utils/query"
 import type { Dashboard, MonthlyRevenue, Payment } from "@/lib/types"
 
-export function useDashboard() {
+export function useDashboard(startDate?: string, endDate?: string) {
   return useQuery<Dashboard>({
     queryKey: queryKeys.dashboard,
-    queryFn: () => api.get(ApiPath.Reports.DASHBOARD).then((r) => r.data),
+    queryFn: () =>
+      api
+        .get(ApiPath.Reports.DASHBOARD, { params: { startDate, endDate } })
+        .then((r) => r.data),
   })
 }
 

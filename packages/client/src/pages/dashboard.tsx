@@ -1,4 +1,6 @@
 import { useTranslation } from "react-i18next"
+import { useState } from "react"
+import { DatePicker } from "@/components/ui/date-picker"
 import {
   Area,
   AreaChart,
@@ -59,12 +61,12 @@ export default function DashboardPage() {
   const { t } = useTranslation()
   const { hasPermission } = useAuth()
   const months = monthNames()
-  const { data: dashboard, isLoading } = useDashboard()
+  const now = new Date()
+  const [dateFrom, setDateFrom] = useState(`${now.getFullYear()}-01-01`)
+  const [dateTo, setDateTo] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`)
+  const { data: dashboard, isLoading } = useDashboard(dateFrom, dateTo)
 
-  const { data: revenue, isLoading: revenueLoading } = useRevenue(
-    `${new Date().getFullYear()}-01-01`,
-    `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`,
-  )
+  const { data: revenue, isLoading: revenueLoading } = useRevenue(dateFrom, dateTo)
 
   if (!hasPermission("reports.dashboard")) {
     return (
@@ -99,10 +101,26 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold">{t("dashboard.title")}</h1>
         <p className="text-sm text-muted-foreground">
           {t("dashboard.overview", {
-            month: months[dashboard!.month - 1],
-            year: dashboard!.year,
+            startDate: dashboard!.startDate,
+            endDate: dashboard!.endDate,
           })}
         </p>
+        <div className="flex items-center gap-4 mt-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">{t("reports.dateFrom")}</span>
+            <DatePicker
+              value={dateFrom}
+              onChange={(v) => setDateFrom(v ?? `${now.getFullYear()}-01-01`)}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">{t("reports.dateTo")}</span>
+            <DatePicker
+              value={dateTo}
+              onChange={(v) => setDateTo(v ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`)}
+            />
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

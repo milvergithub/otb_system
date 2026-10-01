@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Between } from 'typeorm';
 import { Payment, PaymentStatus } from '../billing/entities/payment.entity';
 import { Consumption } from '../consumption/entities/consumption.entity';
 import { Member } from '../members/entities/member.entity';
@@ -22,19 +22,47 @@ export class ReportsService {
     private readonly sharePaymentsRepository: Repository<SharePayment>,
   ) {}
 
-  async getDashboard(month?: number, year?: number) {
+  async getDashboard(startDate?: string, endDate?: string) {
     const now = new Date();
-    const targetMonth = month || now.getMonth() + 1;
-    const targetYear = year || now.getFullYear();
+    const defaultStart = `${now.getFullYear()}-01-01`;
+    const defaultEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const start = startDate || defaultStart;
+    const end = endDate || defaultEnd;
 
-    const totalMembers = await this.membersRepository.count();
-    const totalMeters = await this.metersRepository.count();
+    const startYear = parseInt(start.substring(0, 4), 10);
+    const startMonth = parseInt(start.substring(5, 7), 10);
+    const endYear = parseInt(end.substring(0, 4), 10);
+    const endMonth = parseInt(end.substring(5, 7), 10);
+
+    const monthStart = `${startYear}-${String(startMonth).padStart(2, '0')}-01`;
+    const lastDayStart = new Date(startYear, startMonth, 0).getDate();
+    const monthEnd = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(
+      new Date(endYear, endMonth, 0).getDate(),
+    ).padStart(2, '0')}`;
+
+    const totalMembers = await this.membersRepository.count({
+      where: {
+        created_at: Between(new Date(monthStart), new Date(monthEnd)),
+      },
+    });
+
+    const totalMeters = await this.metersRepository.count({
+      where: {
+        created_at: Between(new Date(monthStart), new Date(monthEnd)),
+      },
+    });
 
     const monthlyPayments = await this.paymentsRepository
       .createQueryBuilder('payment')
       .leftJoinAndSelect('payment.consumption', 'consumption')
-      .where('consumption.month = :month', { month: targetMonth })
-      .andWhere('consumption.year = :year', { year: targetYear })
+      .where(
+        '(consumption.year > :startYear OR (consumption.year = :startYear AND consumption.month >= :startMonth))',
+        { startYear, startMonth },
+      )
+      .andWhere(
+        '(consumption.year < :endYear OR (consumption.year = :endYear AND consumption.month <= :endMonth))',
+        { endYear, endMonth },
+      )
       .getMany();
 
     const totalCollected = monthlyPayments.reduce(
@@ -46,28 +74,36 @@ export class ReportsService {
       0,
     );
     const overdueCount = await this.paymentsRepository.count({
-      where: { status: PaymentStatus.OVERDUE },
+      where: {
+        status: PaymentStatus.OVERDUE,
+        due_date: Between(start, end),
+      },
     });
     const pendingCount = await this.paymentsRepository.count({
-      where: { status: PaymentStatus.PENDING },
+      where: {
+        status: PaymentStatus.PENDING,
+        due_date: Between(start, end),
+      },
     });
 
     const totalConsumption = await this.consumptionsRepository
       .createQueryBuilder('c')
-      .where('c.year = :year', { year: targetYear })
-      .andWhere('c.month = :month', { month: targetMonth })
+      .where(
+        '(c.year > :startYear OR (c.year = :startYear AND c.month >= :startMonth))',
+        { startYear, startMonth },
+      )
+      .andWhere(
+        '(c.year < :endYear OR (c.year = :endYear AND c.month <= :endMonth))',
+        { endYear, endMonth },
+      )
       .select('SUM(CAST(c.cubic_meters AS FLOAT))', 'total')
       .getRawOne<{ total: string }>();
-
-    const monthStart = `${targetYear}-${String(targetMonth).padStart(2, '0')}-01`;
-    const lastDay = new Date(targetYear, targetMonth, 0).getDate();
-    const monthEnd = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
     const shareCollected = await this.sharePaymentsRepository
       .createQueryBuilder('sp')
       .select('SUM(CAST(sp.amount AS FLOAT))', 'total')
-      .where('sp.paid_at >= :monthStart', { monthStart })
-      .andWhere('sp.paid_at <= :monthEnd', { monthEnd })
+      .where('sp.paid_at >= :start', { start })
+      .andWhere('sp.paid_at <= :end', { end })
       .getRawOne<{ total: string | null }>();
 
     const shareTotal = shareCollected?.total ? Number(shareCollected.total) : 0;
@@ -89,8 +125,8 @@ export class ReportsService {
       totalConsumption: totalConsumption?.total
         ? Number(totalConsumption.total)
         : 0,
-      month: targetMonth,
-      year: targetYear,
+      startDate: start,
+      endDate: end,
     };
   }
 

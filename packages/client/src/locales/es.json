@@ -113,7 +113,7 @@
   },
   "dashboard": {
     "title": "Panel",
-    "overview": "Resumen de {{month}} {{year}}",
+    "overview": "Resumen desde {{startDate}} hasta {{endDate}}",
     "members": "Socios",
     "meters": "Medidores",
     "collected": "Recaudado",
@@ -211,7 +211,6 @@
     "latitude": "Latitud",
     "longitude": "Longitud",
     "googleMapsLink": "Enlace de Google Maps:",
-    "location": "Ubicación",
     "useMyLocation": "Mi ubicación",
     "locationDenied": "Permiso de ubicación denegado",
     "selectOnMap": "Seleccionar en mapa",

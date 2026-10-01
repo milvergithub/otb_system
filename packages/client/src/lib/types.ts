@@ -225,8 +225,8 @@ export interface Dashboard {
   overdueCount: number
   pendingCount: number
   totalConsumption: number
-  month: number
-  year: number
+  startDate: string
+  endDate: string
 }
 
 export interface MonthlyRevenue {
