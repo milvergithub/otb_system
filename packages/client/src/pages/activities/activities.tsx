@@ -168,7 +168,7 @@ export default function ActivitiesPage() {
       name: a.name,
       description: a.description ?? "",
       date: a.date,
-      startTime: a.start_time,
+      startTime: a?.start_time,
       endTime: a.end_time,
     })
     setDialogOpen(true)
