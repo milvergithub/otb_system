@@ -1,12 +1,15 @@
 import { useState, type FormEvent } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
+import { Ban, Eye, Pencil } from "lucide-react"
+import { formatCurrency } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
-import { DataTable } from "@/components/ui/data-table"
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table"
+import { RowActions } from "@/components/ui/row-actions"
 import { DataTablePagination } from "@/components/ui/data-table-pagination"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -60,30 +63,51 @@ export default function FinancesPage() {
     setPage(1)
   }
 
-  const columns = [
+  const columns: DataTableColumn<FinanceTransaction>[] = [
     { key: "date", label: t("finances.date"), sortable: true, render: (row: FinanceTransaction) => <span>{row.date.slice(0, 10)}</span> },
     { key: "type", label: t("finances.typeLabel"), sortable: true, render: (row: FinanceTransaction) => <Badge variant={row.type === "income" ? "default" : "destructive"}>{t(TRANSACTION_TYPE_LABEL[row.type])}</Badge> },
     { key: "concept", label: t("finances.concept"), sortable: true, render: (row: FinanceTransaction) => <span>{row.concept}</span> },
-    { key: "amount", label: t("finances.amount"), sortable: true, render: (row: FinanceTransaction) => <span>{row.amount}</span> },
+    { key: "amount", label: t("finances.amount"), sortable: true, align: "right", render: (row: FinanceTransaction) => <span className="font-medium">{formatCurrency(row.amount)}</span> },
     { key: "payment_method", label: t("finances.paymentMethod"), sortable: false, render: (row: FinanceTransaction) => <span>{row.payment_method ? t(METHOD_LABEL[row.payment_method]) : t("common.none")}</span> },
     { key: "category", label: t("finances.category"), sortable: false, render: (row: FinanceTransaction) => <span>{row.category?.name ?? (row.category_id ? t("finances.uncategorized") : t("common.none"))}</span> },
     { key: "source_type", label: t("finances.sourceType"), render: (row: FinanceTransaction) => <span>{row.source_type ? t(SOURCE_LABEL[row.source_type]) : t("common.none")}</span> },
     { key: "status", label: t("finances.statusLabel"), render: (row: FinanceTransaction) => <Badge variant={row.status === "active" ? "default" : "secondary"}>{t(row.status === "active" ? "finances.status.active" : "finances.status.voided")}</Badge> },
-    { key: "actions", label: t("finances.actions"), render: (row: FinanceTransaction) => (
-      <div className="flex gap-2">
-        <Button variant="ghost" size="sm" onClick={() => setDetailTransaction(row)}>{t("common.details")}</Button>
-        {row.status === "active" ? (
-          <>
-            <Can permission="finances.update">
-              <Button variant="ghost" size="sm" onClick={() => { setEditing(row); setDialogOpen(true) }}>{t("common.edit")}</Button>
-            </Can>
-            <Can permission="finances.void">
-              <Button variant="ghost" size="sm" onClick={() => setVoidTransaction(row)}>{t("finances.void")}</Button>
-            </Can>
-          </>
-        ) : null}
-      </div>
-    )},
+    {
+      key: "actions",
+      label: "",
+      className: "w-10",
+      stickyRight: true,
+      render: (row: FinanceTransaction) => (
+          <div onClick={(e) => e.stopPropagation()}>
+            <RowActions
+                items={[
+                  {
+                    label: t("common.view"),
+                    icon: <Eye className="size-4" />,
+                    permission: "finances.read",
+                    onClick: () => setDetailTransaction(row),
+                  },
+                  ...(row.status === "active"
+                      ? [
+                        {
+                          label: t("common.edit"),
+                          icon: <Pencil className="size-4" />,
+                          permission: "finances.update",
+                          onClick: () => { setEditing(row); setDialogOpen(true) },
+                        },
+                        {
+                          label: t("finances.void"),
+                          icon: <Ban className="size-4" />,
+                          permission: "finances.void",
+                          onClick: () => setVoidTransaction(row),
+                        },
+                      ]
+                      : []),
+                ]}
+            />
+          </div>
+      ),
+    },
   ]
 
   return (

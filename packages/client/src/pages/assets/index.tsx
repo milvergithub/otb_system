@@ -238,29 +238,31 @@ export default function AssetsPage() {
                 className: "w-10",
                 stickyRight: true,
                 render: (asset: Asset) => (
-                  <RowActions
-                    items={[
-                      {
-                        label: t("common.view"),
-                        icon: <Eye className="size-4" />,
-                        permission: "assets.read",
-                        onClick: () => setSelected(asset),
-                      },
-                      {
-                        label: t("common.edit"),
-                        icon: <Pencil className="size-4" />,
-                        permission: "assets.update",
-                        onClick: () => openEdit(asset),
-                      },
-                      {
-                        label: t("common.delete"),
-                        icon: <Trash2 className="size-4" />,
-                        permission: "assets.delete",
-                        destructive: true,
-                        onClick: () => setDeleting(asset),
-                      },
-                    ]}
-                  />
+                    <div onClick={(e) => e.stopPropagation()}>
+                        <RowActions
+                            items={[
+                                {
+                                    label: t("common.view"),
+                                    icon: <Eye className="size-4" />,
+                                    permission: "assets.read",
+                                    onClick: () => setSelected(asset),
+                                },
+                                {
+                                    label: t("common.edit"),
+                                    icon: <Pencil className="size-4" />,
+                                    permission: "assets.update",
+                                    onClick: () => openEdit(asset),
+                                },
+                                {
+                                    label: t("common.delete"),
+                                    icon: <Trash2 className="size-4" />,
+                                    permission: "assets.delete",
+                                    destructive: true,
+                                    onClick: () => setDeleting(asset),
+                                },
+                            ]}
+                        />
+                    </div>
                 ),
               } as const,
             ]}
