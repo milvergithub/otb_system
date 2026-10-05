@@ -17,6 +17,8 @@ const RolesPage = lazy(() => import("@/pages/roles"))
 const UsersPage = lazy(() => import("@/pages/users"))
 const ZonesPage = lazy(() => import("@/pages/zones"))
 const AuditLogsPage = lazy(() => import("@/pages/audit"))
+const AssetsPage = lazy(() => import("@/pages/assets"))
+const FinancesPage = lazy(() => import("@/pages/finances"))
 const ActivitiesPage = lazy(() => import("@/pages/activities/activities"))
 const ActivitySharePage = lazy(() => import("@/pages/activities/share"))
 const AttendancePage = lazy(() => import("@/pages/activities/attendance"))
@@ -51,8 +53,10 @@ export default function App() {
         <Route path="members" element={<MembersPage />} />
         <Route path="meters" element={<MetersPage />} />
         <Route path="zones" element={<ZonesPage />} />
+        <Route path="bienes" element={<AssetsPage />} />
         <Route path="consumption" element={<ConsumptionPage />} />
         <Route path="billing" element={<BillingPage />} />
+        <Route path="finanzas" element={<FinancesPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="settings" element={<SettingsPage />} />

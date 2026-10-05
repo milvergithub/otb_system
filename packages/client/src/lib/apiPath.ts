@@ -88,6 +88,59 @@ export const ApiPath = {
     BASE: "/meter-types",
     ONE: (id: string) => `/meter-types/${id}` as const,
   },
+  Assets: {
+    BASE: "/assets",
+    BULK: "/assets/bulk",
+    SELECT: "/assets/select",
+    STATUS_SUMMARY: "/assets/status-summary",
+    ONE: (id: string) => `/assets/${id}` as const,
+    QR: (id: string) => `/assets/${id}/qr` as const,
+    MOVEMENTS: (id: string) => `/assets/${id}/movements` as const,
+    MAINTENANCES: (id: string) => `/assets/${id}/maintenances` as const,
+    DOCUMENTS: (id: string) => `/assets/${id}/documents` as const,
+    PUBLIC: (code: string) => `/assets/public/${code}` as const,
+    LOAN: (id: string) => `/assets/${id}/loan` as const,
+    RETURN: (id: string) => `/assets/${id}/return` as const,
+    TRANSFER: (id: string) => `/assets/${id}/transfer` as const,
+    LOST: (id: string) => `/assets/${id}/lost` as const,
+    RETIRE: (id: string) => `/assets/${id}/retire` as const,
+    RESTORE: (id: string) => `/assets/${id}/restore` as const,
+    START_MAINTENANCE: (id: string) => `/assets/${id}/maintenance` as const,
+    FINISH_MAINTENANCE: (id: string, maintenanceId: string) =>
+      `/assets/${id}/maintenance/${maintenanceId}/finish` as const,
+    DOCUMENT: (id: string, documentId: string) =>
+      `/assets/${id}/documents/${documentId}` as const,
+    DOCUMENT_CONTENT: (id: string, documentId: string) =>
+      `/assets/${id}/documents/${documentId}/content` as const,
+  },
+  AssetCategories: {
+    BASE: "/asset-categories",
+    ONE: (id: string) => `/asset-categories/${id}` as const,
+  },
+  AssetLocations: {
+    BASE: "/asset-locations",
+    ONE: (id: string) => `/asset-locations/${id}` as const,
+  },
+  Finances: {
+    BASE: "/finances",
+    ONE: (id: string) => `/finances/${id}` as const,
+    VOID: (id: string) => `/finances/${id}/void` as const,
+    REPORTS_SUMMARY: "/finances/reports/summary",
+    REPORTS_BY_CATEGORY: "/finances/reports/by-category",
+    REPORTS_BY_METHOD: "/finances/reports/by-method",
+    REPORTS_MONTHLY: "/finances/reports/monthly",
+    REPORTS_WATER: "/finances/reports/water",
+    REPORTS_EXPORT: "/finances/reports/export",
+    DOCUMENTS: (id: string) => `/finances/${id}/documents` as const,
+    DOCUMENT: (id: string, documentId: string) =>
+      `/finances/${id}/documents/${documentId}` as const,
+    DOCUMENT_CONTENT: (id: string, documentId: string) =>
+      `/finances/${id}/documents/${documentId}/content` as const,
+  },
+  FinanceCategories: {
+    BASE: "/finance-categories",
+    ONE: (id: string) => `/finance-categories/${id}` as const,
+  },
   Audit: {
     BASE: "/audit",
     EXPORT: "/audit/export",

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { Save, Settings as SettingsIcon, Gauge, Map, HandCoins, Percent, TrendingUp, MessageSquare } from "lucide-react"
+import { Save, Settings as SettingsIcon, Gauge, Map, HandCoins, Percent, TrendingUp, MessageSquare, Boxes, Wallet } from "lucide-react"
 import { getApiErrorMessage } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useSettings, useUpdateSettings } from "@/hooks/settings"
@@ -12,6 +12,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import MeterTypesPanel from "./meters/MeterTypesPanel"
 import ZoneTypesPanel from "./zones/ZoneTypesPanel"
+import AssetCategoriesPanel from "./assets/AssetCategoriesPanel"
+import AssetLocationsPanel from "./assets/AssetLocationsPanel"
+import FinanceCategoriesPanel from "./finances/FinanceCategoriesPanel"
 import SharesPage from "./shares"
 import DiscountsPage from "./discounts"
 import TariffsPage from "./tariffs"
@@ -91,51 +94,70 @@ export default function SettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <Can permission="settings.read">
-            <TabsTrigger value="general" className="gap-2">
-              <SettingsIcon className="size-4" />
-              {t("settings.general")}
-            </TabsTrigger>
-          </Can>
-          <Can permission="settings.read">
-            <TabsTrigger value="whatsapp" className="gap-2">
-              <MessageSquare className="size-4" />
-              {t("settings.whatsapp.tab")}
-            </TabsTrigger>
-          </Can>
-          <Can permission="meter_types.read">
-            <TabsTrigger value="meterTypes" className="gap-2">
-              <Gauge className="size-4" />
-              {t("settings.meterTypes")}
-            </TabsTrigger>
-          </Can>
-          <Can permission="zone_types.read">
-            <TabsTrigger value="zoneTypes" className="gap-2">
-              <Map className="size-4" />
-              {t("settings.zoneTypes")}
-            </TabsTrigger>
-          </Can>
-          <Can permission="shares.read">
-            <TabsTrigger value="shares" className="gap-2">
-              <HandCoins className="size-4" />
-              {t("settings.shares")}
-            </TabsTrigger>
-          </Can>
-          <Can permission="discounts.read">
-            <TabsTrigger value="discounts" className="gap-2">
-              <Percent className="size-4" />
-              {t("settings.discounts")}
-            </TabsTrigger>
-          </Can>
-          <Can permission="tariffs.read">
-            <TabsTrigger value="tariffs" className="gap-2">
-              <TrendingUp className="size-4" />
-              {t("settings.tariffs")}
-            </TabsTrigger>
-          </Can>
-        </TabsList>
-
+        <div className="w-full overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
+          <TabsList>
+            <Can permission="settings.read">
+              <TabsTrigger value="general" className="gap-2">
+                <SettingsIcon className="size-4" />
+                {t("settings.general")}
+              </TabsTrigger>
+            </Can>
+            <Can permission="settings.read">
+              <TabsTrigger value="whatsapp" className="gap-2">
+                <MessageSquare className="size-4" />
+                {t("settings.whatsapp.tab")}
+              </TabsTrigger>
+            </Can>
+            <Can permission="meter_types.read">
+              <TabsTrigger value="meterTypes" className="gap-2">
+                <Gauge className="size-4" />
+                {t("settings.meterTypes")}
+              </TabsTrigger>
+            </Can>
+            <Can permission="zone_types.read">
+              <TabsTrigger value="zoneTypes" className="gap-2">
+                <Map className="size-4" />
+                {t("settings.zoneTypes")}
+              </TabsTrigger>
+            </Can>
+            <Can permission="shares.read">
+              <TabsTrigger value="shares" className="gap-2">
+                <HandCoins className="size-4" />
+                {t("settings.shares")}
+              </TabsTrigger>
+            </Can>
+            <Can permission="discounts.read">
+              <TabsTrigger value="discounts" className="gap-2">
+                <Percent className="size-4" />
+                {t("settings.discounts")}
+              </TabsTrigger>
+            </Can>
+            <Can permission="tariffs.read">
+              <TabsTrigger value="tariffs" className="gap-2">
+                <TrendingUp className="size-4" />
+                {t("settings.tariffs")}
+              </TabsTrigger>
+            </Can>
+            <Can permission="assets.read">
+              <TabsTrigger value="assetCategories" className="gap-2">
+                <Boxes className="size-4" />
+                {t("settings.assetCategories")}
+              </TabsTrigger>
+            </Can>
+            <Can permission="assets.read">
+              <TabsTrigger value="assetLocations" className="gap-2">
+                <Boxes className="size-4" />
+                {t("settings.assetLocations")}
+              </TabsTrigger>
+            </Can>
+            <Can permission="finances.read">
+              <TabsTrigger value="financeCategories" className="gap-2">
+                <Wallet className="size-4" />
+                {t("settings.financeCategories")}
+              </TabsTrigger>
+            </Can>
+          </TabsList>
+        </div>
         <Can permission="settings.read">
           <TabsContent value="general">
             <div className="mt-4 space-y-4">
@@ -221,6 +243,30 @@ export default function SettingsPage() {
           <TabsContent value="tariffs">
             <div className="mt-4">
               <TariffsPage />
+            </div>
+          </TabsContent>
+        </Can>
+
+        <Can permission="assets.read">
+          <TabsContent value="assetCategories">
+            <div className="mt-4">
+              <AssetCategoriesPanel />
+            </div>
+          </TabsContent>
+        </Can>
+
+        <Can permission="assets.read">
+          <TabsContent value="assetLocations">
+            <div className="mt-4">
+              <AssetLocationsPanel />
+            </div>
+          </TabsContent>
+        </Can>
+
+        <Can permission="finances.read">
+          <TabsContent value="financeCategories">
+            <div className="mt-4">
+              <FinanceCategoriesPanel />
             </div>
           </TabsContent>
         </Can>

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Consumption } from '../consumption/entities/consumption.entity';
 import { ConsumptionModule } from '../consumption/consumption.module';
+import { FinancesModule } from '../finances/finances.module';
 import { SettingsModule } from '../settings/settings.module';
 import { TariffsModule } from '../tariffs/tariffs.module';
 import { BillingController } from './billing.controller';
@@ -26,6 +27,7 @@ import { ReceiptService } from './receipt.service';
     TariffsModule,
     SettingsModule,
     ConsumptionModule,
+    FinancesModule,
   ],
   controllers: [DiscountController, BillingController],
   providers: [BillingService, ReceiptService, DiscountService],

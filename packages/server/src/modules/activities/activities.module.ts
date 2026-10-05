@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Member } from '../members/entities/member.entity';
+import { FinancesModule } from '../finances/finances.module';
 import { Activity } from './entities/activity.entity';
 import { ActivityShare } from './entities/activity-share.entity';
 import { FineType } from './entities/fine-type.entity';
@@ -26,6 +27,7 @@ import { FinesController } from './fines.controller';
       Fine,
       Member,
     ]),
+    FinancesModule,
   ],
   controllers: [
     ActivitiesController,

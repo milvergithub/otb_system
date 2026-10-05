@@ -1,10 +1,11 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   PaginatedResult,
@@ -23,6 +24,8 @@ import { PaymentHistory } from './entities/payment-history.entity';
 import { PaymentDiscount } from './entities/payment-discount.entity';
 import { Payment, PaymentStatus } from './entities/payment.entity';
 import { PayBillDto } from './dto/billing.dto';
+import { FinancesService } from '../finances/finances.service';
+import { FinanceSourceType } from '../finances/entities/finance-transaction.entity';
 
 const SORT_COLUMNS: Record<string, string | string[]> = {
   total_amount: 'payment.total_amount',
@@ -52,6 +55,8 @@ export class BillingService {
     private readonly discountService: DiscountService,
     private readonly eventEmitter: EventEmitter2,
     private readonly storageService: StorageService,
+    private readonly financesService: FinancesService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -300,45 +305,21 @@ export class BillingService {
 
     let total = parseFloat(payment.total_amount);
     const alreadyPaid = parseFloat(payment.amount_paid);
+    const requestedDiscountIds: string[] = [];
+    let totalDiscount = 0;
 
     if (dto.discountIds) {
       const originalAmount = total + parseFloat(payment.discount_amount);
 
-      await this.paymentDiscountsRepository.delete({ payment_id: payment.id });
-
-      if (dto.discountIds.length > 0) {
-        const discountEntries = await this.applyMultipleDiscounts(
-          payment.id,
+      requestedDiscountIds.push(...dto.discountIds);
+      for (const discountId of requestedDiscountIds) {
+        const discount = await this.discountService.findOne(discountId);
+        totalDiscount += this.discountService.calculateDiscountAmount(
           originalAmount,
-          dto.discountIds,
+          discount,
         );
-        const totalDiscount = discountEntries.reduce(
-          (sum, d) => sum + parseFloat(d.amount),
-          0,
-        );
-        total = Math.max(0, originalAmount - totalDiscount);
-
-        await this.paymentsRepository
-          .createQueryBuilder()
-          .update(Payment)
-          .set({
-            total_amount: total.toFixed(2),
-            discount_amount: totalDiscount.toFixed(2),
-          })
-          .where('id = :id', { id: payment.id })
-          .execute();
-      } else {
-        total = originalAmount;
-        await this.paymentsRepository
-          .createQueryBuilder()
-          .update(Payment)
-          .set({
-            total_amount: originalAmount.toFixed(2),
-            discount_amount: '0',
-          })
-          .where('id = :id', { id: payment.id })
-          .execute();
       }
+      total = Math.max(0, originalAmount - totalDiscount);
     }
 
     const newPaidTotal = alreadyPaid + dto.amount;
@@ -349,49 +330,140 @@ export class BillingService {
       );
     }
 
+    const member = payment.consumption?.meter?.member;
+
+    const movement = {
+      sourceType: FinanceSourceType.WATER_BILL_PAYMENT,
+      amount: dto.amount,
+      concept:
+        `Pago de boleta de agua ${payment.consumption?.year ?? ''}-${String(payment.consumption?.month ?? '').padStart(2, '0')}`.trim(),
+      memberId: member?.id ?? null,
+      paymentMethod: dto.paymentMethod,
+      reference: dto.reference,
+      notes: dto.notes,
+    };
+
+    // Fails before anything is written, so a bad reference never leaves a
+    // collected bill without its ledger movement.
+    await this.financesService.validateMovement({
+      ...movement,
+      sourceId: 'pending',
+    });
+
+    // Object storage is not transactional: the upload happens before the
+    // transaction, so a later failure can leave an unreferenced evidence file.
     const evidenceKey = await this.storageService.uploadOptimizedImage(
       dto.evidenceBase64,
       'water-payment/evidence',
     );
 
-    await this.historyRepository
-      .createQueryBuilder()
-      .insert()
-      .into(PaymentHistory)
-      .values({
-        payment_id: payment.id,
-        amount: dto.amount.toFixed(2),
-        payment_method: dto.paymentMethod,
-        reference: dto.reference,
-        notes: dto.notes,
-        evidence_key: evidenceKey,
-      })
-      .execute();
+    await this.dataSource.transaction(async (manager) => {
+      const paymentsRepo = manager.getRepository(Payment);
+      const historyRepo = manager.getRepository(PaymentHistory);
+      const discountsRepo = manager.getRepository(PaymentDiscount);
 
-    const newStatus =
-      newPaidTotal >= total - 0.001
-        ? PaymentStatus.PAID
-        : PaymentStatus.PARTIAL;
+      // No relations here: Postgres rejects FOR UPDATE on the nullable side of
+      // the outer joins those relations introduce.
+      const fresh = await paymentsRepo.findOne({
+        where: { id },
+      });
+      if (!fresh) throw new NotFoundException('Payment not found');
+      if (fresh.status === PaymentStatus.PAID) {
+        throw new BadRequestException('This bill has already been fully paid');
+      }
 
-    await this.paymentsRepository
-      .createQueryBuilder()
-      .update(Payment)
-      .set({
-        amount_paid: newPaidTotal.toFixed(2),
-        status: newStatus,
-        paid_at: newStatus === PaymentStatus.PAID ? new Date() : (null as any),
-      })
-      .where('id = :id', { id: payment.id })
-      .execute();
+      if (dto.discountIds) {
+        const originalAmount =
+          parseFloat(fresh.total_amount) + parseFloat(fresh.discount_amount);
+        await discountsRepo.delete({ payment_id: fresh.id });
 
+        await this.applyMultipleDiscounts(
+          fresh.id,
+          originalAmount,
+          requestedDiscountIds,
+          manager,
+        );
+
+        await paymentsRepo
+          .createQueryBuilder()
+          .update(Payment)
+          .set({
+            total_amount: total.toFixed(2),
+            discount_amount: totalDiscount.toFixed(2),
+          })
+          .where('id = :id', { id: fresh.id })
+          .execute();
+      }
+
+      const history = await historyRepo.save(
+        historyRepo.create({
+          payment_id: fresh.id,
+          amount: dto.amount.toFixed(2),
+          payment_method: dto.paymentMethod,
+          reference: dto.reference,
+          notes: dto.notes,
+          evidence_key: evidenceKey,
+        }),
+      );
+
+      // amount_paid is incremented in SQL instead of from a value read earlier:
+      // two concurrent payments must add up, not overwrite each other.
+      const increment = await paymentsRepo
+        .createQueryBuilder()
+        .update(Payment)
+        .set({
+          amount_paid: () => `"amount_paid" + ${dto.amount.toFixed(2)}`,
+        })
+        .where('id = :id', { id: fresh.id })
+        .andWhere('status != :paid', { paid: PaymentStatus.PAID })
+        .andWhere('"amount_paid" + :amt <= "total_amount" + 0.001', {
+          amt: dto.amount.toFixed(2),
+        })
+        .returning(['amount_paid', 'total_amount'])
+        .execute();
+
+      if (!increment.raw?.length) {
+        throw new ConflictException(
+          'This bill was already paid or the amount exceeds its remaining balance',
+        );
+      }
+
+      const paidTotalAfter = parseFloat(increment.raw[0].amount_paid);
+      const currentTotal = parseFloat(increment.raw[0].total_amount);
+
+      const newStatus =
+        paidTotalAfter >= currentTotal - 0.001
+          ? PaymentStatus.PAID
+          : PaymentStatus.PARTIAL;
+
+      await paymentsRepo
+        .createQueryBuilder()
+        .update(Payment)
+        .set({
+          status: newStatus,
+          paid_at:
+            newStatus === PaymentStatus.PAID ? new Date() : (null as any),
+        })
+        .where('id = :id', { id: fresh.id })
+        .execute();
+
+      await this.financesService.recordIncome(
+        { ...movement, sourceId: history.id },
+        undefined,
+        manager,
+      );
+    });
+
+    // Re-read after the commit: inside the transaction this would use a different
+    // connection and return the pre-update row.
     const paidPayment = await this.findOne(id);
-    const member = paidPayment.consumption?.meter?.member;
-    if (member?.phone && paidPayment.consumption) {
+
+    if (member?.phone && payment.consumption) {
       this.eventEmitter.emit('payment.completed', {
         paymentId: id,
         phone: member.phone,
         phone_country: member.phone_country,
-        filename: `comprobante-pago-${paidPayment.consumption.month}-${paidPayment.consumption.year}.pdf`,
+        filename: `comprobante-pago-${payment.consumption.month}-${payment.consumption.year}.pdf`,
       });
     }
 
@@ -405,7 +477,11 @@ export class BillingService {
     paymentId: string,
     originalAmount: number,
     discountIds: string[],
+    manager?: EntityManager,
   ): Promise<PaymentDiscount[]> {
+    const repo = manager
+      ? manager.getRepository(PaymentDiscount)
+      : this.paymentDiscountsRepository;
     const entries: PaymentDiscount[] = [];
     for (const discountId of discountIds) {
       const discount = await this.discountService.findOne(discountId);
@@ -413,12 +489,12 @@ export class BillingService {
         originalAmount,
         discount,
       );
-      const entry = this.paymentDiscountsRepository.create({
+      const entry = repo.create({
         payment_id: paymentId,
         discount_id: discountId,
         amount: amount.toFixed(2),
       });
-      entries.push(await this.paymentDiscountsRepository.save(entry));
+      entries.push(await repo.save(entry));
     }
     return entries;
   }

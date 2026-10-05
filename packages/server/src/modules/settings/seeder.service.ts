@@ -187,6 +187,46 @@ const DEFAULT_PERMISSIONS = [
     action: 'viewFines',
     description: 'View member fines',
   },
+  { resource: 'assets', action: 'read', description: 'View assets' },
+  { resource: 'assets', action: 'create', description: 'Create assets' },
+  { resource: 'assets', action: 'update', description: 'Update assets' },
+  { resource: 'assets', action: 'delete', description: 'Delete assets' },
+  {
+    resource: 'assets',
+    action: 'loan',
+    description: 'Register asset loans and returns',
+  },
+  {
+    resource: 'assets',
+    action: 'maintenance',
+    description: 'Register asset maintenance',
+  },
+  {
+    resource: 'assets',
+    action: 'retire',
+    description: 'Retire and restore assets',
+  },
+  { resource: 'finances', action: 'read', description: 'View finances' },
+  {
+    resource: 'finances',
+    action: 'create',
+    description: 'Create finance transactions',
+  },
+  {
+    resource: 'finances',
+    action: 'update',
+    description: 'Update finance transactions',
+  },
+  {
+    resource: 'finances',
+    action: 'void',
+    description: 'Void finance transactions',
+  },
+  {
+    resource: 'finances',
+    action: 'export',
+    description: 'Export finance reports',
+  },
 ];
 
 @Injectable()

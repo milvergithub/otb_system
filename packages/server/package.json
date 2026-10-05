@@ -16,6 +16,8 @@
     "migration:run": "npm run typeorm -- migration:run",
     "migration:revert": "npm run typeorm -- migration:revert",
     "migration:run:prod": "node dist/database/run-migrations.js",
+    "backfill:finance": "ts-node src/database/backfill-finance-movements.ts",
+    "backfill:finance:apply": "ts-node src/database/backfill-finance-movements.ts --apply",
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",

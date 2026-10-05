@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next"
 import logo from "@/assets/img.png";
 import {
   BarChart3,
+  Package,
   Bell,
   Check,
   FileText,
@@ -17,6 +18,7 @@ import {
   Shield,
   Users,
   UserCog,
+  Wallet,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { useUnreadCount } from "@/hooks/notifications"
@@ -52,8 +54,10 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/members", label: "nav.members", icon: Users, permission: "members.read" },
   { to: "/meters", label: "nav.meters", icon: Gauge, permission: "meters.read" },
   { to: "/zones", label: "nav.zones", icon: Map, permission: "zones.read" },
+  { to: "/bienes", label: "nav.assets", icon: Package, permission: "assets.read" },
   { to: "/consumption", label: "nav.consumption", icon: BarChart3, permission: "consumption.read" },
   { to: "/billing", label: "nav.billing", icon: Receipt, permission: "billing.read" },
+  { to: "/finanzas", label: "nav.finances", icon: Wallet, permission: "finances.read" },
   { to: "/actividades", label: "nav.activities", icon: Landmark, permission: "activities.read" },
   { to: "/reports", label: "nav.reports", icon: FileText, permission: "reports.read" },
   { to: "/notifications", label: "nav.notifications", icon: Bell, permission: "notifications.read" },

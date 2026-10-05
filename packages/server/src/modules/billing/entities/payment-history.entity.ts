@@ -12,6 +12,8 @@ export enum PaymentMethod {
   CASH = 'cash',
   TRANSFER = 'transfer',
   CARD = 'card',
+  QR = 'qr',
+  OTHER = 'other',
 }
 
 @Entity('payment_history')

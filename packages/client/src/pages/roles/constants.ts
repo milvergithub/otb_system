@@ -14,5 +14,7 @@ export const RESOURCES = [
   "shares",
   "discounts",
   "zones",
+  "assets",
+  "finances",
   "meter_types"
 ]

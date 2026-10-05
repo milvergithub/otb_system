@@ -31,6 +31,8 @@ import { TariffsModule } from './modules/tariffs/tariffs.module';
 import { UsersModule } from './modules/users/users.module';
 import { ZonesModule } from './modules/zones/zones.module';
 import { ActivitiesModule } from './modules/activities/activities.module';
+import { AssetsModule } from './modules/assets/assets.module';
+import { FinancesModule } from './modules/finances/finances.module';
 import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
 import { AuditSubscriber } from './modules/audit/audit.subscriber';
 
@@ -99,6 +101,8 @@ import { AuditSubscriber } from './modules/audit/audit.subscriber';
     SharesModule,
     ZonesModule,
     ActivitiesModule,
+    AssetsModule,
+    FinancesModule,
     WhatsAppModule,
   ],
   providers: [

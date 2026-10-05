@@ -41,6 +41,18 @@ const MIGRATIONS = [
     timestamp: 1755000000012,
     name: 'AddEvidenceKeyToSharePayments1755000000012',
   },
+  {
+    timestamp: 1755000000013,
+    name: 'CreateAssetsTables1755000000013',
+  },
+  {
+    timestamp: 1755000000014,
+    name: 'CreateFinanceTables1755000000014',
+  },
+  {
+    timestamp: 1755000000015,
+    name: 'AddMaintenanceExpenseTransaction1755000000015',
+  },
 ];
 
 async function isFreshDatabase(ds: DataSource): Promise<boolean> {

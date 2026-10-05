@@ -166,7 +166,7 @@ export interface Consumption {
 }
 
 export type PaymentStatus = "pending" | "paid" | "overdue" | "partial"
-export type PaymentMethod = "cash" | "transfer" | "card"
+export type PaymentMethod = "cash" | "transfer" | "card" | "qr" | "other"
 
 export interface PaymentHistory {
   id: string
@@ -385,4 +385,178 @@ export interface AttendanceSummary {
   absentStart: number
   absentEnd: number
   absentBoth: number
+}
+
+export type AssetStatus = "active" | "loaned" | "in_maintenance" | "lost" | "retired"
+
+export type AssetCondition = "new" | "good" | "fair" | "poor"
+
+export type AssetAcquisitionType = "purchase" | "donation" | "transfer" | "construction"
+
+export type AssetMovementType = "loan" | "transfer" | "lost" | "retirement" | "restore"
+
+export type AssetDocumentKind = "photo" | "invoice" | "delivery_receipt" | "other"
+
+export interface AssetCategory {
+  id: string
+  name: string
+  description?: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface AssetLocation {
+  id: string
+  name: string
+  description?: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface AssetDocument {
+  id: string
+  asset_id: string
+  file_key: string
+  file_name: string
+  mime_type: string
+  file_size?: number | null
+  kind: AssetDocumentKind
+  uploaded_by?: string | null
+  created_at: string
+}
+
+export interface AssetMovement {
+  id: string
+  asset_id: string
+  type: AssetMovementType
+  from_location_id?: string | null
+  to_location_id?: string | null
+  responsible_user_id?: string | null
+  responsible_member_id?: string | null
+  motive?: string | null
+  moved_at: string
+  returned_at?: string | null
+  notes?: string | null
+  created_by?: string | null
+  created_at: string
+  fromLocation?: AssetLocation | null
+  toLocation?: AssetLocation | null
+  responsibleUser?: Pick<User, "id" | "full_name"> | null
+  responsibleMember?: Pick<Member, "id" | "first_name" | "last_name"> | null
+}
+
+export interface AssetMaintenance {
+  id: string
+  asset_id: string
+  reason: string
+  started_at: string
+  finished_at?: string | null
+  cost?: string | null
+  provider?: string | null
+  notes?: string | null
+  created_by?: string | null
+  expense_transaction_id?: string | null
+  expenseTransaction?: FinanceTransaction | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Asset {
+  id: string
+  code: string
+  name: string
+  description?: string | null
+  category_id?: string | null
+  category?: AssetCategory | null
+  location_id?: string | null
+  location?: AssetLocation | null
+  status: AssetStatus
+  condition: AssetCondition
+  quantity: number
+  acquisition_date?: string | null
+  acquisition_value?: string | null
+  acquisition_type?: AssetAcquisitionType | null
+  current_responsible_user_id?: string | null
+  currentResponsibleUser?: Pick<User, "id" | "full_name"> | null
+  current_responsible_member_id?: string | null
+  currentResponsibleMember?: Pick<Member, "id" | "first_name" | "last_name"> | null
+  notes?: string | null
+  retired_at?: string | null
+  retirement_reason?: string | null
+  retirement_responsible_user_id?: string | null
+  retirementResponsibleUser?: Pick<User, "id" | "full_name"> | null
+  retirement_document_key?: string | null
+  expense_transaction_id?: string | null
+  created_at: string
+  updated_at: string
+  movements?: AssetMovement[]
+  maintenances?: AssetMaintenance[]
+  documents?: AssetDocument[]
+}
+
+export type FinanceTransactionType = "income" | "expense"
+export type FinanceTransactionStatus = "active" | "voided"
+export type FinanceSourceType =
+  | "manual"
+  | "water_bill_payment"
+  | "water_membership_fee"
+  | "fine_payment"
+  | "asset_purchase"
+  | "asset_maintenance"
+  | "donation"
+  | "court_rental"
+  | "other"
+export type FinanceDocumentKind = "invoice" | "receipt" | "transfer" | "photo" | "other"
+export type FinanceCategoryType = "income" | "expense" | "both"
+
+export interface FinanceCategory {
+  id: string
+  name: string
+  type: FinanceCategoryType
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface FinanceDocument {
+  id: string
+  transaction_id: string
+  file_key: string
+  file_name: string
+  mime_type: string
+  file_size?: number | null
+  kind: FinanceDocumentKind
+  uploaded_by?: string | null
+  created_at: string
+}
+
+export interface FinanceTransaction {
+  id: string
+  type: FinanceTransactionType
+  date: string
+  amount: string
+  concept: string
+  category_id?: string | null
+  category?: FinanceCategory | null
+  payment_method?: PaymentMethod | null
+  reference?: string | null
+  member_id?: string | null
+  member?: Pick<Member, "id" | "first_name" | "last_name"> | null
+  source_type?: FinanceSourceType | null
+  source_id?: string | null
+  status: FinanceTransactionStatus
+  user_id?: string | null
+  user?: Pick<User, "id" | "full_name"> | null
+  provider?: string | null
+  asset_id?: string | null
+  asset?: Asset | null
+  notes?: string | null
+  voided_at?: string | null
+  voided_reason?: string | null
+  voided_by?: string | null
+  documents?: FinanceDocument[]
+  created_at: string
+  updated_at: string
 }

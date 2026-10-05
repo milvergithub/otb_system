@@ -25,6 +25,15 @@ import { ActivityShare } from '../modules/activities/entities/activity-share.ent
 import { FineType } from '../modules/activities/entities/fine-type.entity';
 import { Attendance } from '../modules/activities/entities/attendance.entity';
 import { Fine } from '../modules/activities/entities/fine.entity';
+import { Asset } from '../modules/assets/entities/asset.entity';
+import { AssetCategory } from '../modules/assets/entities/asset-category.entity';
+import { AssetLocation } from '../modules/assets/entities/asset-location.entity';
+import { AssetMovement } from '../modules/assets/entities/asset-movement.entity';
+import { AssetMaintenance } from '../modules/assets/entities/asset-maintenance.entity';
+import { AssetDocument } from '../modules/assets/entities/asset-document.entity';
+import { FinanceTransaction } from '../modules/finances/entities/finance-transaction.entity';
+import { FinanceCategory } from '../modules/finances/entities/finance-category.entity';
+import { FinanceDocument } from '../modules/finances/entities/finance-document.entity';
 
 const isCompiled = __dirname.includes('dist');
 const migrationsPath = isCompiled
@@ -64,6 +73,15 @@ export const AppDataSource = new DataSource({
     FineType,
     Attendance,
     Fine,
+    Asset,
+    AssetCategory,
+    AssetLocation,
+    AssetMovement,
+    AssetMaintenance,
+    AssetDocument,
+    FinanceTransaction,
+    FinanceCategory,
+    FinanceDocument,
   ],
   migrations: migrationsPath,
   synchronize: process.env.NODE_ENV !== 'production',
