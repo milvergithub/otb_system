@@ -1,6 +1,9 @@
 {
   "validation": {
-    "required": "This field is required"
+    "required": "This field is required",
+    "invalidEmail": "Invalid email address",
+    "minLength": "Must be at least {{count}} characters",
+    "passwordsDoNotMatch": "Passwords do not match"
   },
   "common": {
     "loading": "Loading...",
@@ -126,6 +129,19 @@
     "password": "Password",
     "signingIn": "Signing in...",
     "signIn": "Sign in"
+  },
+  "setup": {
+    "title": "Initial setup",
+    "subtitle": "Before getting started, create the main administrator account.",
+    "fullName": "Name",
+    "email": "Email",
+    "password": "Password",
+    "passwordConfirmation": "Confirm password",
+    "submit": "Set up system",
+    "submitting": "Setting up...",
+    "success": "Administrator created successfully",
+    "statusErrorTitle": "Connection error",
+    "retry": "Retry"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -722,7 +738,6 @@
     "invalidToken": "Invalid token",
     "invalidRefreshToken": "Invalid refresh token",
     "emailAlreadyExists": "Email already exists",
-    "emailAlreadyRegistered": "Email already registered",
     "userNotFound": "User not found",
     "memberNotFound": "Member not found",
     "meterNotFound": "Meter not found",
@@ -753,7 +768,9 @@
     "overlappingBaseTariff": "A base tariff already exists for this period",
     "overlappingShare": "A water share already exists for this period",
     "endDateAfterStart": "End date must be after the start date",
-    "maxGreaterThanMin": "The maximum must be greater than the minimum"
+    "maxGreaterThanMin": "The maximum must be greater than the minimum",
+    "setupAlreadyCompleted": "Initial setup has already been completed.",
+    "setupStatusFailed": "Could not check the setup status."
   },
   "zones": {
     "title": "Zones",

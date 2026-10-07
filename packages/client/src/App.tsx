@@ -4,7 +4,9 @@ import { useAuth } from "@/lib/auth"
 import { Layout } from "@/components/layout"
 import InstallAppDialog from "@/components/InstallAppDialog"
 import { PageLoader } from "@/components/ui/page-loader"
+import { SetupGate, SETUP_PATH } from "@/components/setup-gate"
 const LoginPage = lazy(() => import("@/pages/login"))
+const SetupPage = lazy(() => import("@/pages/setup"))
 const DashboardPage = lazy(() => import("@/pages/dashboard"))
 const MembersPage = lazy(() => import("@/pages/members"))
 const MetersPage = lazy(() => import("@/pages/meters"))
@@ -39,7 +41,9 @@ export default function App() {
   return (
     <Suspense fallback={<PageLoader />}>
       <InstallAppDialog />
+      <SetupGate>
       <Routes>
+      <Route path={SETUP_PATH} element={<SetupPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route
         path="/"
@@ -71,6 +75,7 @@ export default function App() {
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </SetupGate>
     </Suspense>
   )
 }

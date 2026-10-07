@@ -17,6 +17,14 @@ export enum UserRole {
   USER = 'user',
 }
 
+export function legacyRoleFromRoles(
+  roles: Pick<Role, 'name'>[] | undefined | null,
+): UserRole {
+  return roles?.some((r) => r.name === 'admin')
+    ? UserRole.ADMIN
+    : UserRole.USER;
+}
+
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')

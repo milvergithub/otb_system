@@ -4,6 +4,10 @@ export const ApiPath = {
     REFRESH: "/auth/refresh",
     ME: "/auth/me",
   },
+  Setup: {
+    STATUS: "/setup/status",
+    ADMIN: "/setup/admin",
+  },
   Members: {
     BASE: "/members",
     ALL: "/members/all",

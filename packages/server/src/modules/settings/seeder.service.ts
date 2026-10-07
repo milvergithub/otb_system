@@ -1,8 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import * as bcrypt from 'bcrypt';
-import { In, Repository } from 'typeorm';
-import { User, UserRole } from '../users/entities/user.entity';
+import { Repository } from 'typeorm';
 import { Role } from '../roles/entities/role.entity';
 import { Permission } from '../roles/entities/permission.entity';
 import { SettingsService } from './settings.service';
@@ -256,8 +254,6 @@ export class SeederService implements OnModuleInit {
   private readonly logger = new Logger(SeederService.name);
 
   constructor(
-    @InjectRepository(User)
-    private readonly usersRepository: Repository<User>,
     @InjectRepository(Role)
     private readonly rolesRepository: Repository<Role>,
     @InjectRepository(Permission)
@@ -268,7 +264,6 @@ export class SeederService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     await this.seedPermissions();
     await this.seedRoles();
-    await this.seedAdminUser();
     await this.settingsService.initializeDefaults();
   }
 
@@ -329,41 +324,6 @@ export class SeederService implements OnModuleInit {
         }),
       );
       this.logger.log('User role seeded');
-    }
-  }
-
-  private async seedAdminUser(): Promise<void> {
-    const email = process.env.SEED_ADMIN_EMAIL || 'admin@otb.com';
-    const existing = await this.usersRepository.findOne({
-      where: { email },
-      relations: ['roles'],
-    });
-    if (!existing) {
-      const passwordHash = await bcrypt.hash(
-        process.env.SEED_ADMIN_PASSWORD || 'admin123',
-        10,
-      );
-      const adminRole = await this.rolesRepository.findOne({
-        where: { name: 'admin' },
-      });
-      const user = this.usersRepository.create({
-        email,
-        password_hash: passwordHash,
-        full_name: 'System Administrator',
-        role: UserRole.ADMIN,
-        roles: adminRole ? [adminRole] : [],
-      });
-      await this.usersRepository.save(user);
-      this.logger.log(`Seeded admin user: ${email}`);
-    } else if (!existing.roles?.length) {
-      const adminRole = await this.rolesRepository.findOne({
-        where: { name: 'admin' },
-      });
-      if (adminRole) {
-        existing.roles = [adminRole];
-        await this.usersRepository.save(existing);
-        this.logger.log('Assigned admin role to existing admin user');
-      }
     }
   }
 }

@@ -1,6 +1,9 @@
 {
   "validation": {
-    "required": "Campo requerido"
+    "required": "Campo requerido",
+    "invalidEmail": "Correo electrónico inválido",
+    "minLength": "Debe tener al menos {{count}} caracteres",
+    "passwordsDoNotMatch": "Las contraseñas no coinciden"
   },
   "common": {
     "loading": "Cargando...",
@@ -126,6 +129,19 @@
     "password": "Contraseña",
     "signingIn": "Iniciando sesión...",
     "signIn": "Iniciar sesión"
+  },
+  "setup": {
+    "title": "Configuración inicial",
+    "subtitle": "Antes de comenzar, crea la cuenta de administrador principal.",
+    "fullName": "Nombre",
+    "email": "Email",
+    "password": "Contraseña",
+    "passwordConfirmation": "Confirmar contraseña",
+    "submit": "Configurar sistema",
+    "submitting": "Configurando...",
+    "success": "Administrador creado correctamente",
+    "statusErrorTitle": "Error de conexión",
+    "retry": "Reintentar"
   },
   "dashboard": {
     "title": "Panel",
@@ -722,7 +738,6 @@
     "invalidToken": "Token inválido",
     "invalidRefreshToken": "Token de renovación inválido",
     "emailAlreadyExists": "El correo electrónico ya existe",
-    "emailAlreadyRegistered": "El correo electrónico ya está registrado",
     "userNotFound": "Usuario no encontrado",
     "memberNotFound": "Socio no encontrado",
     "meterNotFound": "Medidor no encontrado",
@@ -753,7 +768,9 @@
     "overlappingBaseTariff": "Ya existe una tarifa base vigente para este período",
     "overlappingShare": "Ya existe una acción de agua vigente para este período",
     "endDateAfterStart": "La fecha de fin debe ser posterior a la fecha de inicio",
-    "maxGreaterThanMin": "El máximo debe ser mayor que el mínimo"
+    "maxGreaterThanMin": "El máximo debe ser mayor que el mínimo",
+    "setupAlreadyCompleted": "La configuración inicial ya fue completada.",
+    "setupStatusFailed": "No se pudo comprobar el estado de configuración."
   },
   "zones": {
     "title": "Zonas",

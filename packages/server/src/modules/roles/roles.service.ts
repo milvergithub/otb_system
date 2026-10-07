@@ -7,7 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Role } from './entities/role.entity';
 import { Permission } from './entities/permission.entity';
-import { User } from '../users/entities/user.entity';
+import { User, legacyRoleFromRoles } from '../users/entities/user.entity';
 import { CreateRoleDto, UpdateRoleDto } from './dto/role.dto';
 
 @Injectable()
@@ -145,6 +145,7 @@ export class RolesService {
     if (!user) throw new NotFoundException('User not found');
 
     user.roles = await this.rolesRepository.findBy({ id: In(roleIds) });
+    user.role = legacyRoleFromRoles(user.roles);
     await this.usersRepository.save(user);
     return { success: true };
   }

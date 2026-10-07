@@ -7,7 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import { User } from './entities/user.entity';
+import { User, legacyRoleFromRoles } from './entities/user.entity';
 import { Role } from '../roles/entities/role.entity';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 
@@ -60,6 +60,7 @@ export class UsersService {
         id: In(dto.roleIds),
       });
     }
+    user.role = legacyRoleFromRoles(user.roles);
 
     const saved = await this.usersRepository.save(user);
     const { password_hash, ...safe } = saved;
@@ -95,6 +96,7 @@ export class UsersService {
       user.roles = await this.rolesRepository.findBy({
         id: In(dto.roleIds),
       });
+      user.role = legacyRoleFromRoles(user.roles);
     }
 
     const saved = await this.usersRepository.save(user);

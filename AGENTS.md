@@ -25,7 +25,7 @@
   - Server lint (`eslint ... --fix`) **rewrites files in place** with `--fix`; client lint does not
   - Client lint fails on `react-hooks/set-state-in-effect` (ERROR) and a few other rules; see Client Specifics
 - `npm run test` — runs Jest (server only; client has no test setup)
-  - Unit tests live next to the code as `*.spec.ts` (`packages/server/jest.config.js`, rootDir `src`); currently 10 suites / 58 tests covering financial responsibility (scope, access, resolvers, attribution) and activities (attendance, evidence, fines, manual fines)
+  - Unit tests live next to the code as `*.spec.ts` (`packages/server/jest.config.js`, rootDir `src`); currently 13 suites / 85 tests covering financial responsibility (scope, access, resolvers, attribution), activities (attendance, evidence, fines, manual fines), initial setup and legacy role sync
 
 ## Server Specifics
 - Entry: `packages/server/src/main.ts`
@@ -41,6 +41,15 @@
 - Global providers: `JwtAuthGuard`, `RolesGuard`, `AuditContextInterceptor`, `HttpLogInterceptor`
 - Scheduling: `@nestjs/schedule` cron jobs (e.g., billing/notification jobs run at 8am La Paz time); events via `@nestjs/event-emitter` (e.g., `bill.generated`, `payment.completed` → WhatsApp/report flows)
 - Financial responsibility (Opción B): `finance_transactions.responsible_user_id` / `collector_user_id` / `registered_by_user_id` + `activities.financial_responsible_user_id`. Every finance read/write endpoint passes a `FinanceAccess` context; without the `finances.all` permission (visibility only) the scope is forced to `responsible_user_id = current user`. All writers (billing, shares, fines, assets, manual) resolve attribution through `FinancialResponsibilityService` — never from roles/permissions/`created_by`; `registered_by_user_id` is always server-set (stripped from DTOs by `whitelist: true`). Configurable responsibles live in settings: `water_bill_responsible_user_id`, `water_share_responsible_user_id`. There is **no Collection/Cash workflow** — `collector_user_id` is only a snapshot field prepared for it
+
+## Initial Setup (first run)
+- No admin user is seeded anymore (`SeederService` only seeds permissions + the `admin`/`user` roles; `SEED_ADMIN_*` env vars are gone)
+- `setup` module: `GET /setup/status` → `{ setupCompleted }`, `POST /setup/admin` (`fullName`, `email`, `password`, `passwordConfirmation`) → same response as `/auth/login`. Both `@Public()`
+- `setupCompleted` = exists an active user with the `admin` Role (`user_roles`) or legacy `users.role = 'admin'`; computed from the DB, never stored
+- Creation runs in a transaction guarded by `pg_advisory_xact_lock(SETUP_ADVISORY_LOCK_KEY)` + in-transaction re-check → concurrent requests get `409 Initial setup has already been completed`
+- `SeederService` is provided/exported only by `SettingsModule` (`UsersModule` imports it) so seeding runs once per boot
+- Legacy `users.role` is derived from RBAC roles via `legacyRoleFromRoles()` (`user.entity.ts`) on every role write (`UsersService.create/update`, `RolesService.assignRolesToUser`, setup): `admin` if the user has the `admin` Role, else `user`
+- Client: `SetupGate` (`components/setup-gate.tsx`) wraps all routes and redirects on server status only (`/setup` ↔ rest); after success `applySession` (auth store) + setup-status cache set to completed
 
 ## Activities Domain
 - Rebuilt in migration `1755000000017-rebuild-activities-domain.ts` and `1755000000018-add-activity-collector.ts` (both additive + idempotent; safe on fresh and legacy DBs)

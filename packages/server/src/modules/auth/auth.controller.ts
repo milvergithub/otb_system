@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -16,7 +15,7 @@ import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthUser } from './interfaces/auth-user.interface';
 import { AuthService } from './auth.service';
-import { LoginDto, RefreshTokenDto, RegisterDto } from './dto/auth.dto';
+import { LoginDto, RefreshTokenDto } from './dto/auth.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -40,19 +39,6 @@ export class AuthController {
     } catch (error: any) {
       if (error.message === 'User is disabled') {
         throw new UnauthorizedException('Account is disabled');
-      }
-      throw error;
-    }
-  }
-
-  @Public()
-  @Post('register')
-  async register(@Body() dto: RegisterDto) {
-    try {
-      return await this.authService.register(dto);
-    } catch (error: any) {
-      if (error.message === 'EMAIL_ALREADY_EXISTS') {
-        throw new BadRequestException('Email already registered');
       }
       throw error;
     }

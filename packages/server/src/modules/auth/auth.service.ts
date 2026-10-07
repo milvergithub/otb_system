@@ -45,30 +45,6 @@ export class AuthService {
     };
   }
 
-  async register(data: {
-    email: string;
-    password: string;
-    fullName: string;
-    role?: string;
-  }) {
-    const existing = await this.usersRepository.findOne({
-      where: { email: data.email },
-    });
-    if (existing) {
-      throw new Error('EMAIL_ALREADY_EXISTS');
-    }
-    const passwordHash = await bcrypt.hash(data.password, 10);
-    const user = this.usersRepository.create({
-      email: data.email,
-      password_hash: passwordHash,
-      full_name: data.fullName,
-      role: (data.role as User['role']) || 'user',
-    });
-    const saved = await this.usersRepository.save(user);
-    const tokens = await this.generateTokens(saved, [], []);
-    return { user: this.sanitizeUser(saved), ...tokens };
-  }
-
   async refreshToken(userId: string) {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
     if (!user) {

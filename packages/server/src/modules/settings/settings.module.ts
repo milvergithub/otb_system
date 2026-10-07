@@ -12,6 +12,6 @@ import { SettingsService } from './settings.service';
   imports: [TypeOrmModule.forFeature([Setting, User, Role, Permission])],
   controllers: [SettingsController],
   providers: [SettingsService, SeederService],
-  exports: [SettingsService],
+  exports: [SettingsService, SeederService],
 })
 export class SettingsModule {}

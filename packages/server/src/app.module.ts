@@ -34,6 +34,7 @@ import { ActivitiesModule } from './modules/activities/activities.module';
 import { AssetsModule } from './modules/assets/assets.module';
 import { FinancesModule } from './modules/finances/finances.module';
 import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
+import { SetupModule } from './modules/setup/setup.module';
 import { AuditSubscriber } from './modules/audit/audit.subscriber';
 
 @Module({
@@ -88,6 +89,7 @@ import { AuditSubscriber } from './modules/audit/audit.subscriber';
     ContextModule,
     AuditModule,
     AuthModule,
+    SetupModule,
     UsersModule,
     RolesModule,
     MembersModule,

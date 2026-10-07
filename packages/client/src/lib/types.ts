@@ -47,6 +47,17 @@ export interface AuthResponse {
   refreshToken: string
 }
 
+export interface SetupStatus {
+  setupCompleted: boolean
+}
+
+export interface CreateInitialAdminRequest {
+  fullName: string
+  email: string
+  password: string
+  passwordConfirmation: string
+}
+
 export interface Paginated<T> {
   items: T[]
   total: number

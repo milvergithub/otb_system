@@ -8,6 +8,7 @@ interface AuthState {
   loading: boolean
   loadUser: () => Promise<void>
   login: (email: string, password: string) => Promise<void>
+  applySession: (data: AuthResponse) => void
   logout: () => void
   hasPermission: (permission: string) => boolean
 }
@@ -33,9 +34,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   login: async (email: string, password: string) => {
     const res = await api.post<AuthResponse>(ApiPath.Auth.LOGIN, { email, password })
-    const data = res.data
+    get().applySession(res.data)
+  },
+
+  applySession: (data: AuthResponse) => {
     setTokens(data.accessToken, data.refreshToken)
-    set({ user: data.user })
+    set({ user: data.user, loading: false })
   },
 
   logout: () => {

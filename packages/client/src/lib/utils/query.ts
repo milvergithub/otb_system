@@ -11,6 +11,9 @@ export function retryQuery<TData, TError = Error>(
 }
 
 export const queryKeys = {
+  setup: {
+    status: ["setup", "status"] as const,
+  },
   meters: {
     all: ["meters"] as const,
     list: (
