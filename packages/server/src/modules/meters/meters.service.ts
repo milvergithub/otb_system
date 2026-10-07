@@ -141,7 +141,7 @@ export class MetersService {
     });
   }
 
-  async create(dto: CreateMeterDto): Promise<Meter> {
+  async create(dto: CreateMeterDto, currentUserId?: string): Promise<Meter> {
     const existing = await this.metersRepository.findOne({
       where: { code: dto.code },
     });
@@ -154,8 +154,6 @@ export class MetersService {
     if (!member) {
       throw new BadRequestException('Member not found');
     }
-
-    const activeShare = await this.sharesService.getActiveForDate(new Date());
 
     const evidenceKey = dto.shareEvidenceBase64
       ? await this.sharePaymentsService.uploadEvidence(dto.shareEvidenceBase64)
@@ -176,18 +174,21 @@ export class MetersService {
       );
 
       if (dto.shareAmount) {
-        const sharePaymentsRepo = manager.getRepository(SharePayment);
-        await sharePaymentsRepo.save(
-          sharePaymentsRepo.create({
-            meter_id: created.id,
-            share_id: activeShare?.id,
-            amount: dto.shareAmount.toString(),
-            payment_method: dto.sharePaymentMethod,
+        // The share paid while registering the meter must also be booked in
+        // the finance ledger — same single path as SharePaymentsService.create.
+        await this.sharePaymentsService.createAsPartOfTransaction(
+          manager,
+          {
+            meterId: created.id,
+            memberId: member.id,
+            amount: dto.shareAmount,
+            paymentMethod: dto.sharePaymentMethod,
             reference: dto.shareReference,
             notes: dto.shareNotes,
-            evidence_key: evidenceKey,
-            paid_at: new Date().toISOString().split('T')[0],
-          }),
+            paidAt: new Date().toISOString().split('T')[0],
+            evidenceKey,
+          },
+          currentUserId,
         );
       }
 

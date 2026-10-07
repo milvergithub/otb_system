@@ -346,6 +346,68 @@ function ComboboxSelect({
   )
 }
 
+export interface ComboboxMultiSelectProps {
+  values: string[]
+  onValuesChange: (values: string[]) => void
+  options: ComboboxOption[]
+  placeholder?: string
+  emptyText?: string
+  className?: string
+  disabled?: boolean
+  id?: string
+}
+
+function ComboboxMultiSelect({
+  values,
+  onValuesChange,
+  options,
+  placeholder,
+  emptyText,
+  className,
+  disabled,
+  id,
+}: ComboboxMultiSelectProps) {
+  const { t } = useTranslation()
+  const anchor = useComboboxAnchor()
+
+  const selected = React.useMemo(
+    () =>
+      values
+        .map((v) => options.find((o) => o.value === v))
+        .filter((o): o is ComboboxOption => Boolean(o)),
+    [values, options],
+  )
+
+  return (
+    <Combobox
+      items={options}
+      multiple
+      value={selected}
+      onValueChange={(next) => onValuesChange(next.map((o) => o.value))}
+      isItemEqualToValue={(a, b) => a.value === b.value}
+    >
+      <ComboboxChips ref={anchor} className={className}>
+        <ComboboxValue placeholder={placeholder}>
+          {selected.map((option) => (
+            <ComboboxChip key={option.value}>{option.label}</ComboboxChip>
+          ))}
+        </ComboboxValue>
+        <ComboboxChipsInput id={id} disabled={disabled} />
+      </ComboboxChips>
+      <ComboboxContent sideOffset={4} align="start" anchor={anchor}>
+        <ComboboxEmpty>{emptyText ?? t("common.noResults")}</ComboboxEmpty>
+        <ComboboxList>
+          {(option: ComboboxOption) => (
+            <ComboboxItem key={option.value} value={option}>
+              {option.label}
+            </ComboboxItem>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
+  )
+}
+
 export {
   Combobox,
   ComboboxInput,
@@ -363,5 +425,6 @@ export {
   ComboboxTrigger,
   ComboboxValue,
   ComboboxSelect,
+  ComboboxMultiSelect,
   useComboboxAnchor,
 }

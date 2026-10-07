@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { CreateSharePaymentDto } from './dto/share-payment.dto';
 import { SharePaymentsService } from './share-payments.service';
 
@@ -24,7 +25,8 @@ export class SharePaymentsController {
   create(
     @Param('meterId') meterId: string,
     @Body() dto: CreateSharePaymentDto,
+    @CurrentUser('id') userId?: string,
   ) {
-    return this.sharePaymentsService.create(meterId, dto);
+    return this.sharePaymentsService.create(meterId, dto, userId);
   }
 }

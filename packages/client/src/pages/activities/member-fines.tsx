@@ -18,6 +18,7 @@ import {
   usePayFinesBulk,
 } from "@/hooks/activities"
 import { useGetMember } from "@/hooks/members"
+import { useSearchUsers } from "@/hooks/users"
 import { useAuth } from "@/lib/auth"
 import { getApiErrorMessage } from "@/lib/api"
 import type { Fine, FineStatus } from "@/lib/types"
@@ -26,7 +27,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { ComboboxSelect } from "@/components/ui/combobox"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   TableHead,
@@ -91,6 +94,9 @@ export default function MemberFinesPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [payBulkOpen, setPayBulkOpen] = useState(false)
   const [bulkNotes, setBulkNotes] = useState("")
+  const [collectorId, setCollectorId] = useState("")
+  const canPickCollector = hasPermission("users.read")
+  const { data: users } = useSearchUsers(undefined, canPickCollector)
 
   const pendingFines = (fines ?? []).filter((f) => f.status === "pending")
   const allPendingSelected =
@@ -105,10 +111,15 @@ export default function MemberFinesPage() {
   const handlePay = async () => {
     if (!paying) return
     try {
-      await payMut.mutateAsync({ id: paying.id, notes: payNotes || undefined })
+      await payMut.mutateAsync({
+        id: paying.id,
+        notes: payNotes || undefined,
+        collectorUserId: collectorId || undefined,
+      })
       toast.success(t("activities.finePaid"))
       setPaying(null)
       setPayNotes("")
+      setCollectorId("")
     } catch (err) {
       toast.error(getApiErrorMessage(err))
     }
@@ -151,10 +162,12 @@ export default function MemberFinesPage() {
       await payBulkMut.mutateAsync({
         ids: [...selected],
         notes: bulkNotes || undefined,
+        collectorUserId: collectorId || undefined,
       })
       toast.success(t("activities.finePaid"))
       setPayBulkOpen(false)
       setBulkNotes("")
+      setCollectorId("")
       setSelected(new Set())
     } catch (err) {
       toast.error(getApiErrorMessage(err))
@@ -394,6 +407,22 @@ export default function MemberFinesPage() {
                 </div>
               </div>
             )}
+            {canPickCollector ? (
+              <div className="space-y-2">
+                <Label>{t("finances.collector")}</Label>
+                <ComboboxSelect
+                  value={collectorId}
+                  onValueChange={setCollectorId}
+                  options={[
+                    { label: t("finances.collectorAuto"), value: "" },
+                    ...(users ?? []).map((u) => ({ label: u.full_name, value: u.id })),
+                  ]}
+                  placeholder={t("common.select")}
+                  searchPlaceholder={t("common.search")}
+                  className="w-full"
+                />
+              </div>
+            ) : null}
             <Input
               placeholder={t("activities.notesOptional")}
               value={payNotes}
@@ -446,6 +475,22 @@ export default function MemberFinesPage() {
                 <span className="tabular-nums">{formatCurrency(selectedTotal)}</span>
               </div>
             </div>
+            {canPickCollector ? (
+              <div className="space-y-2">
+                <Label>{t("finances.collector")}</Label>
+                <ComboboxSelect
+                  value={collectorId}
+                  onValueChange={setCollectorId}
+                  options={[
+                    { label: t("finances.collectorAuto"), value: "" },
+                    ...(users ?? []).map((u) => ({ label: u.full_name, value: u.id })),
+                  ]}
+                  placeholder={t("common.select")}
+                  searchPlaceholder={t("common.search")}
+                  className="w-full"
+                />
+              </div>
+            ) : null}
             <Input
               placeholder={t("activities.notesOptional")}
               value={bulkNotes}

@@ -282,7 +282,7 @@ export class AssetsService {
     };
   }
 
-  async create(dto: CreateAssetDto): Promise<Asset> {
+  async create(dto: CreateAssetDto, currentUserId?: string): Promise<Asset> {
     await this.assertAssetReferences(dto);
 
     const asset = this.assetsRepo.create({
@@ -308,7 +308,7 @@ export class AssetsService {
     return this.dataSource.transaction(async (manager) => {
       const saved = await manager.getRepository(Asset).save(asset);
 
-      await this.recordPurchaseExpense(saved, manager);
+      await this.recordPurchaseExpense(saved, manager, currentUserId);
 
       return saved;
     });
@@ -318,10 +318,14 @@ export class AssetsService {
    * Pushes the acquisition cost of a purchased asset into the ledger as expense.
    * Donations, transfers and constructions are not money leaving the OTB, so they
    * are ignored. Idempotent through the asset id as source id.
+   *
+   * Responsibility snapshot: the asset's current responsible user at purchase
+   * time; registeredBy is the authenticated creator.
    */
   private async recordPurchaseExpense(
     asset: Asset,
     manager?: EntityManager,
+    registeredByUserId?: string,
   ): Promise<void> {
     if (asset.acquisition_type !== AssetAcquisitionType.PURCHASE) return;
     const value = asset.acquisition_value
@@ -337,6 +341,8 @@ export class AssetsService {
       date: asset.acquisition_date ?? undefined,
       assetId: asset.id,
       notes: asset.description ?? undefined,
+      responsibleUserId: asset.current_responsible_user_id,
+      registeredByUserId: registeredByUserId ?? null,
     };
 
     if (!manager) {
@@ -358,6 +364,7 @@ export class AssetsService {
     dto: CreateAssetsBulkDto,
     assets: Asset[],
     manager?: EntityManager,
+    registeredByUserId?: string,
   ): Promise<void> {
     if (dto.acquisitionType !== AssetAcquisitionType.PURCHASE) return;
     const total = dto.acquisitionValue ?? 0;
@@ -373,6 +380,7 @@ export class AssetsService {
       concept: `Compra de lote ${assets.length} x ${dto.name} (${first} a ${last})`,
       date: dto.acquisitionDate ?? undefined,
       notes: dto.description ?? undefined,
+      registeredByUserId: registeredByUserId ?? null,
     };
 
     if (!manager) {
@@ -388,7 +396,10 @@ export class AssetsService {
    * Creates N individual assets sharing the same data, each with its own
    * sequential code. Homogeneous lots stay traceable unit by unit.
    */
-  async createBulk(dto: CreateAssetsBulkDto): Promise<Asset[]> {
+  async createBulk(
+    dto: CreateAssetsBulkDto,
+    currentUserId?: string,
+  ): Promise<Asset[]> {
     await this.assertAssetReferences(dto);
 
     const start = await this.nextCodeSequence();
@@ -432,7 +443,7 @@ export class AssetsService {
     return this.dataSource.transaction(async (manager) => {
       const saved = await manager.getRepository(Asset).save(assets);
 
-      await this.recordBulkPurchaseExpense(dto, saved, manager);
+      await this.recordBulkPurchaseExpense(dto, saved, manager, currentUserId);
 
       return saved;
     });
@@ -788,6 +799,7 @@ export class AssetsService {
     id: string,
     maintenanceId: string,
     dto: FinishAssetMaintenanceDto,
+    currentUserId?: string,
   ): Promise<AssetMaintenance> {
     const asset = await this.findOne(id);
 
@@ -826,6 +838,7 @@ export class AssetsService {
         savedAsset,
         savedMaintenance,
         manager,
+        currentUserId,
       );
 
       return savedMaintenance;
@@ -842,6 +855,7 @@ export class AssetsService {
     asset: Asset,
     maintenance: AssetMaintenance,
     manager?: EntityManager,
+    registeredByUserId?: string,
   ): Promise<void> {
     const cost = maintenance.cost ? parseFloat(maintenance.cost) : 0;
     if (!Number.isFinite(cost) || cost <= 0) return;
@@ -855,6 +869,8 @@ export class AssetsService {
       assetId: asset.id,
       provider: maintenance.provider ?? undefined,
       notes: maintenance.reason,
+      responsibleUserId: asset.current_responsible_user_id,
+      registeredByUserId: registeredByUserId ?? null,
     };
 
     const transaction = manager

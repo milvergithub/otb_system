@@ -54,11 +54,11 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/members", label: "nav.members", icon: Users, permission: "members.read" },
   { to: "/meters", label: "nav.meters", icon: Gauge, permission: "meters.read" },
   { to: "/zones", label: "nav.zones", icon: Map, permission: "zones.read" },
-  { to: "/bienes", label: "nav.assets", icon: Package, permission: "assets.read" },
   { to: "/consumption", label: "nav.consumption", icon: BarChart3, permission: "consumption.read" },
   { to: "/billing", label: "nav.billing", icon: Receipt, permission: "billing.read" },
-  { to: "/finanzas", label: "nav.finances", icon: Wallet, permission: "finances.read" },
   { to: "/actividades", label: "nav.activities", icon: Landmark, permission: "activities.read" },
+  { to: "/bienes", label: "nav.assets", icon: Package, permission: "assets.read" },
+  { to: "/finanzas", label: "nav.finances", icon: Wallet, permission: "finances.read" },
   { to: "/reports", label: "nav.reports", icon: FileText, permission: "reports.read" },
   { to: "/notifications", label: "nav.notifications", icon: Bell, permission: "notifications.read" },
   { to: "/settings", label: "nav.settings", icon: Settings, permission: "settings.read" },
@@ -261,7 +261,7 @@ export function Layout() {
             <UserMenu />
           </div>
         </header>
-        <div className="flex flex-1 flex-col p-4 lg:p-8">
+        <div className="flex min-w-0 flex-1 flex-col p-4 lg:p-8">
           <Outlet />
         </div>
       </SidebarInset>

@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -10,6 +11,7 @@ import {
 } from 'typeorm';
 import { Activity } from './activity.entity';
 import { Member } from '../../members/entities/member.entity';
+import { User } from '../../users/entities/user.entity';
 
 export enum AttendanceStatus {
   PRESENT = 'present',
@@ -18,8 +20,18 @@ export enum AttendanceStatus {
   ABSENT_BOTH = 'absent_both',
 }
 
+export enum AttendanceResult {
+  PRESENT = 'present',
+  ABSENT = 'absent',
+  LATE = 'late',
+  LEFT_EARLY = 'left_early',
+  EXCUSED = 'excused',
+}
+
 @Entity('attendances')
 @Unique(['activity_id', 'member_id'])
+@Index(['activity_id'])
+@Index(['result'])
 export class Attendance {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -52,6 +64,29 @@ export class Attendance {
 
   @Column({ type: 'varchar', length: 20, default: AttendanceStatus.PRESENT })
   status: AttendanceStatus;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  result: AttendanceResult | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  initial_marked_at: Date | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  initial_marked_by_user_id: string | null;
+
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'initial_marked_by_user_id' })
+  initialMarkedBy: User | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  final_marked_at: Date | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  final_marked_by_user_id: string | null;
+
+  @ManyToOne(() => User, { onDelete: 'SET NULL', nullable: true })
+  @JoinColumn({ name: 'final_marked_by_user_id' })
+  finalMarkedBy: User | null;
 
   @CreateDateColumn()
   created_at: Date;

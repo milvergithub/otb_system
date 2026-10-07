@@ -7,6 +7,11 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   payment_due_day: '15',
   organization_name: 'OTB Water System',
   currency: 'BOB',
+  // Financial responsibility (user ids, empty = not configured yet).
+  // Snapshot semantics: movements copy the value at creation time, so
+  // changing these settings never rewrites historical finance records.
+  water_bill_responsible_user_id: '',
+  water_share_responsible_user_id: '',
   openwa_api_key: process.env.OPENWA_API_KEY || '',
   openwa_consumption_template_id:
     process.env.OPENWA_CONSUMPTION_TEMPLATE_ID || '',

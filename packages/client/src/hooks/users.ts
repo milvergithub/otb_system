@@ -4,13 +4,14 @@ import { ApiPath } from "@/lib/apiPath"
 import { queryKeys } from "@/lib/utils/query"
 import type { UserWithRoles } from "@/lib/types"
 
-export function useSearchUsers(search?: string) {
+export function useSearchUsers(search?: string, enabled = true) {
   return useQuery<UserWithRoles[]>({
     queryKey: queryKeys.users.list(search ?? ""),
     queryFn: () =>
       api
         .get(ApiPath.Users.BASE, { params: { search: search || undefined } })
         .then((r) => r.data),
+    enabled,
   })
 }
 

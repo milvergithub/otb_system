@@ -75,6 +75,7 @@ export interface PayBillRequest {
   notes?: string
   discountIds?: string[]
   evidenceBase64?: string
+  collectorUserId?: string
 }
 
 export function usePayBill() {

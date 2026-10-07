@@ -9,6 +9,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { CreateMeterDto, UpdateMeterDto } from './dto/meter.dto';
 import { MeterStatus } from './entities/meter.entity';
@@ -49,8 +50,8 @@ export class MetersController {
 
   @Post()
   @Roles('meters.create')
-  create(@Body() dto: CreateMeterDto) {
-    return this.metersService.create(dto);
+  create(@Body() dto: CreateMeterDto, @CurrentUser('id') userId?: string) {
+    return this.metersService.create(dto, userId);
   }
 
   @Patch(':id')

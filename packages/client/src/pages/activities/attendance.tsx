@@ -72,6 +72,18 @@ function presenceKey(
     .join("|")
 }
 
+const RESULT_CONFIG: Record<
+  string,
+  { label: string; variant: "default" | "secondary" | "outline" | "destructive" }
+> = {
+  present: { label: "activities.resultPresent", variant: "default" },
+  late: { label: "activities.resultLate", variant: "outline" },
+  left_early: { label: "activities.resultLeftEarly", variant: "outline" },
+  absent: { label: "activities.resultAbsent", variant: "destructive" },
+  excused: { label: "activities.resultExcused", variant: "secondary" },
+  pending: { label: "activities.resultPending", variant: "secondary" },
+}
+
 const STATUS_CONFIG: Record<
   AttendanceStatus,
   { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: typeof CheckCircle }
@@ -428,7 +440,7 @@ export default function AttendancePage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/actividades")}>
+        <Button variant="ghost" size="icon" onClick={() => navigate(`/actividades/${id}`)}>
           <ArrowLeft className="size-5" />
         </Button>
         <div className="flex-1">
@@ -546,6 +558,7 @@ export default function AttendancePage() {
                         <TableHead className="text-center">{t("activities.colControlStart")}</TableHead>
                         <TableHead className="text-center">{t("activities.colControlEnd")}</TableHead>
                         <TableHead className="text-center">{t("activities.status")}</TableHead>
+                        <TableHead className="text-center">{t("activities.result")}</TableHead>
                       </TableRow>
                     )}
                     renderRow={(row) => {
@@ -590,6 +603,19 @@ export default function AttendancePage() {
                             <Badge variant={cfg.variant} className="text-xs">
                               <Icon className="mr-1 size-3" />
                               {t(cfg.label)}
+                            </Badge>
+                          </td>
+                          <td className="p-2 text-center">
+                            <Badge
+                              variant={(RESULT_CONFIG[att?.result ?? "pending"] ?? RESULT_CONFIG.pending).variant}
+                              className="text-xs"
+                            >
+                              {t(
+                                (
+                                  RESULT_CONFIG[att?.result ?? "pending"] ??
+                                  RESULT_CONFIG.pending
+                                ).label,
+                              )}
                             </Badge>
                           </td>
                         </>

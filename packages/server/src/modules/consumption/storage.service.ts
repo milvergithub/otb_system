@@ -20,6 +20,8 @@ const ALLOWED_DOCUMENT_TYPES: Record<string, string> = {
   'image/png': 'png',
   'image/webp': 'webp',
   'image/heic': 'heic',
+  'video/mp4': 'mp4',
+  'video/webm': 'webm',
 };
 
 const DATA_URL_PATTERN = /^data:([\w/+.-]+);base64,(.+)$/s;
@@ -114,6 +116,7 @@ export class StorageService {
     fileBase64: string,
     folder: string,
     fileName?: string,
+    maxBytes = MAX_DOCUMENT_BYTES,
   ): Promise<StoredDocument | null> {
     const match = DATA_URL_PATTERN.exec(fileBase64.trim());
     const mimeType = match ? match[1].toLowerCase() : 'application/pdf';
@@ -127,9 +130,9 @@ export class StorageService {
     if (buffer.length === 0) {
       throw new Error('The uploaded document is empty');
     }
-    if (buffer.length > MAX_DOCUMENT_BYTES) {
+    if (buffer.length > maxBytes) {
       throw new Error(
-        `The uploaded document exceeds ${MAX_DOCUMENT_BYTES / (1024 * 1024)}MB`,
+        `The uploaded document exceeds ${maxBytes / (1024 * 1024)}MB`,
       );
     }
 

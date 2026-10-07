@@ -73,14 +73,23 @@ export class FinesController {
 
   @Patch('bulk-pay')
   @Roles('activities.update')
-  bulkPay(@Body() dto: BulkPayFinesDto) {
-    return this.service.bulkPay(dto.ids, dto.notes);
+  bulkPay(@Body() dto: BulkPayFinesDto, @CurrentUser('id') userId?: string) {
+    return this.service.bulkPay(
+      dto.ids,
+      dto.notes,
+      userId,
+      dto.collectorUserId,
+    );
   }
 
   @Patch(':id/pay')
   @Roles('activities.update')
-  pay(@Param('id') id: string, @Body() dto: PayFineDto) {
-    return this.service.pay(id, dto);
+  pay(
+    @Param('id') id: string,
+    @Body() dto: PayFineDto,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.service.pay(id, dto, userId);
   }
 
   @Patch(':id/cancel')

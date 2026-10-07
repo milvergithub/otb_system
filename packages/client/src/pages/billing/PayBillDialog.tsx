@@ -9,6 +9,8 @@ import { getApiErrorMessage } from "@/lib/api"
 import { formatCurrency, monthNames } from "@/lib/utils"
 import type { Payment } from "@/lib/types"
 import { useActiveDiscounts, usePayBill } from "@/hooks/billing"
+import { useSearchUsers } from "@/hooks/users"
+import { useAuth } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -33,6 +35,7 @@ const payFormSchema = (t: TFunction) =>
     method: requiredString(t),
     reference: z.string().optional(),
     discount_ids: z.array(z.string()).optional(),
+    collectorUserId: z.string().optional(),
   })
 
 type PayFormValues = z.infer<ReturnType<typeof payFormSchema>>
@@ -42,6 +45,7 @@ const DEFAULT_PAY_FORM: PayFormValues = {
   method: "cash",
   reference: "",
   discount_ids: [],
+  collectorUserId: "",
 }
 
 interface PayBillDialogProps {
@@ -61,6 +65,7 @@ export default function PayBillDialog({
   })
 
   const watchMethod = useWatch({ control: form.control, name: "method" })
+  const watchCollector = useWatch({ control: form.control, name: "collectorUserId" })
   const watchDiscountIds = useWatch({
     control: form.control,
     name: "discount_ids",
@@ -68,6 +73,9 @@ export default function PayBillDialog({
 
   const { data: discounts } = useActiveDiscounts()
   const payMutation = usePayBill()
+  const { hasPermission } = useAuth()
+  const canPickCollector = hasPermission("users.read")
+  const { data: users } = useSearchUsers(undefined, canPickCollector)
 
   const [imageSrc, setImageSrc] = useState<string | null>(null)
   const [croppedBase64, setCroppedBase64] = useState<string | null>(null)
@@ -109,6 +117,7 @@ export default function PayBillDialog({
       method: "cash",
       reference: "",
       discount_ids: payment.paymentDiscounts?.map((pd) => pd.discount_id) ?? [],
+      collectorUserId: "",
     })
   }, [payment, form])
 
@@ -158,6 +167,7 @@ export default function PayBillDialog({
           reference: values.reference || undefined,
           discountIds: values.discount_ids ?? [],
           evidenceBase64: croppedBase64 ?? undefined,
+          collectorUserId: values.collectorUserId || undefined,
         },
         {
           onSuccess: () => {
@@ -221,6 +231,22 @@ export default function PayBillDialog({
               {...form.register("reference")}
             />
           </div>
+          {canPickCollector ? (
+            <div className="space-y-2">
+              <Label>{t("finances.collector")}</Label>
+              <ComboboxSelect
+                value={watchCollector || ""}
+                onValueChange={(v) => form.setValue("collectorUserId", v)}
+                className="w-full"
+                options={[
+                  { label: t("finances.collectorAuto"), value: "" },
+                  ...(users ?? []).map((u) => ({ label: u.full_name, value: u.id })),
+                ]}
+                placeholder={t("common.select")}
+                searchPlaceholder={t("common.search")}
+              />
+            </div>
+          ) : null}
           <div className="space-y-2">
             <Label>{t("billing.discountsOptional")}</Label>
             <div className="rounded-md border p-3 space-y-2 max-h-40 overflow-y-auto">

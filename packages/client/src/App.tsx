@@ -20,8 +20,8 @@ const AuditLogsPage = lazy(() => import("@/pages/audit"))
 const AssetsPage = lazy(() => import("@/pages/assets"))
 const FinancesPage = lazy(() => import("@/pages/finances"))
 const ActivitiesPage = lazy(() => import("@/pages/activities/activities"))
-const ActivitySharePage = lazy(() => import("@/pages/activities/share"))
 const AttendancePage = lazy(() => import("@/pages/activities/attendance"))
+const ActivityDetailPage = lazy(() => import("@/pages/activities/detail"))
 const MemberFinesPage = lazy(() => import("@/pages/activities/member-fines"))
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -64,7 +64,7 @@ export default function App() {
         <Route path="users" element={<UsersPage />} />
         <Route path="audit" element={<AuditLogsPage />} />
         <Route path="actividades" element={<ActivitiesPage />} />
-        <Route path="actividades/:id" element={<ActivitySharePage />} />
+        <Route path="actividades/:id" element={<ActivityDetailPage />} />
         <Route path="actividades/:id/asistencia" element={<AttendancePage />} />
         <Route path="fine-types" element={<ActivitiesPage />} />
         <Route path="fines/:memberId" element={<MemberFinesPage />} />

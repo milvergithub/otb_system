@@ -125,14 +125,13 @@ export default function MeterFormDialog({
             type_id: editing.type_id,
             latitude: editing.latitude ?? "",
             longitude: editing.longitude ?? "",
-            share_amount: "",
+  share_amount: "0",
             share_method: "",
             share_reference: "",
             share_notes: "",
           }
         : {
             ...DEFAULT_METER_FORM,
-            share_amount: activeShares?.[0]?.amount ?? "",
           },
     )
   }, [open, editing, activeShares, meterForm])
@@ -140,6 +139,7 @@ export default function MeterFormDialog({
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     meterForm.handleSubmit(async (values) => {
+      const shareAmount = Number(values.share_amount)
       const payload = {
         code: values.code,
         memberId: values.member_id,
@@ -147,7 +147,7 @@ export default function MeterFormDialog({
         typeId: values.type_id,
         latitude: values.latitude ? parseFloat(values.latitude) : undefined,
         longitude: values.longitude ? parseFloat(values.longitude) : undefined,
-        shareAmount: values.share_amount ? Number(values.share_amount) : undefined,
+        shareAmount: Number.isFinite(shareAmount) && shareAmount > 0 ? shareAmount : undefined,
         sharePaymentMethod: values.share_method || undefined,
         shareReference: values.share_reference || undefined,
         shareNotes: values.share_notes || undefined,
@@ -278,12 +278,13 @@ export default function MeterFormDialog({
                       min="0"
                       step="0.01"
                       {...meterForm.register("share_amount")}
-                      placeholder={
-                        activeShares?.[0]
-                          ? t("meters.default", { amount: activeShares[0].amount })
-                          : t("meters.noActiveShare")
-                      }
+                      placeholder="0"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      {activeShares?.[0]
+                        ? t("meters.activeShareAmount", { amount: activeShares[0].amount })
+                        : t("meters.noActiveShare")}
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label>{t("meters.paymentMethod")}</Label>

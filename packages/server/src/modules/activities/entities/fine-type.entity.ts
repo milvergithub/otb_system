@@ -12,13 +12,20 @@ export enum FineTypeCode {
   ABSENT_END = 'absent_end',
 }
 
+export enum FineTypeAppliesTo {
+  ABSENT = 'absent',
+  LATE = 'late',
+  LEFT_EARLY = 'left_early',
+  MANUAL = 'manual',
+}
+
 @Entity('fine_types')
 export class FineType {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column({ type: 'varchar', length: 50 })
-  code: FineTypeCode;
+  code: string;
 
   @Column()
   name: string;
@@ -28,6 +35,9 @@ export class FineType {
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   amount: string;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  applies_to: FineTypeAppliesTo | null;
 
   @Column({ default: true })
   is_active: boolean;

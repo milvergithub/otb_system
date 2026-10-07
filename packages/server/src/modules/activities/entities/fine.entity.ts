@@ -2,14 +2,17 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { Member } from '../../members/entities/member.entity';
+import { User } from '../../users/entities/user.entity';
 import { Activity } from './activity.entity';
 import { FineType } from './fine-type.entity';
+import { Attendance } from './attendance.entity';
 
 export enum FineStatus {
   PENDING = 'pending',
@@ -17,7 +20,16 @@ export enum FineStatus {
   CANCELLED = 'cancelled',
 }
 
+export enum FineSource {
+  ATTENDANCE = 'attendance',
+  MANUAL = 'manual',
+  OTHER = 'other',
+}
+
 @Entity('fines')
+@Index(['activity_id'])
+@Index(['member_id'])
+@Index(['attendance_id'])
 export class Fine {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -42,6 +54,26 @@ export class Fine {
   @ManyToOne(() => FineType, { eager: true })
   @JoinColumn({ name: 'fine_type_id' })
   fineType: FineType;
+
+  @Column({ type: 'varchar', length: 20, default: FineSource.ATTENDANCE })
+  source: FineSource;
+
+  @Column({ type: 'uuid', nullable: true })
+  attendance_id: string | null;
+
+  @ManyToOne(() => Attendance, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'attendance_id' })
+  attendance: Attendance | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  created_by_user_id: string | null;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'created_by_user_id' })
+  createdBy: User | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  issued_at: Date | null;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   amount: string;

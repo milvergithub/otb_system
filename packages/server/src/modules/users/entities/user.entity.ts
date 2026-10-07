@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
   JoinTable,
   ManyToMany,
   ManyToOne,
@@ -44,6 +45,7 @@ export class User {
   member_id: string | null;
 
   @ManyToOne(() => Member, { nullable: true, eager: false })
+  @JoinColumn({ name: 'member_id' })
   member: Member | null;
 
   @ManyToMany(() => Role, (role) => role.id, { eager: true })

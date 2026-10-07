@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { FineType, FineTypeCode } from './entities/fine-type.entity';
+import { FineType } from './entities/fine-type.entity';
 import { CreateFineTypeDto, UpdateFineTypeDto } from './dto/fine-type.dto';
 
 @Injectable()
@@ -25,7 +25,7 @@ export class FineTypesService {
     return ft;
   }
 
-  async findByCode(code: FineTypeCode): Promise<FineType | null> {
+  async findByCode(code: string): Promise<FineType | null> {
     return this.repo.findOne({ where: { code, is_active: true } });
   }
 
@@ -41,6 +41,7 @@ export class FineTypesService {
       name: dto.name,
       description: dto.description,
       amount: dto.amount.toString(),
+      applies_to: dto.appliesTo ?? null,
       is_active: dto.isActive ?? true,
     });
     return this.repo.save(entity);
@@ -53,6 +54,8 @@ export class FineTypesService {
       name: dto.name ?? entity.name,
       description: dto.description ?? entity.description,
       amount: dto.amount !== undefined ? dto.amount.toString() : entity.amount,
+      applies_to:
+        dto.appliesTo !== undefined ? dto.appliesTo : entity.applies_to,
       is_active: dto.isActive ?? entity.is_active,
     });
     return this.repo.save(entity);

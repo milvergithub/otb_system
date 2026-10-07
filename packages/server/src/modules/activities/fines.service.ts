@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -18,10 +19,23 @@ import {
   PaginationDto,
 } from '../../common/dto/pagination.dto';
 import { buildOrder } from '../../common/utils/sort';
-import { Fine, FineStatus } from './entities/fine.entity';
-import { PayFineDto, CancelFineDto } from './dto/fine.dto';
+import { Fine, FineSource, FineStatus } from './entities/fine.entity';
+import { FineType, FineTypeAppliesTo } from './entities/fine-type.entity';
+import { Member } from '../members/entities/member.entity';
+import { Activity } from './entities/activity.entity';
+import { PayFineDto, CancelFineDto, CreateManualFineDto } from './dto/fine.dto';
 import { FinancesService } from '../finances/finances.service';
 import { FinanceSourceType } from '../finances/entities/finance-transaction.entity';
+
+/**
+ * Registration context taken at payment time for the finance movement. The
+ * collector itself is resolved per fine: the explicit value wins, otherwise the
+ * fine's activity `collector_user_id`, otherwise the registrant.
+ */
+interface FinePaymentContext {
+  explicitCollectorUserId: string | null;
+  registeredByUserId: string | null;
+}
 
 const SORT_COLUMNS: Record<string, string> = {
   member: 'member.first_name',
@@ -39,6 +53,12 @@ export class FinesService {
   constructor(
     @InjectRepository(Fine)
     private readonly repo: Repository<Fine>,
+    @InjectRepository(FineType)
+    private readonly fineTypeRepo: Repository<FineType>,
+    @InjectRepository(Member)
+    private readonly membersRepo: Repository<Member>,
+    @InjectRepository(Activity)
+    private readonly activitiesRepo: Repository<Activity>,
     private readonly eventEmitter: EventEmitter2,
     private readonly financesService: FinancesService,
     private readonly dataSource: DataSource,
@@ -51,7 +71,7 @@ export class FinesService {
   ): void {
     if (canViewAll) return;
     query.andWhere(
-      'f.activity_id IN (SELECT a.id FROM activities a LEFT JOIN activity_shares s ON s.activity_id = a.id WHERE a.created_by = :userId OR s.user_id = :userId)',
+      'f.activity_id IN (SELECT a.id FROM activities a WHERE a.responsible_user_id = :userId)',
       { userId },
     );
   }
@@ -192,7 +212,60 @@ export class FinesService {
     return fine;
   }
 
-  async pay(id: string, dto: PayFineDto): Promise<Fine> {
+  /**
+   * Manual fine (source = MANUAL). The issuer is always the authenticated user;
+   * clients cannot send createdByUserId. Amount defaults to the fine type
+   * amount, which keeps prices in one place instead of the frontend.
+   */
+  async createManual(
+    activityId: string,
+    dto: CreateManualFineDto,
+    currentUserId?: string,
+  ): Promise<Fine> {
+    const activity = await this.activitiesRepo.findOneBy({ id: activityId });
+    if (!activity) throw new NotFoundException('Actividad no encontrada');
+
+    const fineType = await this.fineTypeRepo.findOneBy({
+      id: dto.fineTypeId,
+    });
+    if (!fineType) throw new BadRequestException('Tipo de multa no encontrado');
+    if (!fineType.is_active) {
+      throw new BadRequestException('El tipo de multa está inactivo');
+    }
+
+    const member = await this.membersRepo.findOneBy({ id: dto.memberId });
+    if (!member) throw new BadRequestException('Socio no encontrado');
+
+    const amount = dto.amount?.trim()
+      ? Number(dto.amount)
+      : parseFloat(fineType.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('El monto de la multa es inválido');
+    }
+
+    const fine = this.repo.create({
+      member_id: dto.memberId,
+      activity_id: activityId,
+      fine_type_id: fineType.id,
+      amount: amount.toFixed(2),
+      status: FineStatus.PENDING,
+      source: FineSource.MANUAL,
+      created_by_user_id: currentUserId ?? null,
+      issued_at: new Date(),
+      notes: dto.notes ?? undefined,
+    });
+    return this.repo.save(fine);
+  }
+
+  async pay(
+    id: string,
+    dto: PayFineDto,
+    currentUserId?: string,
+  ): Promise<Fine> {
+    const attribution = this.buildPaymentContext(
+      dto.collectorUserId,
+      currentUserId,
+    );
     await this.dataSource.transaction(async (manager) => {
       const repo = manager.getRepository(Fine);
 
@@ -236,7 +309,7 @@ export class FinesService {
       });
       if (!updated) throw new NotFoundException('Multa no encontrada');
 
-      await this.recordFineIncome(updated, manager);
+      await this.recordFineIncome(updated, manager, attribution);
 
       return updated;
     });
@@ -255,9 +328,19 @@ export class FinesService {
     return paid;
   }
 
-  async bulkPay(ids: string[], notes?: string): Promise<{ paid: number }> {
+  async bulkPay(
+    ids: string[],
+    notes?: string,
+    currentUserId?: string,
+    collectorUserId?: string,
+  ): Promise<{ paid: number }> {
     const uniqueIds = [...new Set(ids)];
     if (uniqueIds.length === 0) return { paid: 0 };
+
+    const attribution = this.buildPaymentContext(
+      collectorUserId,
+      currentUserId,
+    );
 
     const values: Partial<Fine> = {
       status: FineStatus.PAID,
@@ -292,7 +375,7 @@ export class FinesService {
       });
 
       for (const fine of updated) {
-        await this.recordFineIncome(fine, manager);
+        await this.recordFineIncome(fine, manager, attribution);
       }
 
       return updated;
@@ -324,14 +407,55 @@ export class FinesService {
   }
 
   /**
+   * Centralized registration context for a fine payment: registeredBy is always
+   * the authenticated user; the collector falls back per fine to the activity's
+   * `collector_user_id` (see `resolveCollector`).
+   */
+  private buildPaymentContext(
+    collectorUserId: string | null | undefined,
+    registeredByUserId: string | null | undefined,
+  ): FinePaymentContext {
+    return {
+      explicitCollectorUserId: collectorUserId ?? null,
+      registeredByUserId: registeredByUserId ?? null,
+    };
+  }
+
+  /**
+   * Collector of a fine movement: explicit value wins, otherwise the fine's
+   * activity collector (the user selected at activity creation to collect its
+   * fines), otherwise the authenticated registrant.
+   */
+  private resolveCollector(
+    activityCollectorUserId: string | null,
+    context?: FinePaymentContext,
+  ): string | null {
+    return (
+      context?.explicitCollectorUserId ??
+      activityCollectorUserId ??
+      context?.registeredByUserId ??
+      null
+    );
+  }
+
+  /**
    * Pushes a paid fine into the financial ledger as automatic income.
    * Idempotent through the (sourceType, sourceId) pair, so paying the same
    * fine twice can never duplicate the movement.
+   *
+   * Responsibility snapshot: taken from the fine's activity collector
+   * (`activities.collector_user_id`, never from created_by, role, or the
+   * registrant), so later changes never rewrite history. The collector of the
+   * movement is the activity collector too, unless an explicit collector is
+   * provided for this payment. Bulk payments spanning several activities
+   * resolve each fine individually.
    */
   private async recordFineIncome(
     fine: Fine,
     manager?: EntityManager,
+    context?: FinePaymentContext,
   ): Promise<void> {
+    const activityCollectorUserId = fine.activity?.collector_user_id ?? null;
     const input = {
       sourceType: FinanceSourceType.FINE_PAYMENT,
       sourceId: fine.id,
@@ -344,6 +468,10 @@ export class FinesService {
         : undefined,
       memberId: fine.member_id,
       notes: fine.notes,
+      activityId: fine.activity_id,
+      responsibleUserId: activityCollectorUserId,
+      collectorUserId: this.resolveCollector(activityCollectorUserId, context),
+      registeredByUserId: context?.registeredByUserId ?? null,
     };
 
     if (!manager) {

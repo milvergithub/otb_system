@@ -10,6 +10,7 @@ import { formatCurrency, formatDate } from "@/lib/utils"
 import type { Meter } from "@/lib/types"
 import { useAuth } from "@/lib/auth"
 import { useMeterSharePayments, useAddSharePayment } from "@/hooks/meters"
+import { useSearchUsers } from "@/hooks/users"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -42,6 +43,7 @@ const sharePaymentFormSchema = (t: TFunction) =>
     method: z.string().optional(),
     reference: z.string().optional(),
     notes: z.string().optional(),
+    collectorUserId: z.string().optional(),
   })
 
 type SharePaymentFormValues = z.infer<ReturnType<typeof sharePaymentFormSchema>>
@@ -51,6 +53,7 @@ const DEFAULT_SHARE_PAY_FORM: SharePaymentFormValues = {
   method: "",
   reference: "",
   notes: "",
+  collectorUserId: "",
 }
 
 interface SharePaymentsDialogProps {
@@ -72,6 +75,7 @@ export default function SharePaymentsDialog({
   })
 
   const watchSharePayMethod = useWatch({ control: sharePayForm.control, name: "method" })
+  const watchSharePayCollector = useWatch({ control: sharePayForm.control, name: "collectorUserId" })
 
   const [imageSrc, setImageSrc] = useState<string | null>(null)
   const [croppedBase64, setCroppedBase64] = useState<string | null>(null)
@@ -80,6 +84,8 @@ export default function SharePaymentsDialog({
 
   const { data: sharePayments } = useMeterSharePayments(meter?.id, !!meter)
   const addSharePayment = useAddSharePayment(meter?.id ?? "")
+  const canPickCollector = hasPermission("users.read")
+  const { data: users } = useSearchUsers(undefined, canPickCollector)
 
   useEffect(() => {
     if (meter) sharePayForm.reset(DEFAULT_SHARE_PAY_FORM)
@@ -108,6 +114,7 @@ export default function SharePaymentsDialog({
           reference: values.reference || undefined,
           notes: values.notes || undefined,
           evidenceBase64: croppedBase64 ?? undefined,
+          collectorUserId: values.collectorUserId || undefined,
         },
         {
           onSuccess: () => {
@@ -250,6 +257,22 @@ export default function SharePaymentsDialog({
                   {...sharePayForm.register("notes")}
                 />
               </div>
+              {canPickCollector ? (
+                <div className="space-y-2">
+                  <Label>{t("finances.collector")}</Label>
+                  <ComboboxSelect
+                    value={watchSharePayCollector || ""}
+                    onValueChange={(v) => sharePayForm.setValue("collectorUserId", v)}
+                    placeholder={t("common.select")}
+                    searchPlaceholder={t("common.search")}
+                    className="w-full"
+                    options={[
+                      { label: t("finances.collectorAuto"), value: "" },
+                      ...(users ?? []).map((u) => ({ label: u.full_name, value: u.id })),
+                    ]}
+                  />
+                </div>
+              ) : null}
               <div className="space-y-2">
                 <Label>{t("meters.evidence")}</Label>
                 <input

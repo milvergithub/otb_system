@@ -64,14 +64,17 @@ export class AssetsController {
 
   @Post()
   @Roles('assets.create')
-  create(@Body() dto: CreateAssetDto) {
-    return this.assetsService.create(dto);
+  create(@Body() dto: CreateAssetDto, @CurrentUser('id') userId?: string) {
+    return this.assetsService.create(dto, userId);
   }
 
   @Post('bulk')
   @Roles('assets.create')
-  createBulk(@Body() dto: CreateAssetsBulkDto) {
-    return this.assetsService.createBulk(dto);
+  createBulk(
+    @Body() dto: CreateAssetsBulkDto,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.assetsService.createBulk(dto, userId);
   }
 
   @Get(':id')
@@ -207,8 +210,9 @@ export class AssetsController {
     @Param('id') id: string,
     @Param('maintenanceId') maintenanceId: string,
     @Body() dto: FinishAssetMaintenanceDto,
+    @CurrentUser('id') userId?: string,
   ) {
-    return this.assetsService.finishMaintenance(id, maintenanceId, dto);
+    return this.assetsService.finishMaintenance(id, maintenanceId, dto, userId);
   }
 
   @Post(':id/documents')

@@ -5,6 +5,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Min,
 } from 'class-validator';
 import { PaymentMethod } from '../entities/payment-history.entity';
@@ -35,6 +36,16 @@ export class PayBillDto {
   @IsOptional()
   @IsString()
   evidenceBase64?: string;
+
+  /**
+   * User that physically collected the money. Optional: when omitted the
+   * authenticated registrant is assumed to be the collector.
+   * `registeredByUserId` and `responsibleUserId` are never accepted here —
+   * they are resolved server-side.
+   */
+  @IsOptional()
+  @IsUUID()
+  collectorUserId?: string;
 }
 
 export class GenerateBillDto {

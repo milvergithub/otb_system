@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
-import { useForm } from "react-hook-form"
+import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { Save, Settings as SettingsIcon, Gauge, Map, HandCoins, Percent, TrendingUp, MessageSquare, Boxes, Wallet } from "lucide-react"
 import { getApiErrorMessage } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useSettings, useUpdateSettings } from "@/hooks/settings"
+import { useSearchUsers } from "@/hooks/users"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
+import { ComboboxSelect } from "@/components/ui/combobox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import MeterTypesPanel from "./meters/MeterTypesPanel"
 import ZoneTypesPanel from "./zones/ZoneTypesPanel"
@@ -38,6 +40,10 @@ const SETTING_LABELS: Record<string, { label: string; description: string }> = {
 }
 
 const NUMBER_KEYS = ["payment_due_day"]
+const USER_SETTING_KEYS = [
+  "water_bill_responsible_user_id",
+  "water_share_responsible_user_id",
+]
 const OPENWA_KEYS = [
   "openwa_api_key",
   "openwa_consumption_template_id",
@@ -52,6 +58,8 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("general")
 
   const { data: settings, isLoading } = useSettings()
+  const canPickUsers = hasPermission("users.read")
+  const { data: users } = useSearchUsers(undefined, canPickUsers)
 
   const updateMutation = useUpdateSettings()
 
@@ -85,7 +93,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+      <div className="min-w-0 space-y-6">
       <div>
         <h1 className="text-2xl font-bold">{t("settings.title")}</h1>
         <p className="text-sm text-muted-foreground">
@@ -94,7 +102,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="w-full overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
+        <div className="w-full min-w-0 overflow-x-auto">
           <TabsList>
             <Can permission="settings.read">
               <TabsTrigger value="general" className="gap-2">
@@ -159,10 +167,10 @@ export default function SettingsPage() {
           </TabsList>
         </div>
         <Can permission="settings.read">
-          <TabsContent value="general">
+          <TabsContent value="general" className="min-w-0">
             <div className="mt-4 space-y-4">
               <form onSubmit={handleSubmit} noValidate className="space-y-4">
-                {Object.keys(settings ?? {}).filter((key) => !OPENWA_KEYS.includes(key)).map((key) => {
+                {Object.keys(settings ?? {}).filter((key) => !OPENWA_KEYS.includes(key) && !(canPickUsers && USER_SETTING_KEYS.includes(key))).map((key) => {
                   const meta = SETTING_LABELS[key]
                   const isNumber = NUMBER_KEYS.includes(key)
                   return (
@@ -185,6 +193,62 @@ export default function SettingsPage() {
                     </div>
                   )
                 })}
+                {canPickUsers ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>{t("settings.waterBillResponsible.label")}</Label>
+                      <Controller
+                        control={form.control}
+                        name="water_bill_responsible_user_id"
+                        render={({ field }) => (
+                          <ComboboxSelect
+                            value={field.value ?? ""}
+                            onValueChange={(v) => field.onChange(v)}
+                            options={[
+                              { label: t("finances.noResponsible"), value: "" },
+                              ...(users ?? []).map((u) => ({
+                                label: u.full_name,
+                                value: u.id,
+                              })),
+                            ]}
+                            placeholder={t("common.select")}
+                            searchPlaceholder={t("common.search")}
+                            disabled={!canUpdate}
+                          />
+                        )}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {t("settings.waterBillResponsible.description")}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t("settings.waterShareResponsible.label")}</Label>
+                      <Controller
+                        control={form.control}
+                        name="water_share_responsible_user_id"
+                        render={({ field }) => (
+                          <ComboboxSelect
+                            value={field.value ?? ""}
+                            onValueChange={(v) => field.onChange(v)}
+                            options={[
+                              { label: t("finances.noResponsible"), value: "" },
+                              ...(users ?? []).map((u) => ({
+                                label: u.full_name,
+                                value: u.id,
+                              })),
+                            ]}
+                            placeholder={t("common.select")}
+                            searchPlaceholder={t("common.search")}
+                            disabled={!canUpdate}
+                          />
+                        )}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {t("settings.waterShareResponsible.description")}
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
                 {canUpdate ? (
                   <div className="flex justify-end">
                     <Button
@@ -202,13 +266,13 @@ export default function SettingsPage() {
         </Can>
 
         <Can permission="settings.read">
-          <TabsContent value="whatsapp">
+          <TabsContent value="whatsapp" className="min-w-0">
             <WhatsAppSettingsPanel />
           </TabsContent>
         </Can>
 
         <Can permission="meter_types.read">
-          <TabsContent value="meterTypes">
+          <TabsContent value="meterTypes" className="min-w-0">
             <div className="mt-4">
               <MeterTypesPanel />
             </div>
@@ -216,7 +280,7 @@ export default function SettingsPage() {
         </Can>
 
         <Can permission="zone_types.read">
-          <TabsContent value="zoneTypes">
+          <TabsContent value="zoneTypes" className="min-w-0">
             <div className="mt-4">
               <ZoneTypesPanel />
             </div>
@@ -224,7 +288,7 @@ export default function SettingsPage() {
         </Can>
 
         <Can permission="shares.read">
-          <TabsContent value="shares">
+          <TabsContent value="shares" className="min-w-0">
             <div className="mt-4">
               <SharesPage />
             </div>
@@ -232,7 +296,7 @@ export default function SettingsPage() {
         </Can>
 
         <Can permission="discounts.read">
-          <TabsContent value="discounts">
+          <TabsContent value="discounts" className="min-w-0">
             <div className="mt-4">
               <DiscountsPage />
             </div>
@@ -240,7 +304,7 @@ export default function SettingsPage() {
         </Can>
 
         <Can permission="tariffs.read">
-          <TabsContent value="tariffs">
+          <TabsContent value="tariffs" className="min-w-0">
             <div className="mt-4">
               <TariffsPage />
             </div>
@@ -248,7 +312,7 @@ export default function SettingsPage() {
         </Can>
 
         <Can permission="assets.read">
-          <TabsContent value="assetCategories">
+          <TabsContent value="assetCategories" className="min-w-0">
             <div className="mt-4">
               <AssetCategoriesPanel />
             </div>
@@ -256,7 +320,7 @@ export default function SettingsPage() {
         </Can>
 
         <Can permission="assets.read">
-          <TabsContent value="assetLocations">
+          <TabsContent value="assetLocations" className="min-w-0">
             <div className="mt-4">
               <AssetLocationsPanel />
             </div>
@@ -264,7 +328,7 @@ export default function SettingsPage() {
         </Can>
 
         <Can permission="finances.read">
-          <TabsContent value="financeCategories">
+          <TabsContent value="financeCategories" className="min-w-0">
             <div className="mt-4">
               <FinanceCategoriesPanel />
             </div>

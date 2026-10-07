@@ -116,9 +116,7 @@ export class ReportsService {
       shareCollected: Number(shareTotal.toFixed(2)),
       collectionRate:
         totalBilled > 0
-          ? Number(
-              (((totalCollected + shareTotal) / totalBilled) * 100).toFixed(1),
-            )
+          ? Number(((totalCollected / totalBilled) * 100).toFixed(1))
           : 0,
       overdueCount,
       pendingCount,

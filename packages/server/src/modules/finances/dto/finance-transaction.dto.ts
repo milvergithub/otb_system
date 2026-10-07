@@ -1,6 +1,7 @@
 import { PartialType } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+  IsArray,
   IsDateString,
   IsEnum,
   IsNotEmpty,
@@ -13,9 +14,20 @@ import {
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import {
   FinanceSourceType,
+  FinanceTransactionStatus,
   FinanceTransactionType,
 } from '../entities/finance-transaction.entity';
 import { PaymentMethod } from '../../billing/entities/payment-history.entity';
+
+/**
+ * Visibility scope for finance queries. `mine` = movements where the requester
+ * is the financial responsible; `all` requires the `finances.all` permission
+ * (which grants visibility, never financial responsibility).
+ */
+export enum FinanceScope {
+  MINE = 'mine',
+  ALL = 'all',
+}
 
 export class CreateFinanceTransactionDto {
   @IsEnum(FinanceTransactionType)
@@ -61,6 +73,22 @@ export class CreateFinanceTransactionDto {
   @IsUUID()
   userId?: string;
 
+  /**
+   * Financially responsible user. Never defaulted to the authenticated user:
+   * only `finances.all` may assign an arbitrary responsible, otherwise the
+   * value must be the requester's own id (or omitted).
+   * NOTE: `registeredByUserId` is intentionally absent from this DTO — it is
+   * always taken from the authenticated context.
+   */
+  @IsOptional()
+  @IsUUID()
+  responsibleUserId?: string;
+
+  /** User that physically collected the money (optional). */
+  @IsOptional()
+  @IsUUID()
+  collectorUserId?: string;
+
   @IsOptional()
   @IsString()
   provider?: string;
@@ -68,6 +96,10 @@ export class CreateFinanceTransactionDto {
   @IsOptional()
   @IsUUID()
   assetId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  activityId?: string;
 
   @IsOptional()
   @IsString()
@@ -94,6 +126,17 @@ export class FilterFinanceDto extends PaginationDto {
   categoryId?: string;
 
   @IsOptional()
+  @Transform(({ value }) => {
+    if (value === undefined || value === null || value === '') return undefined;
+    const raw = Array.isArray(value) ? value : String(value).split(',');
+    const cleaned = raw.map((v: unknown) => String(v).trim()).filter(Boolean);
+    return cleaned.length > 0 ? cleaned : undefined;
+  })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  categoryIds?: string[];
+
+  @IsOptional()
   @IsUUID()
   memberId?: string;
 
@@ -103,7 +146,36 @@ export class FilterFinanceDto extends PaginationDto {
 
   @IsOptional()
   @IsUUID()
+  responsibleUserId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  collectorUserId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  registeredByUserId?: string;
+
+  /**
+   * Visibility scope: `mine` limits the result to the requester's financial
+   * responsibility. Without `finances.all` the scope is always forced to
+   * `mine` server-side, regardless of the value sent by the client.
+   */
+  @IsOptional()
+  @IsEnum(FinanceScope)
+  scope?: FinanceScope;
+
+  @IsOptional()
+  @IsEnum(FinanceTransactionStatus)
+  status?: FinanceTransactionStatus;
+
+  @IsOptional()
+  @IsUUID()
   assetId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  activityId?: string;
 
   @IsOptional()
   @IsEnum(FinanceSourceType)
@@ -134,4 +206,20 @@ export class FinanceReportsFilterDto {
   @IsOptional()
   @IsEnum(FinanceTransactionType)
   type?: FinanceTransactionType;
+
+  @IsOptional()
+  @IsUUID()
+  responsibleUserId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  collectorUserId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  registeredByUserId?: string;
+
+  @IsOptional()
+  @IsEnum(FinanceScope)
+  scope?: FinanceScope;
 }

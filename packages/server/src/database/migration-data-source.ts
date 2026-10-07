@@ -21,7 +21,9 @@ import { AuditLog } from '../modules/audit/entities/audit-log.entity';
 import { Zone } from '../modules/zones/zone.entity';
 import { ZoneTypeEntity } from '../modules/zones/entities/zone-type.entity';
 import { Activity } from '../modules/activities/entities/activity.entity';
-import { ActivityShare } from '../modules/activities/entities/activity-share.entity';
+import { ActivityType } from '../modules/activities/entities/activity-type.entity';
+import { ActivityAttendanceSession } from '../modules/activities/entities/activity-attendance-session.entity';
+import { ActivityEvidence } from '../modules/activities/entities/activity-evidence.entity';
 import { FineType } from '../modules/activities/entities/fine-type.entity';
 import { Attendance } from '../modules/activities/entities/attendance.entity';
 import { Fine } from '../modules/activities/entities/fine.entity';
@@ -69,7 +71,9 @@ export const AppDataSource = new DataSource({
     Zone,
     ZoneTypeEntity,
     Activity,
-    ActivityShare,
+    ActivityType,
+    ActivityAttendanceSession,
+    ActivityEvidence,
     FineType,
     Attendance,
     Fine,

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -26,13 +27,17 @@ export class MeterTypesService {
   }
 
   async create(dto: CreateMeterTypeDto): Promise<MeterTypeEntity> {
+    await this.assertCodeAvailable(dto.code);
     const existing = await this.meterTypeRepo.findOneBy({ name: dto.name });
     if (existing) {
       throw new BadRequestException(
         `A meter type with name "${dto.name}" already exists`,
       );
     }
-    const meterType = this.meterTypeRepo.create(dto);
+    const meterType = this.meterTypeRepo.create({
+      code: dto.code.trim().toUpperCase(),
+      name: dto.name,
+    });
     return this.meterTypeRepo.save(meterType);
   }
 
@@ -46,12 +51,27 @@ export class MeterTypesService {
         );
       }
     }
-    Object.assign(meterType, dto);
+    if (dto.name !== undefined) meterType.name = dto.name;
     return this.meterTypeRepo.save(meterType);
   }
 
   async remove(id: string): Promise<void> {
     const meterType = await this.findOne(id);
     await this.meterTypeRepo.remove(meterType);
+  }
+
+  private async assertCodeAvailable(
+    code: string,
+    currentId?: string,
+  ): Promise<void> {
+    if (!code?.trim()) {
+      throw new BadRequestException('El código es obligatorio');
+    }
+    const existing = await this.meterTypeRepo.findOneBy({
+      code: code.trim().toUpperCase(),
+    });
+    if (existing && existing.id !== currentId) {
+      throw new ConflictException('Ya existe un tipo con ese código');
+    }
   }
 }

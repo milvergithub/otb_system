@@ -10,6 +10,8 @@ import { getApiErrorMessage } from "@/lib/api"
 import type { FinanceTransaction, FinanceTransactionType, PaymentMethod } from "@/lib/types"
 import { useAssetsSelect } from "@/hooks/assets"
 import { useAllMembers } from "@/hooks/members"
+import { useSearchUsers } from "@/hooks/users"
+import { useAuth } from "@/lib/auth"
 import {
   useAddFinanceDocument,
   useAddFinanceTransaction,
@@ -21,6 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ComboboxSelect } from "@/components/ui/combobox"
+import { DatePicker } from "@/components/ui/date-picker"
 import {
   Dialog,
   DialogContent,
@@ -48,6 +51,8 @@ const financeFormSchema = (t: TFunction) =>
     assetId: z.string().optional(),
     provider: z.string().optional(),
     notes: z.string().optional(),
+    responsibleUserId: z.string().optional(),
+    collectorUserId: z.string().optional(),
   })
 
 type FinanceFormValues = z.infer<ReturnType<typeof financeFormSchema>>
@@ -64,6 +69,8 @@ const DEFAULT_FORM: FinanceFormValues = {
   assetId: "",
   provider: "",
   notes: "",
+  responsibleUserId: "",
+  collectorUserId: "",
 }
 
 interface FinanceTransactionFormDialogProps {
@@ -93,6 +100,9 @@ export default function FinanceTransactionFormDialog({
   const { data: categories } = useFinanceCategories()
   const { data: members } = useAllMembers()
   const { data: assets } = useAssetsSelect()
+  const { hasPermission } = useAuth()
+  const canPickResponsible = hasPermission("users.read")
+  const { data: users } = useSearchUsers(undefined, canPickResponsible)
 
   const addMutation = useAddFinanceTransaction()
   const editMutation = useEditFinanceTransaction()
@@ -118,6 +128,8 @@ export default function FinanceTransactionFormDialog({
             assetId: editing.asset_id ?? "",
             provider: editing.provider ?? "",
             notes: editing.notes ?? "",
+            responsibleUserId: editing.responsible_user_id ?? "",
+            collectorUserId: editing.collector_user_id ?? "",
           }
         : DEFAULT_FORM,
     )
@@ -150,6 +162,8 @@ export default function FinanceTransactionFormDialog({
         assetId: values.assetId || undefined,
         provider: values.provider || undefined,
         notes: values.notes || undefined,
+        responsibleUserId: values.responsibleUserId || undefined,
+        collectorUserId: values.collectorUserId || undefined,
       }
 
       const onSuccess = (transaction: FinanceTransaction) => {
@@ -205,7 +219,13 @@ export default function FinanceTransactionFormDialog({
             </div>
             <div className="space-y-2">
               <Label htmlFor="date">{t("common.date")}</Label>
-              <Input id="date" type="date" {...form.register("date")} />
+              <Controller
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <DatePicker id="date" value={field.value ?? ""} onChange={field.onChange} />
+                )}
+              />
               {form.formState.errors.date && (
                 <p className="text-sm text-destructive">{form.formState.errors.date.message}</p>
               )}
@@ -316,6 +336,53 @@ export default function FinanceTransactionFormDialog({
             <div className="space-y-2">
               <Label htmlFor="provider">{t("finances.provider")}</Label>
               <Input id="provider" {...form.register("provider")} />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>{t("finances.responsible")}</Label>
+              <Controller
+                control={form.control}
+                name="responsibleUserId"
+                render={({ field }) => (
+                  <ComboboxSelect
+                    value={field.value || ""}
+                    onValueChange={field.onChange}
+                    options={[
+                      { label: t("finances.noResponsible"), value: "" },
+                      ...(users ?? []).map((u) => ({
+                        label: u.full_name,
+                        value: u.id,
+                      })),
+                    ]}
+                    placeholder={t("common.select")}
+                    searchPlaceholder={t("common.search")}
+                  />
+                )}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>{t("finances.collector")}</Label>
+              <Controller
+                control={form.control}
+                name="collectorUserId"
+                render={({ field }) => (
+                  <ComboboxSelect
+                    value={field.value || ""}
+                    onValueChange={field.onChange}
+                    options={[
+                      { label: t("finances.collectorAuto"), value: "" },
+                      ...(users ?? []).map((u) => ({
+                        label: u.full_name,
+                        value: u.id,
+                      })),
+                    ]}
+                    placeholder={t("common.select")}
+                    searchPlaceholder={t("common.search")}
+                  />
+                )}
+              />
             </div>
           </div>
 

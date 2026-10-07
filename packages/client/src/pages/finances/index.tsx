@@ -13,7 +13,7 @@ import { RowActions } from "@/components/ui/row-actions"
 import { DataTablePagination } from "@/components/ui/data-table-pagination"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ComboboxSelect } from "@/components/ui/combobox"
+import { ComboboxMultiSelect, ComboboxSelect } from "@/components/ui/combobox"
 import { useTableSort } from "@/hooks/use-sort"
 import {
   useSearchFinances,
@@ -31,26 +31,31 @@ import FinanceTransactionDetailSheet from "./FinanceDetailSheet"
 import VoidFinanceTransactionDialog from "./VoidFinanceTransactionDialog"
 import { TRANSACTION_TYPE_LABEL, SOURCE_LABEL, METHOD_LABEL } from "./constants"
 import Can from "@/components/Can"
+import { useAuth } from "@/lib/auth"
 
 type Tab = "transactions" | "reports"
+type Scope = "mine" | "all"
 
 export default function FinancesPage() {
   const { t } = useTranslation()
+  const { hasPermission } = useAuth()
+  const canViewAll = hasPermission("finances.all")
   const [tab, setTab] = useState<Tab>("transactions")
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState("")
   const [searchInput, setSearchInput] = useState("")
   const [typeFilter, setTypeFilter] = useState<"" | "income" | "expense">("")
-  const [categoryId, setCategoryId] = useState("")
+  const [categoryIds, setCategoryIds] = useState<string[]>([])
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
+  const [scope, setScope] = useState<Scope>(canViewAll ? "all" : "mine")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<FinanceTransaction | null>(null)
   const [detailTransaction, setDetailTransaction] = useState<FinanceTransaction | null>(null)
   const [voidTransaction, setVoidTransaction] = useState<FinanceTransaction | null>(null)
 
   const { sort, toggleSort } = useTableSort({ key: "date", order: "desc" }, () => setPage(1))
-  const { data, isLoading } = useSearchFinances({ page, search, type: typeFilter, categoryId, dateFrom, dateTo, sortBy: sort?.key, sortOrder: sort?.order })
+  const { data, isLoading } = useSearchFinances({ page, search, type: typeFilter, categoryIds, dateFrom, dateTo, scope, sortBy: sort?.key, sortOrder: sort?.order })
   const { data: categories } = useFinanceCategories()
 
   const items = data?.items ?? []
@@ -70,6 +75,7 @@ export default function FinancesPage() {
     { key: "amount", label: t("finances.amount"), sortable: true, align: "right", render: (row: FinanceTransaction) => <span className="font-medium">{formatCurrency(row.amount)}</span> },
     { key: "payment_method", label: t("finances.paymentMethod"), sortable: false, render: (row: FinanceTransaction) => <span>{row.payment_method ? t(METHOD_LABEL[row.payment_method]) : t("common.none")}</span> },
     { key: "category", label: t("finances.category"), sortable: false, render: (row: FinanceTransaction) => <span>{row.category?.name ?? (row.category_id ? t("finances.uncategorized") : t("common.none"))}</span> },
+    { key: "responsibleUser", label: t("finances.responsible"), render: (row: FinanceTransaction) => <span>{row.responsibleUser?.full_name ?? t("finances.noResponsible")}</span> },
     { key: "source_type", label: t("finances.sourceType"), render: (row: FinanceTransaction) => <span>{row.source_type ? t(SOURCE_LABEL[row.source_type]) : t("common.none")}</span> },
     { key: "status", label: t("finances.statusLabel"), render: (row: FinanceTransaction) => <Badge variant={row.status === "active" ? "default" : "secondary"}>{t(row.status === "active" ? "finances.status.active" : "finances.status.voided")}</Badge> },
     {
@@ -139,7 +145,12 @@ export default function FinancesPage() {
                 </div>
                 <div>
                   <Label>{t("finances.category")}</Label>
-                  <ComboboxSelect value={categoryId} onValueChange={setCategoryId} options={[{ label: t("common.all"), value: "" }, ...(categories?.map((c) => ({ label: c.name, value: c.id })) ?? [])]} placeholder={t("finances.allCategories")} />
+                  <ComboboxMultiSelect
+                    values={categoryIds}
+                    onValuesChange={(v) => { setCategoryIds(v); setPage(1) }}
+                    options={categories?.map((c) => ({ label: c.name, value: c.id })) ?? []}
+                    placeholder={t("finances.allCategories")}
+                  />
                 </div>
                 <div>
                   <Label>{t("finances.dateFrom")}</Label>
@@ -149,6 +160,27 @@ export default function FinancesPage() {
                   <Label>{t("finances.dateTo")}</Label>
                   <DatePicker value={dateTo} onChange={setDateTo} />
                 </div>
+                {canViewAll ? (
+                  <div>
+                    <Label>{t("finances.scopeLabel")}</Label>
+                    <ComboboxSelect
+                      value={scope}
+                      onValueChange={(v) => {
+                        setScope(v as Scope)
+                        setPage(1)
+                      }}
+                      options={[
+                        { label: t("finances.scope.all"), value: "all" },
+                        { label: t("finances.scope.mine"), value: "mine" },
+                      ]}
+                      placeholder={t("finances.scopeLabel")}
+                    />
+                  </div>
+                ) : (
+                  <div className="self-end pb-2 text-sm text-muted-foreground">
+                    {t("finances.scopeLabel")}: {t("finances.scope.mine")}
+                  </div>
+                )}
                 <Button type="submit" variant="outline">{t("common.filter")}</Button>
               </form>
 
@@ -168,7 +200,7 @@ export default function FinancesPage() {
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-4">
-          <ReportsPanel />
+          <ReportsPanel scope={canViewAll ? scope : "mine"} />
         </TabsContent>
       </Tabs>
 
@@ -179,21 +211,21 @@ export default function FinancesPage() {
   )
 }
 
-function ReportsPanel() {
+function ReportsPanel({ scope }: { scope: Scope }) {
   const { t } = useTranslation()
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
-  const { data: summary, isLoading: summaryLoading } = useFinanceReportSummary(startDate || undefined, endDate || undefined)
-  const { data: byCategory } = useFinanceReportByCategory(startDate || undefined, endDate || undefined)
-  const { data: byMethod } = useFinanceReportByMethod(startDate || undefined, endDate || undefined)
-  const { data: monthly } = useFinanceReportMonthly(startDate || undefined, endDate || undefined)
+  const { data: summary, isLoading: summaryLoading } = useFinanceReportSummary(startDate || undefined, endDate || undefined, scope)
+  const { data: byCategory } = useFinanceReportByCategory(startDate || undefined, endDate || undefined, undefined, scope)
+  const { data: byMethod } = useFinanceReportByMethod(startDate || undefined, endDate || undefined, scope)
+  const { data: monthly } = useFinanceReportMonthly(startDate || undefined, endDate || undefined, scope)
   const { data: water } = useFinanceReportWater(startDate || undefined, endDate || undefined)
   const [exporting, setExporting] = useState(false)
 
   async function handleExport() {
     try {
       setExporting(true)
-      await downloadFinanceCsv(startDate || undefined, endDate || undefined)
+      await downloadFinanceCsv(startDate || undefined, endDate || undefined, scope)
     } catch {
       toast.error(t("common.error"))
     } finally {

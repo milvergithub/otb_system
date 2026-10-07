@@ -100,6 +100,12 @@ export default function FinanceTransactionDetailSheet({ transaction, onOpenChang
             <dd>{tx.source_type ?? t("common.none")}</dd>
             <dt className="font-medium text-muted-foreground">{t("finances.reference")}</dt>
             <dd>{tx.reference ?? t("common.none")}</dd>
+            <dt className="font-medium text-muted-foreground">{t("finances.responsible")}</dt>
+            <dd>{tx.responsibleUser?.full_name ?? t("finances.noResponsible")}</dd>
+            <dt className="font-medium text-muted-foreground">{t("finances.collector")}</dt>
+            <dd>{tx.collectorUser?.full_name ?? t("common.none")}</dd>
+            <dt className="font-medium text-muted-foreground">{t("finances.registeredBy")}</dt>
+            <dd>{tx.registeredByUser?.full_name ?? tx.user?.full_name ?? t("common.none")}</dd>
           </dl>
           {tx.notes ? (
             <>

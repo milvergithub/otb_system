@@ -3,6 +3,7 @@ import {
   CreateDateColumn,
   Entity,
   Index,
+  JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
@@ -27,7 +28,7 @@ export class AuditLog {
   user_id: string;
 
   @ManyToOne(() => User, { eager: false, onDelete: 'SET NULL' })
-  @Index()
+  @JoinColumn({ name: 'user_id' })
   user: User;
 
   @Column({

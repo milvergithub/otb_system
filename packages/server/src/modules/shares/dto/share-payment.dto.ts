@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Min,
 } from 'class-validator';
 import { PaymentMethod } from '../../billing/entities/payment-history.entity';
@@ -32,4 +33,12 @@ export class CreateSharePaymentDto {
   @IsOptional()
   @IsString()
   evidenceBase64?: string;
+
+  /**
+   * User that physically collected the money. Optional: when omitted the
+   * authenticated registrant is assumed to be the collector.
+   */
+  @IsOptional()
+  @IsUUID()
+  collectorUserId?: string;
 }

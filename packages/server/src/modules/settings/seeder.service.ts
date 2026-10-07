@@ -7,7 +7,7 @@ import { Role } from '../roles/entities/role.entity';
 import { Permission } from '../roles/entities/permission.entity';
 import { SettingsService } from './settings.service';
 
-const DEFAULT_PERMISSIONS = [
+export const DEFAULT_PERMISSIONS = [
   { resource: 'members', action: 'read', description: 'View members' },
   { resource: 'members', action: 'create', description: 'Create members' },
   { resource: 'members', action: 'update', description: 'Update members' },
@@ -65,6 +65,7 @@ const DEFAULT_PERMISSIONS = [
     action: 'overdue',
     description: 'View overdue reports',
   },
+  { resource: 'reports', action: 'read', description: 'View reports' },
   { resource: 'reports', action: 'export', description: 'Export reports' },
   {
     resource: 'notifications',
@@ -113,6 +114,21 @@ const DEFAULT_PERMISSIONS = [
     resource: 'activities',
     action: 'all',
     description: 'View all activities',
+  },
+  {
+    resource: 'activities',
+    action: 'manageAttendance',
+    description: 'Take and finalize activity attendance',
+  },
+  {
+    resource: 'activities',
+    action: 'manageFines',
+    description: 'Create and manage activity fines',
+  },
+  {
+    resource: 'activities',
+    action: 'manageEvidence',
+    description: 'Upload and delete activity evidence',
   },
   { resource: 'zones', action: 'read', description: 'View zones' },
   { resource: 'zones', action: 'create', description: 'Create zones' },
@@ -207,6 +223,12 @@ const DEFAULT_PERMISSIONS = [
     description: 'Retire and restore assets',
   },
   { resource: 'finances', action: 'read', description: 'View finances' },
+  {
+    resource: 'finances',
+    action: 'all',
+    description:
+      'View all finance movements (visibility only, never financial responsibility)',
+  },
   {
     resource: 'finances',
     action: 'create',

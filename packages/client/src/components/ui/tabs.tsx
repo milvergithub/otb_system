@@ -23,14 +23,17 @@ function Tabs({
 
 const tabsListVariants = cva(
     [
-        "group/tabs-list inline-flex w-fit items-center justify-center",
+        "group/tabs-list inline-flex w-fit max-w-full items-center",
         "rounded-full p-1",
         "bg-background",
         "border-2 border-border",
         "text-muted-foreground",
         "group-data-horizontal/tabs:h-10",
+        "group-data-horizontal/tabs:overflow-x-auto",
         "group-data-vertical/tabs:h-fit",
         "group-data-vertical/tabs:flex-col",
+        "no-scrollbar",
+        "max-md:group-data-horizontal/tabs:h-11",
     ].join(" "),
     {
         variants: {
@@ -70,7 +73,7 @@ function TabsTrigger({
             data-slot="tabs-trigger"
             className={cn(
                 [
-                    "relative inline-flex h-8 flex-1 items-center justify-center",
+                    "relative inline-flex h-8 flex-1 shrink-0 items-center justify-center",
                     "rounded-full px-4",
                     "text-sm font-medium whitespace-nowrap",
                     "text-foreground",
@@ -90,6 +93,13 @@ function TabsTrigger({
                     "[&_svg]:pointer-events-none",
                     "[&_svg]:shrink-0",
                     "[&_svg:not([class*='size-'])]:size-4",
+
+                    // Mobile: icon-only triggers (labels stay in the a11y tree)
+                    "max-md:h-9",
+                    "max-md:[&:has(svg)]:text-[0px]",
+                    "max-md:[&:has(svg)]:gap-0",
+                    "max-md:[&:has(svg)>svg]:mr-0",
+                    "max-md:[&:has(svg)>span]:gap-0",
 
                     // Vertical
                     "group-data-vertical/tabs:w-full",

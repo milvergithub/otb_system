@@ -11,6 +11,9 @@ export class MeterTypeEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ type: 'varchar', length: 30, unique: true })
+  code: string;
+
   @Column({ type: 'varchar', length: 50, unique: true })
   name: string;
 

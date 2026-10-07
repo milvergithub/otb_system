@@ -69,6 +69,7 @@ export interface Member {
 
 export interface MeterTypeItem {
   id: string
+  code: string
   name: string
   created_at: string
   updated_at: string
@@ -282,13 +283,75 @@ export interface AuditLog {
   user?: Pick<User, "id" | "email" | "full_name">
 }
 
-export interface ActivityShare {
+export type ActivityStatus =
+  | "draft"
+  | "scheduled"
+  | "in_progress"
+  | "completed"
+  | "cancelled"
+
+export interface ActivityType {
+  id: string
+  code: string
+  name: string
+  description?: string | null
+  is_active: boolean
+  created_at: string
+}
+
+export type ActivityEvidenceType = "photo" | "video" | "document"
+
+export interface ActivityEvidence {
   id: string
   activity_id: string
-  user_id: string
-  user: User
-  permission: string
+  type: ActivityEvidenceType
+  file_key: string
+  file_name: string
+  mime_type: string
+  size?: string | null
+  description?: string | null
+  uploaded_by_user_id?: string | null
+  uploadedBy?: User | null
+  url?: string
   created_at: string
+}
+
+export interface ActivityAttendanceSession {
+  id: string
+  activity_id: string
+  type: "initial" | "final"
+  started_at: string | null
+  ended_at: string | null
+  started_by_user_id?: string | null
+  ended_by_user_id?: string | null
+}
+
+export interface ActivitySummary {
+  activity: Pick<Activity, "id" | "name" | "status" | "type_id" | "location">
+  membersCount: number
+  attendance: {
+    present: number
+    late: number
+    leftEarly: number
+    absent: number
+    excused: number
+    pending: number
+    notRegistered: number
+  }
+  fines: {
+    count: number
+    pending: number
+    paid: number
+    cancelled: number
+    totalAmount: string
+    collectedAmount: string
+  }
+  finance: {
+    income: string
+    expense: string
+    net: string
+    movements: number
+  }
 }
 
 export interface Activity {
@@ -298,30 +361,56 @@ export interface Activity {
   date: string
   start_time: string
   end_time: string
+  status: ActivityStatus
+  type_id?: string | null
+  type?: ActivityType | null
+  location?: string | null
+  responsible_user_id?: string | null
+  responsibleUser?: User | null
+  collector_user_id?: string | null
+  collectorUser?: User | null
+  attendance_required: boolean
+  fine_enabled: boolean
   initial_control_at: string | null
   final_control_at: string | null
   created_by: string
   creator?: User
+  financial_responsible_user_id?: string | null
+  financialResponsibleUser?: User | null
   created_at: string
   updated_at: string
   attendances?: Attendance[]
   fines?: Fine[]
-  shares?: ActivityShare[]
+  evidence?: ActivityEvidence[]
 }
 
-export type FineTypeCode = "absent_start" | "absent_both" | "absent_end"
+export type FineTypeAppliesTo =
+  | "absent"
+  | "late"
+  | "left_early"
+  | "any"
+  | "manual"
 
 export interface FineType {
   id: string
-  code: FineTypeCode
+  code: string
   name: string
   description?: string | null
   amount: string
+  applies_to: FineTypeAppliesTo
   is_active: boolean
   created_at: string
 }
 
 export type AttendanceStatus = "present" | "absent_start" | "absent_end" | "absent_both"
+
+export type AttendanceResult =
+  | "present"
+  | "late"
+  | "left_early"
+  | "absent"
+  | "excused"
+  | "pending"
 
 export interface Attendance {
   id: string
@@ -332,6 +421,11 @@ export interface Attendance {
   present_at_end: boolean
   checked_at_end: string | null
   status: AttendanceStatus
+  result: AttendanceResult | null
+  initial_marked_at: string | null
+  initial_marked_by_user_id?: string | null
+  final_marked_at: string | null
+  final_marked_by_user_id?: string | null
   created_at: string
   member?: Member
   activity?: Activity
@@ -348,12 +442,15 @@ export interface FinalControlResult {
   processed: number
   presentAtEnd: number
   absentAtEnd: number
+  excusedAtEnd: number
   finesGenerated: number
   finesReconciled: number
   recordedAt: string
 }
 
 export type FineStatus = "pending" | "paid" | "cancelled"
+
+export type FineSource = "attendance" | "manual" | "other"
 
 export interface Fine {
   id: string
@@ -362,6 +459,10 @@ export interface Fine {
   fine_type_id: string
   amount: string
   status: FineStatus
+  source: FineSource
+  attendance_id?: string | null
+  created_by_user_id?: string | null
+  issued_at?: string | null
   paid_at: string | null
   notes?: string | null
   created_at: string
@@ -546,9 +647,16 @@ export interface FinanceTransaction {
   member?: Pick<Member, "id" | "first_name" | "last_name"> | null
   source_type?: FinanceSourceType | null
   source_id?: string | null
+  activity_id?: string | null
   status: FinanceTransactionStatus
   user_id?: string | null
   user?: Pick<User, "id" | "full_name"> | null
+  responsible_user_id?: string | null
+  responsibleUser?: Pick<User, "id" | "full_name"> | null
+  collector_user_id?: string | null
+  collectorUser?: Pick<User, "id" | "full_name"> | null
+  registered_by_user_id?: string | null
+  registeredByUser?: Pick<User, "id" | "full_name"> | null
   provider?: string | null
   asset_id?: string | null
   asset?: Asset | null

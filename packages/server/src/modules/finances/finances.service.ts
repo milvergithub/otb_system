@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -7,7 +8,13 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, In, ILike, Repository } from 'typeorm';
+import {
+  EntityManager,
+  In,
+  ILike,
+  Repository,
+  SelectQueryBuilder,
+} from 'typeorm';
 import {
   PaginatedResult,
   PaginationDto,
@@ -21,6 +28,7 @@ import { Asset } from '../assets/entities/asset.entity';
 import { Member } from '../members/entities/member.entity';
 import { User } from '../users/entities/user.entity';
 import { AssetCategory } from '../assets/entities/asset-category.entity';
+import { Activity } from '../activities/entities/activity.entity';
 import {
   FinanceCategory,
   FinanceCategoryType,
@@ -39,6 +47,7 @@ import {
   CreateFinanceTransactionDto,
   FilterFinanceDto,
   FinanceReportsFilterDto,
+  FinanceScope,
   UpdateFinanceTransactionDto,
   VoidFinanceTransactionDto,
 } from './dto/finance-transaction.dto';
@@ -90,8 +99,29 @@ export interface RecordFinanceMovementInput {
   memberId?: string | null;
   userId?: string | null;
   assetId?: string | null;
+  activityId?: string | null;
   provider?: string;
   notes?: string;
+  /** Financially responsible user (snapshot). See FinancialResponsibilityService. */
+  responsibleUserId?: string | null;
+  /** User that physically collected the money (snapshot). */
+  collectorUserId?: string | null;
+  /** Authenticated user that registered the operation (never client-supplied). */
+  registeredByUserId?: string | null;
+}
+
+/**
+ * Caller context for scoped finance queries. `canViewAll` comes from the
+ * `finances.all` permission, which grants visibility only — it never makes the
+ * user financially responsible of anything.
+ */
+export interface FinanceAccess {
+  userId: string;
+  canViewAll: boolean;
+  scope?: FinanceScope;
+  responsibleUserId?: string;
+  collectorUserId?: string;
+  registeredByUserId?: string;
 }
 
 /**
@@ -128,6 +158,8 @@ export class FinancesService implements OnModuleInit {
     private readonly usersRepo: Repository<User>,
     @InjectRepository(Asset)
     private readonly assetsRepo: Repository<Asset>,
+    @InjectRepository(Activity)
+    private readonly activitiesRepo: Repository<Activity>,
     @InjectRepository(Payment)
     private readonly paymentsRepo: Repository<Payment>,
     @InjectRepository(Consumption)
@@ -156,6 +188,7 @@ export class FinancesService implements OnModuleInit {
 
   async findAll(
     filter: FilterFinanceDto,
+    access?: FinanceAccess,
   ): Promise<PaginatedResult<FinanceTransaction>> {
     const { page, limit, sortBy, sortOrder } = filter;
 
@@ -164,7 +197,12 @@ export class FinancesService implements OnModuleInit {
       .leftJoinAndSelect('tx.category', 'category')
       .leftJoinAndSelect('tx.member', 'member')
       .leftJoinAndSelect('tx.user', 'user')
+      .leftJoinAndSelect('tx.responsibleUser', 'responsibleUser')
+      .leftJoinAndSelect('tx.collectorUser', 'collectorUser')
+      .leftJoinAndSelect('tx.registeredByUser', 'registeredByUser')
       .leftJoinAndSelect('tx.asset', 'asset');
+
+    if (access) this.applyScope(qb, access);
 
     if (filter.search) {
       qb.andWhere('tx.concept ILIKE :search', { search: `%${filter.search}%` });
@@ -172,9 +210,17 @@ export class FinancesService implements OnModuleInit {
     if (filter.type) {
       qb.andWhere('tx.type = :type', { type: filter.type });
     }
-    if (filter.categoryId) {
-      qb.andWhere('tx.category_id = :categoryId', {
-        categoryId: filter.categoryId,
+    if (filter.status) {
+      qb.andWhere('tx.status = :status', { status: filter.status });
+    }
+    const categoryIds = filter.categoryIds?.length
+      ? filter.categoryIds
+      : filter.categoryId
+        ? [filter.categoryId]
+        : [];
+    if (categoryIds.length > 0) {
+      qb.andWhere('tx.category_id IN (:...categoryIds)', {
+        categoryIds: [...new Set(categoryIds)],
       });
     }
     if (filter.memberId) {
@@ -185,6 +231,11 @@ export class FinancesService implements OnModuleInit {
     }
     if (filter.assetId) {
       qb.andWhere('tx.asset_id = :assetId', { assetId: filter.assetId });
+    }
+    if (filter.activityId) {
+      qb.andWhere('tx.activity_id = :activityId', {
+        activityId: filter.activityId,
+      });
     }
     if (filter.sourceType) {
       qb.andWhere('tx.source_type = :sourceType', {
@@ -218,14 +269,24 @@ export class FinancesService implements OnModuleInit {
   async findOne(
     id: string,
     includeDocuments = false,
+    access?: FinanceAccess,
   ): Promise<FinanceTransaction> {
     const tx = await this.transactionsRepo.findOne({
       where: { id },
-      relations: ['category', 'member', 'user', 'asset'],
+      relations: [
+        'category',
+        'member',
+        'user',
+        'asset',
+        'responsibleUser',
+        'collectorUser',
+        'registeredByUser',
+      ],
     });
     if (!tx) {
       throw new NotFoundException(`Transaction ${id} not found`);
     }
+    if (access) this.assertCanAccess(tx, access);
     if (includeDocuments) {
       tx.documents = await this.documentsRepo.find({
         where: { transaction_id: tx.id },
@@ -235,8 +296,32 @@ export class FinancesService implements OnModuleInit {
     return tx;
   }
 
-  async create(
+  /**
+   * Manual entry point: enforces the authorization rule for assigning
+   * financial responsibility — only `finances.all` may point the movement at
+   * an arbitrary responsible user; anyone else may only take responsibility
+   * for their own movements.
+   */
+  async createManual(
     dto: CreateFinanceTransactionDto,
+    access: FinanceAccess,
+  ): Promise<FinanceTransaction> {
+    if (
+      dto.responsibleUserId &&
+      !access.canViewAll &&
+      dto.responsibleUserId !== access.userId
+    ) {
+      throw new ForbiddenException(
+        'Solo puede asignar como responsable financiero a un usuario con permiso finances.all',
+      );
+    }
+    return this.create(dto, access.userId);
+  }
+
+  async create(
+    // `registeredByUserId` is internal-only: it never appears on the request
+    // DTO (the ValidationPipe strips it), so clients cannot forge it.
+    dto: CreateFinanceTransactionDto & { registeredByUserId?: string },
     userId?: string,
     manager?: EntityManager,
   ): Promise<FinanceTransaction> {
@@ -250,6 +335,7 @@ export class FinancesService implements OnModuleInit {
       dto.userId,
       dto.assetId,
       manager,
+      dto.activityId,
     );
     this.validateSource(dto);
 
@@ -262,6 +348,11 @@ export class FinancesService implements OnModuleInit {
 
     const categoryId =
       dto.categoryId ?? (await this.resolveCategoryId(dto.sourceType, manager));
+
+    // registeredBy is always server-derived (dto has no registeredByUserId).
+    // Collector fallback lives here as the single centralized rule: explicit
+    // collector wins, otherwise the registrant is assumed to have collected.
+    const registeredBy = dto.registeredByUserId ?? userId ?? null;
 
     const tx = repo.create({
       type: dto.type,
@@ -276,8 +367,12 @@ export class FinancesService implements OnModuleInit {
       source_id: dto.sourceId ?? null,
       status: FinanceTransactionStatus.ACTIVE,
       user_id: dto.userId ?? userId ?? null,
+      responsible_user_id: dto.responsibleUserId ?? null,
+      collector_user_id: dto.collectorUserId ?? registeredBy,
+      registered_by_user_id: registeredBy,
       provider: dto.provider ?? null,
       asset_id: dto.assetId ?? null,
+      activity_id: dto.activityId ?? null,
       notes: dto.notes ?? null,
     });
 
@@ -297,13 +392,25 @@ export class FinancesService implements OnModuleInit {
   async update(
     id: string,
     dto: UpdateFinanceTransactionDto,
+    access: FinanceAccess,
   ): Promise<FinanceTransaction> {
-    const tx = await this.findOne(id);
+    const tx = await this.findOne(id, false, access);
+    if (
+      dto.responsibleUserId &&
+      !access.canViewAll &&
+      dto.responsibleUserId !== access.userId
+    ) {
+      throw new ForbiddenException(
+        'Solo puede asignar como responsable financiero a un usuario con permiso finances.all',
+      );
+    }
     await this.validateReferences(
       dto.categoryId,
       dto.memberId,
       dto.userId,
       dto.assetId,
+      undefined,
+      dto.activityId,
     );
     Object.assign(tx, {
       date: dto.date ?? tx.date,
@@ -316,8 +423,11 @@ export class FinancesService implements OnModuleInit {
       source_type: dto.sourceType ?? tx.source_type,
       source_id: dto.sourceId ?? tx.source_id,
       user_id: dto.userId ?? tx.user_id,
+      responsible_user_id: dto.responsibleUserId ?? tx.responsible_user_id,
+      collector_user_id: dto.collectorUserId ?? tx.collector_user_id,
       provider: dto.provider ?? tx.provider,
       asset_id: dto.assetId ?? tx.asset_id,
+      activity_id: dto.activityId ?? tx.activity_id,
       notes: dto.notes ?? tx.notes,
     });
     return this.transactionsRepo.save(tx);
@@ -327,8 +437,9 @@ export class FinancesService implements OnModuleInit {
     id: string,
     dto: VoidFinanceTransactionDto,
     userId?: string,
+    access?: FinanceAccess,
   ): Promise<FinanceTransaction> {
-    const tx = await this.findOne(id);
+    const tx = await this.findOne(id, false, access);
     if (tx.status === FinanceTransactionStatus.VOIDED) {
       throw new BadRequestException('Transaction is already voided');
     }
@@ -339,7 +450,11 @@ export class FinancesService implements OnModuleInit {
     return this.transactionsRepo.save(tx);
   }
 
-  async getDocuments(transactionId: string): Promise<FinanceDocument[]> {
+  async getDocuments(
+    transactionId: string,
+    access?: FinanceAccess,
+  ): Promise<FinanceDocument[]> {
+    await this.findOne(transactionId, false, access);
     return this.documentsRepo.find({
       where: { transaction_id: transactionId },
       order: { created_at: 'DESC' },
@@ -350,8 +465,9 @@ export class FinancesService implements OnModuleInit {
     transactionId: string,
     dto: AddFinanceDocumentDto,
     userId?: string,
+    access?: FinanceAccess,
   ): Promise<FinanceDocument> {
-    const tx = await this.findOne(transactionId);
+    const tx = await this.findOne(transactionId, false, access);
 
     let stored: StoredDocument | null;
     try {
@@ -387,7 +503,9 @@ export class FinancesService implements OnModuleInit {
   async removeDocument(
     transactionId: string,
     documentId: string,
+    access?: FinanceAccess,
   ): Promise<void> {
+    await this.findOne(transactionId, false, access);
     const doc = await this.documentsRepo.findOneBy({
       id: documentId,
       transaction_id: transactionId,
@@ -408,7 +526,9 @@ export class FinancesService implements OnModuleInit {
   async getDocumentContent(
     transactionId: string,
     documentId: string,
+    access?: FinanceAccess,
   ): ReturnType<StorageService['getObjectStream']> {
+    await this.findOne(transactionId, false, access);
     const doc = await this.documentsRepo.findOneBy({
       id: documentId,
       transaction_id: transactionId,
@@ -421,17 +541,22 @@ export class FinancesService implements OnModuleInit {
   async getSummary(
     startDate?: string,
     endDate?: string,
+    access?: FinanceAccess,
   ): Promise<{
     income: number;
     expense: number;
     balance: number;
     voided: number;
   }> {
-    const items = await this.transactionsRepo
-      .createQueryBuilder('tx')
+    const base = this.transactionsRepo.createQueryBuilder('tx');
+    if (access) this.applyScope(base, access);
+
+    const items = await base
       .select('tx.type', 'type')
       .addSelect('SUM(tx.amount)', 'total')
-      .where('tx.status = :status', { status: FinanceTransactionStatus.ACTIVE })
+      .andWhere('tx.status = :status', {
+        status: FinanceTransactionStatus.ACTIVE,
+      })
       .andWhere(buildDateFilter(startDate, endDate, 'tx'))
       .groupBy('tx.type')
       .getRawMany<{ type: string; total: string }>();
@@ -442,9 +567,13 @@ export class FinancesService implements OnModuleInit {
       if (row.type === 'income') income = Number(row.total);
       if (row.type === 'expense') expense = Number(row.total);
     }
-    const voided = await this.transactionsRepo.count({
-      where: { status: FinanceTransactionStatus.VOIDED },
-    });
+    const voidedQb = this.transactionsRepo
+      .createQueryBuilder('tx')
+      .where('tx.status = :status', {
+        status: FinanceTransactionStatus.VOIDED,
+      });
+    if (access) this.applyScope(voidedQb, access);
+    const voided = await voidedQb.getCount();
     return { income, expense, balance: income - expense, voided };
   }
 
@@ -452,6 +581,7 @@ export class FinancesService implements OnModuleInit {
     startDate?: string,
     endDate?: string,
     type?: FinanceTransactionType,
+    access?: FinanceAccess,
   ): Promise<{ type: string; category: string; total: number }[]> {
     const query = this.transactionsRepo
       .createQueryBuilder('tx')
@@ -463,6 +593,7 @@ export class FinancesService implements OnModuleInit {
       .groupBy('tx.type')
       .addGroupBy('category.id');
 
+    if (access) this.applyScope(query, access);
     if (startDate) query.andWhere('tx.date >= :startDate', { startDate });
     if (endDate) query.andWhere('tx.date <= :endDate', { endDate });
     if (type) query.andWhere('tx.type = :type', { type });
@@ -482,6 +613,7 @@ export class FinancesService implements OnModuleInit {
   async getByPaymentMethod(
     startDate?: string,
     endDate?: string,
+    access?: FinanceAccess,
   ): Promise<{ method: string; total: number }[]> {
     const query = this.transactionsRepo
       .createQueryBuilder('tx')
@@ -491,6 +623,7 @@ export class FinancesService implements OnModuleInit {
       .andWhere('tx.payment_method IS NOT NULL')
       .groupBy('tx.payment_method');
 
+    if (access) this.applyScope(query, access);
     if (startDate) query.andWhere('tx.date >= :startDate', { startDate });
     if (endDate) query.andWhere('tx.date <= :endDate', { endDate });
 
@@ -504,14 +637,19 @@ export class FinancesService implements OnModuleInit {
   async getMonthlySeries(
     startDate?: string,
     endDate?: string,
+    access?: FinanceAccess,
   ): Promise<{ year: number; month: number; type: string; total: number }[]> {
-    const rows = await this.transactionsRepo
+    const qb = this.transactionsRepo
       .createQueryBuilder('tx')
+      .where('tx.status = :status', { status: FinanceTransactionStatus.ACTIVE })
+      .andWhere(buildDateFilter(startDate, endDate, 'tx'));
+    if (access) this.applyScope(qb, access);
+
+    const rows = await qb
       .select('EXTRACT(YEAR FROM tx.date)::int', 'year')
       .addSelect('EXTRACT(MONTH FROM tx.date)::int', 'month')
       .addSelect('tx.type', 'type')
       .addSelect('SUM(tx.amount)', 'total')
-      .where('tx.status = :status', { status: FinanceTransactionStatus.ACTIVE })
       .groupBy('EXTRACT(YEAR FROM tx.date)')
       .addGroupBy('EXTRACT(MONTH FROM tx.date)')
       .addGroupBy('tx.type')
@@ -568,17 +706,25 @@ export class FinancesService implements OnModuleInit {
     return { billed, collected, pending };
   }
 
-  async exportCsv(startDate?: string, endDate?: string): Promise<string> {
-    const items = await this.transactionsRepo
+  async exportCsv(
+    startDate?: string,
+    endDate?: string,
+    access?: FinanceAccess,
+  ): Promise<string> {
+    const qb = this.transactionsRepo
       .createQueryBuilder('tx')
       .leftJoinAndSelect('tx.category', 'category')
       .leftJoinAndSelect('tx.member', 'member')
       .leftJoinAndSelect('tx.user', 'user')
+      .leftJoinAndSelect('tx.responsibleUser', 'responsibleUser')
+      .leftJoinAndSelect('tx.collectorUser', 'collectorUser')
+      .leftJoinAndSelect('tx.registeredByUser', 'registeredByUser')
       .leftJoinAndSelect('tx.asset', 'asset')
       .where('tx.status = :status', { status: FinanceTransactionStatus.ACTIVE })
       .andWhere(buildDateFilter(startDate, endDate, 'tx'))
-      .orderBy('tx.date', 'DESC')
-      .getMany();
+      .orderBy('tx.date', 'DESC');
+    if (access) this.applyScope(qb, access);
+    const items = await qb.getMany();
 
     const header = [
       'Fecha',
@@ -589,6 +735,9 @@ export class FinancesService implements OnModuleInit {
       'Método pago',
       'Socio',
       'Usuario',
+      'Responsable',
+      'Cobrado por',
+      'Registrado por',
       'Proveedor',
       'Bien',
       'Origen',
@@ -608,6 +757,9 @@ export class FinancesService implements OnModuleInit {
         this.csvValue(tx.payment_method),
         this.csvValue(member),
         this.csvValue(tx.user?.full_name),
+        this.csvValue(tx.responsibleUser?.full_name),
+        this.csvValue(tx.collectorUser?.full_name),
+        this.csvValue(tx.registeredByUser?.full_name),
         this.csvValue(tx.provider),
         this.csvValue(tx.asset?.code),
         this.csvValue(tx.source_type),
@@ -636,6 +788,56 @@ export class FinancesService implements OnModuleInit {
     if (startDate) parts.push(`${alias}.date >= '${startDate}'`);
     if (endDate) parts.push(`${alias}.date <= '${endDate}'`);
     return parts.join(' AND ') || '1=1';
+  }
+
+  /**
+   * Applies the "my responsibility" scope to a query.
+   *
+   * - Without `finances.all`, or with `scope=mine`, results are forced to
+   *   movements where the requester is the financial responsible — even if
+   *   the client asked for another responsible user.
+   * - With `finances.all` and `scope=all`, optional responsible/collector/
+   *   registeredBy filters are applied as given.
+   */
+  private applyScope(
+    qb: SelectQueryBuilder<FinanceTransaction>,
+    access: FinanceAccess,
+  ): void {
+    const wantsMine = !access.canViewAll || access.scope === FinanceScope.MINE;
+
+    if (wantsMine) {
+      qb.andWhere('tx.responsible_user_id = :scopeResponsibleUserId', {
+        scopeResponsibleUserId: access.userId,
+      });
+      return;
+    }
+
+    if (access.responsibleUserId) {
+      qb.andWhere('tx.responsible_user_id = :filterResponsibleUserId', {
+        filterResponsibleUserId: access.responsibleUserId,
+      });
+    }
+    if (access.collectorUserId) {
+      qb.andWhere('tx.collector_user_id = :filterCollectorUserId', {
+        filterCollectorUserId: access.collectorUserId,
+      });
+    }
+    if (access.registeredByUserId) {
+      qb.andWhere('tx.registered_by_user_id = :filterRegisteredByUserId', {
+        filterRegisteredByUserId: access.registeredByUserId,
+      });
+    }
+  }
+
+  /** Row-level authorization for a single movement. */
+  private assertCanAccess(tx: FinanceTransaction, access: FinanceAccess): void {
+    const wantsMine = !access.canViewAll || access.scope === FinanceScope.MINE;
+    if (!wantsMine) return;
+    if (tx.responsible_user_id !== access.userId) {
+      throw new ForbiddenException(
+        'No tiene permiso para consultar este movimiento',
+      );
+    }
   }
 
   /**
@@ -694,7 +896,11 @@ export class FinancesService implements OnModuleInit {
       input.userId,
       input.assetId,
       manager,
+      input.activityId,
     );
+    await this.validateUserReference(input.responsibleUserId, manager);
+    await this.validateUserReference(input.collectorUserId, manager);
+    await this.validateUserReference(input.registeredByUserId, manager);
     this.validateSource({
       sourceType: input.sourceType,
       sourceId: input.sourceId,
@@ -725,10 +931,14 @@ export class FinancesService implements OnModuleInit {
       memberId: input.memberId ?? undefined,
       userId: input.userId ?? undefined,
       assetId: input.assetId ?? undefined,
+      activityId: input.activityId ?? undefined,
       provider: input.provider,
       sourceType: input.sourceType,
       sourceId: input.sourceId,
       notes: input.notes,
+      responsibleUserId: input.responsibleUserId ?? undefined,
+      collectorUserId: input.collectorUserId ?? undefined,
+      registeredByUserId: input.registeredByUserId ?? undefined,
     };
 
     if (manager) {
@@ -753,6 +963,7 @@ export class FinancesService implements OnModuleInit {
     userId?: string | null,
     assetId?: string | null,
     manager?: EntityManager,
+    activityId?: string | null,
   ): Promise<void> {
     const categoriesRepo = manager
       ? manager.getRepository(FinanceCategory)
@@ -762,6 +973,9 @@ export class FinancesService implements OnModuleInit {
       : this.membersRepo;
     const usersRepo = manager ? manager.getRepository(User) : this.usersRepo;
     const assetsRepo = manager ? manager.getRepository(Asset) : this.assetsRepo;
+    const activitiesRepo = manager
+      ? manager.getRepository(Activity)
+      : this.activitiesRepo;
 
     if (categoryId) {
       const cat = await categoriesRepo.findOneBy({ id: categoryId });
@@ -779,6 +993,20 @@ export class FinancesService implements OnModuleInit {
       const a = await assetsRepo.findOneBy({ id: assetId });
       if (!a) throw new BadRequestException('Asset not found');
     }
+    if (activityId) {
+      const a = await activitiesRepo.findOneBy({ id: activityId });
+      if (!a) throw new BadRequestException('Activity not found');
+    }
+  }
+
+  private async validateUserReference(
+    userId?: string | null,
+    manager?: EntityManager,
+  ): Promise<void> {
+    if (!userId) return;
+    const usersRepo = manager ? manager.getRepository(User) : this.usersRepo;
+    const user = await usersRepo.findOneBy({ id: userId });
+    if (!user) throw new BadRequestException('User not found');
   }
 
   private validateSource(dto: {

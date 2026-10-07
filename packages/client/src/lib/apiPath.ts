@@ -149,11 +149,21 @@ export const ApiPath = {
     BASE: "/activities",
     ALL: "/activities/all",
     ONE: (id: string) => `/activities/${id}` as const,
+    STATUS: (id: string) => `/activities/${id}/status` as const,
+    SUMMARY: (id: string) => `/activities/${id}/summary` as const,
     ATTENDANCE: (id: string) => `/activities/${id}/attendance` as const,
+    ATTENDANCE_SESSIONS: (id: string) => `/activities/${id}/attendance/sessions` as const,
+    ATTENDANCE_BULK: (id: string) => `/activities/${id}/attendance/bulk` as const,
     INITIAL_CONTROL: (id: string) => `/activities/${id}/attendance/initial-control` as const,
     FINAL_CONTROL: (id: string) => `/activities/${id}/attendance/final-control` as const,
-    SHARES: (id: string) => `/activities/${id}/shares` as const,
-    SHARE_ONE: (activityId: string, userId: string) => `/activities/${activityId}/share/${userId}` as const,
+    FINES: (id: string) => `/activities/${id}/fines` as const,
+    EVIDENCE: (id: string) => `/activities/${id}/evidence` as const,
+    EVIDENCE_ONE: (id: string, evidenceId: string) =>
+      `/activities/${id}/evidence/${evidenceId}` as const,
+  },
+  ActivityTypes: {
+    BASE: "/activity-types",
+    ONE: (id: string) => `/activity-types/${id}` as const,
   },
   FineTypes: {
     BASE: "/fine-types",

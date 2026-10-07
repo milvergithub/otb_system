@@ -25,6 +25,7 @@ import { PaymentDiscount } from './entities/payment-discount.entity';
 import { Payment, PaymentStatus } from './entities/payment.entity';
 import { PayBillDto } from './dto/billing.dto';
 import { FinancesService } from '../finances/finances.service';
+import { FinancialResponsibilityService } from '../finances/financial-responsibility.service';
 import { FinanceSourceType } from '../finances/entities/finance-transaction.entity';
 
 const SORT_COLUMNS: Record<string, string | string[]> = {
@@ -56,6 +57,7 @@ export class BillingService {
     private readonly eventEmitter: EventEmitter2,
     private readonly storageService: StorageService,
     private readonly financesService: FinancesService,
+    private readonly responsibilityService: FinancialResponsibilityService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -296,8 +298,17 @@ export class BillingService {
 
   /**
    * Registers a payment against a bill, optionally changing applied discounts.
+   *
+   * Responsibility snapshot: the financially responsible user comes from the
+   * water-bill configuration (never from the authenticated registrant), the
+   * collector from the DTO with the centralized fallback, and registeredBy
+   * from the authenticated context.
    */
-  async pay(id: string, dto: PayBillDto): Promise<Payment> {
+  async pay(
+    id: string,
+    dto: PayBillDto,
+    currentUserId?: string,
+  ): Promise<Payment> {
     const payment = await this.findOne(id);
     if (payment.status === PaymentStatus.PAID) {
       throw new BadRequestException('This bill has already been fully paid');
@@ -332,6 +343,13 @@ export class BillingService {
 
     const member = payment.consumption?.meter?.member;
 
+    const responsibleUserId =
+      await this.responsibilityService.resolveWaterBillResponsibleUserId();
+    const collectorUserId = this.responsibilityService.resolveCollectorUserId(
+      dto.collectorUserId,
+      currentUserId,
+    );
+
     const movement = {
       sourceType: FinanceSourceType.WATER_BILL_PAYMENT,
       amount: dto.amount,
@@ -341,6 +359,9 @@ export class BillingService {
       paymentMethod: dto.paymentMethod,
       reference: dto.reference,
       notes: dto.notes,
+      responsibleUserId,
+      collectorUserId,
+      registeredByUserId: currentUserId ?? null,
     };
 
     // Fails before anything is written, so a bad reference never leaves a

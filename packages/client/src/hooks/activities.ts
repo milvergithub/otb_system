@@ -5,8 +5,13 @@ import { queryKeys } from "@/lib/utils/query"
 import type { SortOrder } from "@/components/ui/sortable-header"
 import type {
   Activity,
-  ActivityShare,
+  ActivityAttendanceSession,
+  ActivityEvidence,
+  ActivityStatus,
+  ActivitySummary,
+  ActivityType,
   FineType,
+  FineTypeAppliesTo,
   Fine,
   FineStats,
   Paginated,
@@ -31,6 +36,11 @@ export interface SearchActivitiesParams {
   search?: string
   sortBy?: string
   sortOrder?: SortOrder
+  status?: ActivityStatus | undefined
+  typeId?: string | undefined
+  responsibleUserId?: string | undefined
+  dateFrom?: string | undefined
+  dateTo?: string | undefined
 }
 
 export function useSearchActivities({
@@ -38,14 +48,26 @@ export function useSearchActivities({
   search,
   sortBy,
   sortOrder,
+  status,
+  typeId,
+  responsibleUserId,
+  dateFrom,
+  dateTo,
 }: SearchActivitiesParams) {
   return useQuery<Paginated<Activity>>({
-    queryKey: queryKeys.activities.list(
-      page,
-      search ?? "",
-      sortBy ?? "",
-      sortOrder ?? "",
-    ),
+    queryKey: [
+      ...queryKeys.activities.list(
+        page,
+        search ?? "",
+        sortBy ?? "",
+        sortOrder ?? "",
+      ),
+      status ?? "",
+      typeId ?? "",
+      responsibleUserId ?? "",
+      dateFrom ?? "",
+      dateTo ?? "",
+    ],
     queryFn: () =>
       api
         .get(ApiPath.Activities.BASE, {
@@ -55,6 +77,11 @@ export function useSearchActivities({
             search: search || undefined,
             sortBy: sortBy || undefined,
             sortOrder: sortOrder ? sortOrder.toUpperCase() : undefined,
+            status: status || undefined,
+            typeId: typeId || undefined,
+            responsibleUserId: responsibleUserId || undefined,
+            dateFrom: dateFrom || undefined,
+            dateTo: dateTo || undefined,
           },
         })
         .then((r) => r.data),
@@ -79,6 +106,13 @@ export function useAddActivity() {
       date: string
       startTime: string
       endTime: string
+      status?: ActivityStatus
+      typeId?: string
+      location?: string
+      responsibleUserId?: string
+      collectorUserId?: string
+      attendanceRequired?: boolean
+      fineEnabled?: boolean
     }) =>
       api.post(ApiPath.Activities.BASE, payload).then((r) => r.data),
     onSuccess: () => {
@@ -100,6 +134,13 @@ export function useEditActivity() {
       date?: string
       startTime?: string
       endTime?: string
+      status?: ActivityStatus
+      typeId?: string
+      location?: string
+      responsibleUserId?: string
+      collectorUserId?: string
+      attendanceRequired?: boolean
+      fineEnabled?: boolean
     }) =>
       api
         .patch(ApiPath.Activities.ONE(id), payload)
@@ -124,63 +165,6 @@ export function useDeleteActivity() {
   })
 }
 
-// ── Activity Shares ─────────────────────────────────
-
-export function useActivityShares(activityId: string | undefined) {
-  return useQuery<ActivityShare[]>({
-    queryKey: ["activities", "shares", activityId],
-    queryFn: () =>
-      api.get(ApiPath.Activities.SHARES(activityId!)).then((r) => r.data),
-    enabled: !!activityId,
-  })
-}
-
-export function useShareActivity() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({
-      activityId,
-      userId,
-      permission,
-    }: {
-      activityId: string
-      userId: string
-      permission?: string
-    }) =>
-      api
-        .post(ApiPath.Activities.SHARES(activityId), { userId, permission })
-        .then((r) => r.data),
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: queryKeys.activities.all })
-      qc.invalidateQueries({
-        queryKey: ["activities", "shares", vars.activityId],
-      })
-    },
-  })
-}
-
-export function useUnshareActivity() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({
-      activityId,
-      userId,
-    }: {
-      activityId: string
-      userId: string
-    }) =>
-      api
-        .delete(ApiPath.Activities.SHARE_ONE(activityId, userId))
-        .then((r) => r.data),
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: queryKeys.activities.all })
-      qc.invalidateQueries({
-        queryKey: ["activities", "shares", vars.activityId],
-      })
-    },
-  })
-}
-
 // ── Fine Types ──────────────────────────────────────
 
 export function useFineTypes() {
@@ -199,6 +183,7 @@ export function useAddFineType() {
       name: string
       description?: string
       amount: number
+      appliesTo?: FineTypeAppliesTo
       isActive?: boolean
     }) =>
       api
@@ -218,9 +203,11 @@ export function useEditFineType() {
       ...payload
     }: {
       id: string
+      code?: string
       name?: string
       description?: string
       amount?: number
+      appliesTo?: FineTypeAppliesTo
       isActive?: boolean
     }) =>
       api
@@ -425,8 +412,8 @@ export function useMemberFines(memberId: string | undefined) {
 export function usePayFine() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, notes }: { id: string; notes?: string }) =>
-      api.patch(ApiPath.Fines.PAY(id), { notes }).then((r) => r.data),
+    mutationFn: ({ id, notes, collectorUserId }: { id: string; notes?: string; collectorUserId?: string }) =>
+      api.patch(ApiPath.Fines.PAY(id), { notes, collectorUserId }).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["activities"] })
     },
@@ -436,8 +423,8 @@ export function usePayFine() {
 export function usePayFinesBulk() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ ids, notes }: { ids: string[]; notes?: string }) =>
-      api.patch(ApiPath.Fines.BULK_PAY, { ids, notes }).then((r) => r.data),
+    mutationFn: ({ ids, notes, collectorUserId }: { ids: string[]; notes?: string; collectorUserId?: string }) =>
+      api.patch(ApiPath.Fines.BULK_PAY, { ids, notes, collectorUserId }).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["activities"] })
     },
@@ -458,6 +445,226 @@ export function useCancelFine() {
         .patch(ApiPath.Fines.CANCEL(id), { reason })
         .then((r) => r.data),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["activities"] })
+    },
+  })
+}
+
+export type BulkAttendanceSession = "initial" | "final"
+export type BulkAttendanceStatus = "present" | "absent" | "excused"
+
+export interface BulkAttendancePayload {
+  activityId: string
+  session: BulkAttendanceSession
+  attendance: {
+    memberId: string
+    status: BulkAttendanceStatus
+  }[]
+}
+
+export function useSaveBulkAttendance() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ activityId, ...body }: BulkAttendancePayload) =>
+      api
+        .post<InitialControlResult | FinalControlResult>(
+          ApiPath.Activities.ATTENDANCE_BULK(activityId),
+          body,
+        )
+        .then((r) => r.data),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({
+        queryKey: queryKeys.activities.attendance(vars.activityId),
+      })
+      qc.invalidateQueries({
+        queryKey: queryKeys.activities.detail(vars.activityId),
+      })
+      qc.invalidateQueries({
+        queryKey: ["activities", "summary", vars.activityId],
+      })
+      qc.invalidateQueries({
+        queryKey: ["activities", "sessions", vars.activityId],
+      })
+      qc.invalidateQueries({ queryKey: queryKeys.activities.all })
+    },
+  })
+}
+
+// ── Activity Types ──────────────────────────────────
+
+export function useActivityTypes() {
+  return useQuery<ActivityType[]>({
+    queryKey: ["activities", "types"],
+    queryFn: () =>
+      api.get(ApiPath.ActivityTypes.BASE).then((r) => r.data),
+  })
+}
+
+export function useAddActivityType() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: {
+      code: string
+      name: string
+      description?: string
+      isActive?: boolean
+    }) =>
+      api
+        .post(ApiPath.ActivityTypes.BASE, payload)
+        .then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["activities", "types"] })
+    },
+  })
+}
+
+export function useEditActivityType() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...payload
+    }: {
+      id: string
+      name?: string
+      description?: string
+      isActive?: boolean
+    }) =>
+      api
+        .patch(ApiPath.ActivityTypes.ONE(id), payload)
+        .then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["activities", "types"] })
+    },
+  })
+}
+
+// ── Lifecycle & summary ─────────────────────────────
+
+export function useChangeActivityStatus() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      status,
+    }: {
+      id: string
+      status: ActivityStatus
+    }) =>
+      api.patch(ApiPath.Activities.STATUS(id), { status }).then((r) => r.data),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.activities.all })
+      qc.invalidateQueries({
+        queryKey: queryKeys.activities.detail(vars.id),
+      })
+    },
+  })
+}
+
+export function useActivitySummary(id: string | undefined) {
+  return useQuery<ActivitySummary>({
+    queryKey: ["activities", "summary", id],
+    queryFn: () =>
+      api.get(ApiPath.Activities.SUMMARY(id!)).then((r) => r.data),
+    enabled: !!id,
+  })
+}
+
+export function useActivitySessions(id: string | undefined) {
+  return useQuery<ActivityAttendanceSession[]>({
+    queryKey: ["activities", "sessions", id],
+    queryFn: () =>
+      api
+        .get(ApiPath.Activities.ATTENDANCE_SESSIONS(id!))
+        .then((r) => r.data),
+    enabled: !!id,
+  })
+}
+
+// ── Evidence ────────────────────────────────────────
+
+export function useActivityEvidence(id: string | undefined) {
+  return useQuery<ActivityEvidence[]>({
+    queryKey: ["activities", "evidence", id],
+    queryFn: () =>
+      api.get(ApiPath.Activities.EVIDENCE(id!)).then((r) => r.data),
+    enabled: !!id,
+  })
+}
+
+export interface UploadActivityEvidencePayload {
+  activityId: string
+  fileBase64: string
+  fileName: string
+  mimeType: string
+  type: "photo" | "video" | "document"
+  description?: string
+}
+
+export function useUploadActivityEvidence() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ activityId, ...body }: UploadActivityEvidencePayload) =>
+      api
+        .post(ApiPath.Activities.EVIDENCE(activityId), body)
+        .then((r) => r.data),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({
+        queryKey: ["activities", "evidence", vars.activityId],
+      })
+      qc.invalidateQueries({
+        queryKey: queryKeys.activities.detail(vars.activityId),
+      })
+    },
+  })
+}
+
+export function useDeleteActivityEvidence() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      activityId,
+      evidenceId,
+    }: {
+      activityId: string
+      evidenceId: string
+    }) =>
+      api
+        .delete(ApiPath.Activities.EVIDENCE_ONE(activityId, evidenceId))
+        .then((r) => r.data),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({
+        queryKey: ["activities", "evidence", vars.activityId],
+      })
+    },
+  })
+}
+
+// ── Manual fines ────────────────────────────────────
+
+export function useCreateManualFine() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      activityId,
+      ...body
+    }: {
+      activityId: string
+      memberId: string
+      fineTypeId: string
+      notes?: string
+    }) =>
+      api
+        .post(ApiPath.Activities.FINES(activityId), body)
+        .then((r) => r.data),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: queryKeys.activities.all })
+      qc.invalidateQueries({
+        queryKey: queryKeys.activities.detail(vars.activityId),
+      })
+      qc.invalidateQueries({
+        queryKey: ["activities", "summary", vars.activityId],
+      })
       qc.invalidateQueries({ queryKey: ["activities"] })
     },
   })

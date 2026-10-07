@@ -12,7 +12,12 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthUser } from '../auth/interfaces/auth-user.interface';
-import { CreateActivityDto, UpdateActivityDto } from './dto/activity.dto';
+import {
+  CreateActivityDto,
+  FilterActivitiesDto,
+  UpdateActivityDto,
+  UpdateActivityStatusDto,
+} from './dto/activity.dto';
 import { ActivitiesService } from './activities.service';
 
 @Controller('activities')
@@ -24,13 +29,15 @@ export class ActivitiesController {
   findAll(
     @Query() pagination: PaginationDto,
     @CurrentUser() user: AuthUser,
-    @Query('search') search?: string,
+    @Query('search') search: string | undefined,
+    @Query() filters: FilterActivitiesDto,
   ) {
     return this.service.findAll(
       pagination,
       user.id,
       user.permissions.includes('activities.all'),
       search,
+      filters,
     );
   }
 
@@ -47,6 +54,18 @@ export class ActivitiesController {
   @Roles('activities.read')
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
+  }
+
+  @Get(':id/summary')
+  @Roles('activities.read')
+  getSummary(@Param('id') id: string) {
+    return this.service.getSummary(id);
+  }
+
+  @Get(':id/attendance/sessions')
+  @Roles('activities.read')
+  getSessions(@Param('id') id: string) {
+    return this.service.getSessions(id);
   }
 
   @Post()
@@ -70,6 +89,21 @@ export class ActivitiesController {
     );
   }
 
+  @Patch(':id/status')
+  @Roles('activities.update')
+  changeStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateActivityStatusDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.service.changeStatus(
+      id,
+      dto,
+      user.id,
+      user.permissions.includes('activities.all'),
+    );
+  }
+
   @Delete(':id')
   @Roles('activities.delete')
   remove(@Param('id') id: string, @CurrentUser() user: AuthUser) {
@@ -78,26 +112,5 @@ export class ActivitiesController {
       user.id,
       user.permissions.includes('activities.all'),
     );
-  }
-
-  @Post(':id/share')
-  @Roles('activities.update')
-  share(
-    @Param('id') id: string,
-    @Body() body: { userId: string; permission?: string },
-  ) {
-    return this.service.share(id, body.userId, body.permission ?? 'viewer');
-  }
-
-  @Delete(':id/share/:userId')
-  @Roles('activities.update')
-  unshare(@Param('id') id: string, @Param('userId') userId: string) {
-    return this.service.unshare(id, userId);
-  }
-
-  @Get(':id/shares')
-  @Roles('activities.read')
-  getShares(@Param('id') id: string) {
-    return this.service.getShares(id);
   }
 }

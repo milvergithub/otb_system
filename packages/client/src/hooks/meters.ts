@@ -76,7 +76,7 @@ export function useMeterSharePayments(meterId: string | undefined, enabled = tru
 export function useAddSharePayment(meterId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (payload: { amount: number; paymentMethod?: string; reference?: string; notes?: string; evidenceBase64?: string }) =>
+    mutationFn: (payload: { amount: number; paymentMethod?: string; reference?: string; notes?: string; evidenceBase64?: string; collectorUserId?: string }) =>
       api.post(ApiPath.Meters.SHARE_PAYMENTS(meterId), payload).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.sharePayments.byMeter(meterId) })

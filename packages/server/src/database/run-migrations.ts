@@ -53,6 +53,26 @@ const MIGRATIONS = [
     timestamp: 1755000000015,
     name: 'AddMaintenanceExpenseTransaction1755000000015',
   },
+  {
+    timestamp: 1755000000016,
+    name: 'AddFinanceResponsibility1755000000016',
+  },
+  {
+    timestamp: 1755000000017,
+    name: 'RebuildActivitiesDomain1755000000017',
+  },
+  {
+    timestamp: 1755000000018,
+    name: 'AddActivityCollector1755000000018',
+  },
+  {
+    timestamp: 1755000000019,
+    name: 'DropActivityShares1755000000019',
+  },
+  {
+    timestamp: 1755000000020,
+    name: 'AddCodeToMeterTypes1755000000020',
+  },
 ];
 
 async function isFreshDatabase(ds: DataSource): Promise<boolean> {

@@ -1,5 +1,5 @@
 import { useEffect, type FormEvent } from "react"
-import { useForm } from "react-hook-form"
+import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useTranslation } from "react-i18next"
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { DatePicker } from "@/components/ui/date-picker"
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
@@ -65,7 +66,13 @@ export default function AssetMaintenanceDialog({ asset, open, onOpenChange }: Pr
           </div>
           <div className="space-y-2">
             <Label htmlFor="maintenance-startedAt">{t("assets.startDate")}</Label>
-            <Input id="maintenance-startedAt" type="date" {...form.register("startedAt")} />
+            <Controller
+              control={form.control}
+              name="startedAt"
+              render={({ field }) => (
+                <DatePicker id="maintenance-startedAt" value={field.value ?? ""} onChange={field.onChange} />
+              )}
+            />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">

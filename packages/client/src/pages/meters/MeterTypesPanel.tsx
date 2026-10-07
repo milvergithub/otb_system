@@ -11,6 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -40,31 +41,36 @@ export default function MeterTypesPanel() {
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<MeterTypeItem | null>(null)
+  const [code, setCode] = useState("")
   const [name, setName] = useState("")
   const [deleteTarget, setDeleteTarget] = useState<MeterTypeItem | null>(null)
 
   function openCreate() {
     setEditing(null)
+    setCode("")
     setName("")
     setDialogOpen(true)
   }
 
   function openEdit(mt: MeterTypeItem) {
     setEditing(mt)
+    setCode(mt.code)
     setName(mt.name)
     setDialogOpen(true)
   }
 
   function handleSave() {
-    if (!name.trim()) return
+    const trimmedCode = code.trim()
+    const trimmedName = name.trim()
+    if (!trimmedCode || !trimmedName) return
     if (editing) {
       updateMeterType.mutate(
-        { id: editing.id, name },
+        { id: editing.id, name: trimmedName },
         { onSuccess: () => setDialogOpen(false) },
       )
     } else {
       createMeterType.mutate(
-        { name },
+        { code: trimmedCode, name: trimmedName },
         { onSuccess: () => setDialogOpen(false) },
       )
     }
@@ -112,6 +118,12 @@ export default function MeterTypesPanel() {
               key={mt.id}
               className="flex items-center gap-3 p-3 rounded-md border hover:bg-accent/50"
             >
+              <Badge
+                variant="outline"
+                className="font-mono shrink-0"
+              >
+                {mt.code}
+              </Badge>
               <span className="flex-1 text-sm font-medium">{mt.name}</span>
               <Can permission="meter_types.update">
                 <Button
@@ -149,6 +161,17 @@ export default function MeterTypesPanel() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
+              <Label>{t("meters.typeCode", "Código")}</Label>
+              <Input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder={t("meters.typeCodePlaceholder", "Ej: RES")}
+                disabled={!!editing}
+                className="font-mono uppercase"
+                maxLength={30}
+              />
+            </div>
+            <div className="space-y-2">
               <Label>{t("meters.typeName", "Nombre")}</Label>
               <Input
                 value={name}
@@ -161,7 +184,10 @@ export default function MeterTypesPanel() {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               {t("common.cancel", "Cancelar")}
             </Button>
-            <Button onClick={handleSave} disabled={!name.trim()}>
+            <Button
+              onClick={handleSave}
+              disabled={!name.trim() || (!editing && !code.trim())}
+            >
               {t("common.save", "Guardar")}
             </Button>
           </DialogFooter>

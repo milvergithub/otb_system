@@ -14,11 +14,13 @@ import type {
   Paginated,
 } from "@/lib/types"
 
+export type FinanceScope = "mine" | "all"
+
 export interface SearchFinancesParams {
   page: number
   search?: string
   type?: FinanceTransactionType | ""
-  categoryId?: string
+  categoryIds?: string[]
   memberId?: string
   userId?: string
   assetId?: string
@@ -27,6 +29,11 @@ export interface SearchFinancesParams {
   dateTo?: string
   sortBy?: string
   sortOrder?: SortOrder
+  scope?: FinanceScope
+  responsibleUserId?: string
+  collectorUserId?: string
+  registeredByUserId?: string
+  activityId?: string
 }
 
 export function useSearchFinances(params: SearchFinancesParams) {
@@ -35,7 +42,7 @@ export function useSearchFinances(params: SearchFinancesParams) {
       params.page,
       params.type ?? "",
       params.search ?? "",
-      params.categoryId ?? "",
+      params.categoryIds?.join(",") ?? "",
       params.memberId ?? "",
       params.userId ?? "",
       params.assetId ?? "",
@@ -44,6 +51,11 @@ export function useSearchFinances(params: SearchFinancesParams) {
       params.dateTo ?? "",
       params.sortBy ?? "",
       params.sortOrder ?? "",
+      params.scope ?? "",
+      params.responsibleUserId ?? "",
+      params.collectorUserId ?? "",
+      params.registeredByUserId ?? "",
+      params.activityId ?? "",
     ),
     queryFn: () =>
       api
@@ -53,7 +65,9 @@ export function useSearchFinances(params: SearchFinancesParams) {
             limit: 10,
             search: params.search || undefined,
             type: params.type || undefined,
-            categoryId: params.categoryId || undefined,
+            categoryIds: params.categoryIds?.length
+              ? params.categoryIds.join(",")
+              : undefined,
             memberId: params.memberId || undefined,
             userId: params.userId || undefined,
             assetId: params.assetId || undefined,
@@ -62,6 +76,11 @@ export function useSearchFinances(params: SearchFinancesParams) {
             dateTo: params.dateTo || undefined,
             sortBy: params.sortBy || undefined,
             sortOrder: params.sortOrder ? params.sortOrder.toUpperCase() : undefined,
+            scope: params.scope || undefined,
+            responsibleUserId: params.responsibleUserId || undefined,
+            collectorUserId: params.collectorUserId || undefined,
+            registeredByUserId: params.registeredByUserId || undefined,
+            activityId: params.activityId || undefined,
           },
         })
         .then((r) => r.data),
@@ -103,6 +122,8 @@ export interface FinanceTransactionRequest {
   sourceType?: FinanceSourceType
   sourceId?: string
   userId?: string
+  responsibleUserId?: string
+  collectorUserId?: string
   provider?: string
   assetId?: string
   notes?: string
@@ -167,47 +188,47 @@ export function useDeleteFinanceDocument() {
   })
 }
 
-export function useFinanceReportSummary(startDate?: string, endDate?: string, enabled = true) {
+export function useFinanceReportSummary(startDate?: string, endDate?: string, scope?: FinanceScope, enabled = true) {
   return useQuery<{
     income: number
     expense: number
     balance: number
     voided: number
   }>({
-    queryKey: queryKeys.finances.reportsSummary(startDate ?? "", endDate ?? ""),
+    queryKey: queryKeys.finances.reportsSummary(startDate ?? "", endDate ?? "", scope ?? ""),
     queryFn: () =>
       api
-        .get(ApiPath.Finances.REPORTS_SUMMARY, { params: { startDate, endDate } })
+        .get(ApiPath.Finances.REPORTS_SUMMARY, { params: { startDate, endDate, scope: scope || undefined } })
         .then((r) => r.data),
     enabled,
   })
 }
 
-export function useFinanceReportByCategory(startDate?: string, endDate?: string, type?: string, enabled = true) {
+export function useFinanceReportByCategory(startDate?: string, endDate?: string, type?: string, scope?: FinanceScope, enabled = true) {
   return useQuery<{ type: string; category: string; total: number }[]>({
-    queryKey: queryKeys.finances.reportsByCategory(startDate ?? "", endDate ?? "", type ?? ""),
+    queryKey: queryKeys.finances.reportsByCategory(startDate ?? "", endDate ?? "", type ?? "", scope ?? ""),
     queryFn: () =>
       api
-        .get(ApiPath.Finances.REPORTS_BY_CATEGORY, { params: { startDate, endDate, type: type || undefined } })
+        .get(ApiPath.Finances.REPORTS_BY_CATEGORY, { params: { startDate, endDate, type: type || undefined, scope: scope || undefined } })
         .then((r) => r.data),
     enabled,
   })
 }
 
-export function useFinanceReportByMethod(startDate?: string, endDate?: string, enabled = true) {
+export function useFinanceReportByMethod(startDate?: string, endDate?: string, scope?: FinanceScope, enabled = true) {
   return useQuery<{ method: string; total: number }[]>({
-    queryKey: queryKeys.finances.reportsByMethod(startDate ?? "", endDate ?? ""),
+    queryKey: queryKeys.finances.reportsByMethod(startDate ?? "", endDate ?? "", scope ?? ""),
     queryFn: () =>
-      api.get(ApiPath.Finances.REPORTS_BY_METHOD, { params: { startDate, endDate } }).then((r) => r.data),
+      api.get(ApiPath.Finances.REPORTS_BY_METHOD, { params: { startDate, endDate, scope: scope || undefined } }).then((r) => r.data),
     enabled,
   })
 }
 
-export function useFinanceReportMonthly(startDate?: string, endDate?: string, enabled = true) {
+export function useFinanceReportMonthly(startDate?: string, endDate?: string, scope?: FinanceScope, enabled = true) {
   return useQuery<{ year: number; month: number; type: string; total: number }[]>({
-    queryKey: queryKeys.finances.reportsMonthly(startDate ?? "", endDate ?? ""),
+    queryKey: queryKeys.finances.reportsMonthly(startDate ?? "", endDate ?? "", scope ?? ""),
     queryFn: () =>
-      api.get(ApiPath.Finances.REPORTS_MONTHLY, { params: { startDate, endDate } }).then((r) => r.data),
+      api.get(ApiPath.Finances.REPORTS_MONTHLY, { params: { startDate, endDate, scope: scope || undefined } }).then((r) => r.data),
     enabled,
   })
 }
@@ -221,9 +242,9 @@ export function useFinanceReportWater(startDate?: string, endDate?: string, enab
   })
 }
 
-export async function downloadFinanceCsv(startDate?: string, endDate?: string) {
+export async function downloadFinanceCsv(startDate?: string, endDate?: string, scope?: FinanceScope) {
   const res = await api.get(ApiPath.Finances.REPORTS_EXPORT, {
-    params: { startDate, endDate },
+    params: { startDate, endDate, scope: scope || undefined },
     responseType: "blob",
   })
   const url = URL.createObjectURL(res.data)

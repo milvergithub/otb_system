@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { PaginationDto } from '../../common/dto/pagination.dto';
 import { BillingService } from './billing.service';
 import {
@@ -76,7 +77,11 @@ export class BillingController {
 
   @Post(':id/pay')
   @Roles('billing.update')
-  pay(@Param('id') id: string, @Body() dto: PayBillDto) {
-    return this.billingService.pay(id, dto);
+  pay(
+    @Param('id') id: string,
+    @Body() dto: PayBillDto,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.billingService.pay(id, dto, userId);
   }
 }

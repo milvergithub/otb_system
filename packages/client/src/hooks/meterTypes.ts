@@ -14,7 +14,7 @@ export function useMeterTypes() {
 export function useCreateMeterType() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (payload: { name: string }) =>
+    mutationFn: (payload: { code: string; name: string }) =>
       api.post(ApiPath.MeterTypes.BASE, payload).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.meterTypes.all })

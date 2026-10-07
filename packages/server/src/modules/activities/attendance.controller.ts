@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { ControlAttendanceDto } from './dto/attendance.dto';
+import { AnyRoles, Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthUser } from '../auth/interfaces/auth-user.interface';
+import { BulkAttendanceDto, ControlAttendanceDto } from './dto/attendance.dto';
 import { AttendanceService } from './attendance.service';
 
 @Controller('activities')
@@ -14,21 +16,33 @@ export class AttendanceController {
   }
 
   @Post(':activityId/attendance/initial-control')
-  @Roles('activities.create')
+  @AnyRoles('activities.manageAttendance', 'activities.update')
   saveInitialControl(
     @Param('activityId') activityId: string,
     @Body() dto: ControlAttendanceDto,
+    @CurrentUser('id') userId?: string,
   ) {
-    return this.service.saveInitialControl(activityId, dto);
+    return this.service.saveInitialControl(activityId, dto, userId);
   }
 
   @Post(':activityId/attendance/final-control')
-  @Roles('activities.create')
+  @AnyRoles('activities.manageAttendance', 'activities.update')
   saveFinalControl(
     @Param('activityId') activityId: string,
     @Body() dto: ControlAttendanceDto,
+    @CurrentUser('id') userId?: string,
   ) {
-    return this.service.saveFinalControl(activityId, dto);
+    return this.service.saveFinalControl(activityId, dto, userId);
+  }
+
+  @Post(':activityId/attendance/bulk')
+  @AnyRoles('activities.manageAttendance', 'activities.update')
+  saveBulk(
+    @Param('activityId') activityId: string,
+    @Body() dto: BulkAttendanceDto,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.service.saveBulk(activityId, dto, userId);
   }
 
   @Get('attendance')
