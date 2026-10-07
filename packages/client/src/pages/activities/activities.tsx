@@ -12,7 +12,7 @@ import {
   Plus,
   Search,
   Tag,
-  Trash2,
+  Trash2, MonitorCheck, Type, FileTypeCorner,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import {
@@ -571,6 +571,7 @@ export default function ActivitiesPage() {
       <Tabs defaultValue="activities">
         <TabsList>
           <TabsTrigger value="activities">
+            <MonitorCheck className="mx-1" />
             {t("activities.title")}
             {data ? (
               <Badge variant="secondary" className="ml-1">
@@ -580,6 +581,7 @@ export default function ActivitiesPage() {
           </TabsTrigger>
           <Can permission="activities.read">
             <TabsTrigger value="types">
+              <Type className="mx-1" />
               {t("activities.typesTitle")}
               {activityTypes ? (
                 <Badge variant="secondary" className="ml-1">
@@ -590,6 +592,7 @@ export default function ActivitiesPage() {
           </Can>
           <Can permission="activities.read">
             <TabsTrigger value="fineTypes">
+              <FileTypeCorner className="mx-1" />
               {t("activities.fineTypesTitle")}
               {fineTypes ? (
                 <Badge variant="secondary" className="ml-1">
