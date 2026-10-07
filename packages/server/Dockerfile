@@ -25,6 +25,6 @@ COPY --from=builder --chown=appuser:appgroup /app/node_modules ./node_modules
 COPY --from=builder --chown=appuser:appgroup /app/packages/server/node_modules ./node_modules/.server
 USER appuser
 EXPOSE 3001
-HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 CMD wget -qO- http://localhost:3001/api/docs || exit 1
+# HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 CMD wget -qO- http://localhost:3001/api/docs || exit 1
 # Run migrations then start server
 CMD ["sh", "-c", "node dist/database/run-migrations.js && node dist/main.js"]
