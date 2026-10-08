@@ -43,7 +43,7 @@ function StatCard({
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {title}
         </CardTitle>
-        <div className="rounded-md bg-primary/10 p-2 text-primary">
+        <div className="rounded-md bg-accent/10 p-2 text-accent">
           <Icon className="size-4" />
         </div>
       </CardHeader>
@@ -70,7 +70,7 @@ export default function DashboardPage() {
 
   if (!hasPermission("reports.dashboard")) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
+      <div className="flex min-h-100 items-center justify-center">
         <p className="text-muted-foreground">{t("common.accessDenied")}</p>
       </div>
     )

@@ -25,7 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
-import { Banknote } from "lucide-react"
+import { Banknote, SwitchCamera, Trash } from "lucide-react"
 import ImageCropDialog from "@/components/ImageCropDialog"
 import { PAYMENT_METHODS, memberName, remaining } from "./helpers"
 
@@ -288,10 +288,10 @@ export default function PayBillDialog({
               <div className="flex items-center gap-3">
                 <img src={croppedBase64} alt="Preview" className="h-20 rounded object-cover" />
                 <Button type="button" variant="outline" size="sm" onClick={() => { setCroppedBase64(null); fileInputRef.current?.click() }}>
-                  {t("consumption.imageRetake")}
+                  <SwitchCamera />
                 </Button>
                 <Button type="button" variant="outline" size="sm" onClick={() => { setCroppedBase64(null); setImageSrc(null) }}>
-                  {t("consumption.imageRemove")}
+                  <Trash />
                 </Button>
               </div>
             ) : (

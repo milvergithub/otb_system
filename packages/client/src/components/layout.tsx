@@ -1,3 +1,4 @@
+import { cn } from '@/lib/utils.ts';
 import { NavLink, Outlet, useLocation } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import logo from "@/assets/img.png";
@@ -30,7 +31,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -86,14 +86,16 @@ function SidebarNavItem({ item }: { item: NavItem }) {
       : location.pathname.startsWith(item.to)
   return (
     <SidebarMenuItem className="relative">
-      {isActive && (<span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 bg-[#2f8543] rounded-full"></span>)}
+      {isActive && (<span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 bg-accent rounded-full"></span>)}
       <SidebarMenuButton
         isActive={isActive}
         tooltip={t(item.label)}
         className="h-12 rounded-xl"
         render={<NavLink to={item.to} />}
       >
-        <item.icon className="!size-5" />
+        <div className={cn("p-2 rounded-full flex items-center justify-center", isActive ? "bg-accent" : "bg-sidebar")}>
+          <item.icon className="size-5!" />
+        </div>
         <span>{t(item.label)}</span>
       </SidebarMenuButton>
     </SidebarMenuItem>

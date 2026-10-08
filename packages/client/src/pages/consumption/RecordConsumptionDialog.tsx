@@ -1,3 +1,4 @@
+import { SwitchCamera, Trash } from 'lucide-react';
 import { useRef, useState, type FormEvent } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -206,10 +207,10 @@ export default function RecordConsumptionDialog({
               <div className="flex items-center gap-3">
                 <img src={croppedBase64} alt="Preview" className="h-20 rounded object-cover" />
                 <Button type="button" variant="outline" size="sm" onClick={() => { setCroppedBase64(null); fileInputRef.current?.click() }}>
-                  {t("consumption.imageRetake")}
+                  <SwitchCamera />
                 </Button>
                 <Button type="button" variant="outline" size="sm" onClick={() => { setCroppedBase64(null); setImageSrc(null) }}>
-                  {t("consumption.imageRemove")}
+                  <Trash />
                 </Button>
               </div>
             ) : (

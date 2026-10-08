@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useTranslation } from "react-i18next"
 import type { TFunction } from "i18next"
-import { MapPin } from "lucide-react"
+import { MapPin, SwitchCamera, Trash } from "lucide-react"
 import { requiredString } from "@/lib/validation"
 import { getApiErrorMessage } from "@/lib/api"
 import type { Meter } from "@/lib/types"
@@ -179,7 +179,7 @@ export default function MeterFormDialog({
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{editing ? t("meters.editTitle") : t("meters.newTitle")}</DialogTitle>
           <DialogDescription>
@@ -323,11 +323,11 @@ export default function MeterFormDialog({
                   {croppedBase64 ? (
                     <div className="flex items-center gap-3">
                       <img src={croppedBase64} alt="Preview" className="h-20 rounded object-cover" />
-                      <Button type="button" variant="outline" size="sm" onClick={() => { setCroppedBase64(null); fileInputRef.current?.click() }}>
-                        {t("meters.imageRetake")}
+                      <Button type="button" variant="outline" size="icon" onClick={() => { setCroppedBase64(null); fileInputRef.current?.click() }}>
+                        <SwitchCamera />
                       </Button>
-                      <Button type="button" variant="outline" size="sm" onClick={() => { setCroppedBase64(null); setImageSrc(null) }}>
-                        {t("meters.imageRemove")}
+                      <Button type="button" variant="outline" size="icon" onClick={() => { setCroppedBase64(null); setImageSrc(null) }}>
+                        <Trash />
                       </Button>
                     </div>
                   ) : (
