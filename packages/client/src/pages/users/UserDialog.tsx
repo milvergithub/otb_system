@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next"
 import type { TFunction } from "i18next"
 import { requiredString } from "@/lib/validation"
 import { getApiErrorMessage } from "@/lib/api"
-import type { UserWithRoles } from "@/lib/types"
+import type { CreateResponse, UserWithRoles } from "@/lib/types"
 import { useRoles, useAssignUserRoles } from "@/hooks/roles"
 import { useAddUser, useEditUser } from "@/hooks/users"
 import { Button } from "@/components/ui/button"
@@ -28,7 +28,6 @@ export type UserDialogMode = "create" | "edit" | "roles"
 const userFormSchema = (t: TFunction) =>
   z.object({
     email: requiredString(t),
-    password: z.string().optional(),
     full_name: requiredString(t),
     role_ids: z.array(z.string()).optional(),
   })
@@ -37,7 +36,6 @@ type UserFormValues = z.infer<ReturnType<typeof userFormSchema>>
 
 const DEFAULT_FORM: UserFormValues = {
   email: "",
-  password: "",
   full_name: "",
   role_ids: [],
 }
@@ -46,12 +44,15 @@ interface UserDialogProps {
   mode: UserDialogMode | null
   editing: UserWithRoles | null
   onOpenChange: (open: boolean) => void
+  /** Receives the freshly minted credential so the caller can show it once. */
+  onCreated?: (created: CreateResponse) => void
 }
 
 export default function UserDialog({
   mode,
   editing,
   onOpenChange,
+  onCreated,
 }: UserDialogProps) {
   const { t } = useTranslation()
   const form = useForm<UserFormValues>({
@@ -74,7 +75,6 @@ export default function UserDialog({
     } else if (editing) {
       form.reset({
         email: editing.email,
-        password: "",
         full_name: editing.full_name,
         role_ids: editing.roles?.map((r) => r.id) ?? [],
       })
@@ -103,14 +103,13 @@ export default function UserDialog({
         addMutation.mutate(
           {
             email: values.email,
-            password: values.password,
             fullName: values.full_name,
             roleIds: values.role_ids ?? [],
           },
           {
-            onSuccess: () => {
-              toast.success(t("users.created"))
+            onSuccess: (created) => {
               onOpenChange(false)
+              onCreated?.(created)
             },
             onError: (err) => toast.error(getApiErrorMessage(err)),
           },
@@ -121,7 +120,6 @@ export default function UserDialog({
             id: editing.id,
             email: values.email,
             fullName: values.full_name,
-            password: values.password || undefined,
             roleIds: values.role_ids ?? [],
           },
           {
@@ -185,18 +183,6 @@ export default function UserDialog({
                     {form.formState.errors.email.message}
                   </p>
                 )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">
-                  {mode === "edit" ? t("users.newPassword") : t("users.password")}
-                </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  {...form.register("password")}
-                  required={mode === "create"}
-                  minLength={mode === "create" ? 6 : undefined}
-                />
               </div>
             </>
           )}

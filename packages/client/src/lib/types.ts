@@ -39,6 +39,15 @@ export interface User {
   permissions?: string[]
   member_id?: string | null
   created_at: string
+  /**
+   * True while the account still holds a temporary password minted by an
+   * admin. Missing on sessions issued by an older build, hence optional.
+   */
+  must_change_password?: boolean
+}
+
+export interface CreateResponse extends User {
+  generatedPassword: string
 }
 
 export interface AuthResponse {

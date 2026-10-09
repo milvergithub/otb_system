@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
-import { Pencil, Plus, Search, Trash2, Users, Power } from "lucide-react"
+import { KeyRound, Pencil, Plus, Search, Trash2, Users, Power } from "lucide-react"
 import { getApiErrorMessage } from "@/lib/api"
 import { formatDate } from "@/lib/utils"
 import type { UserWithRoles } from "@/lib/types"
@@ -17,6 +17,10 @@ import { useSortedData } from "@/hooks/use-sorted-data"
 import { toast } from "sonner"
 import UserDialog, { type UserDialogMode } from "./UserDialog"
 import DeleteUserDialog from "./DeleteUserDialog"
+import CredentialsDialog, {
+  type GeneratedCredentials,
+} from "./CredentialsDialog"
+import RegeneratePasswordDialog from "./RegeneratePasswordDialog"
 import { userAccessor } from "./helpers"
 
 export default function UsersPage() {
@@ -27,6 +31,12 @@ export default function UsersPage() {
   const [dialogMode, setDialogMode] = useState<UserDialogMode | null>(null)
   const [editing, setEditing] = useState<UserWithRoles | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [credentials, setCredentials] = useState<GeneratedCredentials | null>(null)
+  const [regenerating, setRegenerating] = useState<{
+    id: string
+    fullName: string
+    email: string
+  } | null>(null)
 
   const { data: users, isLoading } = useSearchUsers(search)
 
@@ -135,6 +145,7 @@ export default function UsersPage() {
                             },
                           ),
                       },
+                      { label: t("users.regenerateAction"), icon: <KeyRound className="size-4" />, permission: "users.update", onClick: () => setRegenerating({ id: userItem.id, fullName: userItem.full_name, email: userItem.email }) },
                       { label: t("common.delete"), icon: <Trash2 className="size-4" />, permission: "users.delete", destructive: true, onClick: () => setDeleteId(userItem.id) },
                     ]}
                   />
@@ -155,6 +166,13 @@ export default function UsersPage() {
       <UserDialog
         mode={dialogMode}
         editing={editing}
+        onCreated={(created) =>
+          setCredentials({
+            fullName: created.full_name,
+            email: created.email,
+            password: created.generatedPassword,
+          })
+        }
         onOpenChange={(open) => {
           if (!open) {
             setDialogMode(null)
@@ -166,6 +184,22 @@ export default function UsersPage() {
         deleteId={deleteId}
         onOpenChange={(open) => {
           if (!open) setDeleteId(null)
+        }}
+      />
+      <CredentialsDialog
+        credentials={credentials}
+        onOpenChange={(open) => {
+          if (!open) setCredentials(null)
+        }}
+      />
+      <RegeneratePasswordDialog
+        target={regenerating}
+        onOpenChange={(open) => {
+          if (!open) setRegenerating(null)
+        }}
+        onRegenerated={(next) => {
+          setRegenerating(null)
+          setCredentials(next)
         }}
       />
     </div>

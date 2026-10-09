@@ -3,6 +3,7 @@ export const ApiPath = {
     LOGIN: "/auth/login",
     REFRESH: "/auth/refresh",
     ME: "/auth/me",
+    CHANGE_PASSWORD: "/auth/change-password",
   },
   Setup: {
     STATUS: "/setup/status",
@@ -70,6 +71,7 @@ export const ApiPath = {
     BASE: "/users",
     ONE: (id: string) => `/users/${id}` as const,
     TOGGLE_ACTIVE: (id: string) => `/users/${id}/toggle-active` as const,
+    REGENERATE_PASSWORD: (id: string) => `/users/${id}/regenerate-password` as const,
   },
   Roles: {
     BASE: "/roles",

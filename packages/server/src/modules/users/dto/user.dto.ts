@@ -4,17 +4,16 @@ import {
   IsOptional,
   IsString,
   IsBoolean,
-  MinLength,
   IsArray,
 } from 'class-validator';
 
+/**
+ * Credentials are never accepted over the wire: `create` mints a temporary
+ * secret server-side and `regeneratePassword` replaces an existing one.
+ */
 export class CreateUserDto {
   @IsEmail()
   email: string;
-
-  @IsString()
-  @MinLength(6)
-  password: string;
 
   @IsString()
   @IsNotEmpty()
@@ -30,11 +29,6 @@ export class UpdateUserDto {
   @IsOptional()
   @IsEmail()
   email?: string;
-
-  @IsOptional()
-  @IsString()
-  @MinLength(6)
-  password?: string;
 
   @IsOptional()
   @IsString()

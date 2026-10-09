@@ -1,6 +1,10 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
-import { Match } from './match.decorator';
+import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
+import {
+  IsStrongPassword,
+  PASSWORD_TOO_WEAK,
+} from '../../../common/decorators/is-strong-password.decorator';
+import { Match } from '../../../common/decorators/match.decorator';
 
 export const PASSWORDS_DO_NOT_MATCH = 'Passwords do not match';
 
@@ -17,7 +21,7 @@ export class CreateInitialAdminDto {
   email: string;
 
   @IsString()
-  @MinLength(6)
+  @IsStrongPassword({ message: PASSWORD_TOO_WEAK })
   password: string;
 
   @IsString()

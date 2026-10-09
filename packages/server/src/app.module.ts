@@ -13,6 +13,7 @@ import openwaConfig from './config/openwa.config';
 import loggerConfig from './config/logger.config';
 import { HttpLogInterceptor } from './core/http-log.interceptor';
 import { JwtAuthGuard } from './core/guards/jwt-auth.guard';
+import { PasswordChangeGuard } from './core/guards/password-change.guard';
 import { RolesGuard } from './core/guards/roles.guard';
 import { ContextModule } from './modules/context/context.module';
 import { AuditContextInterceptor } from './modules/context/context.interceptor';
@@ -119,6 +120,10 @@ import { AuditSubscriber } from './modules/audit/audit.subscriber';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: PasswordChangeGuard,
     },
     {
       provide: APP_GUARD,

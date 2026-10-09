@@ -4,59 +4,31 @@ import { Pencil, Plus, Shield, Trash2 } from "lucide-react"
 import { formatDate } from "@/lib/utils"
 import type { Role } from "@/lib/types"
 import { useAuth } from "@/lib/auth"
-import { useRoles, usePermissions } from "@/hooks/roles"
+import { useRoles } from "@/hooks/roles"
 import { useTableSort } from "@/hooks/use-sort"
 import { RowActions } from "@/components/ui/row-actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
 import { DataTable } from "@/components/ui/data-table"
 import { useSortedData } from "@/hooks/use-sorted-data"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import RoleFormDialog from "./RoleFormDialog"
 import DeleteRoleDialog from "./DeleteRoleDialog"
 import { roleAccessor } from "./helpers"
-import { RESOURCES } from "./constants"
 import Can from "@/components/Can"
 
 export default function RolesPage() {
   const { t } = useTranslation()
   const { hasPermission } = useAuth()
-  const [tab, setTab] = useState("roles")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Role | null>(null)
   const [deleting, setDeleting] = useState<Role | null>(null)
-  const [permissionIds, setPermissionIds] = useState<string[]>([])
 
   const { data: roles, isLoading: rolesLoading } = useRoles()
-
-  const { data: permissions, isLoading: permissionsLoading } = usePermissions()
 
   const { sort, toggleSort } = useTableSort({ key: "name", order: "asc" })
 
   const sortedRoles = useSortedData(roles, sort, roleAccessor, "name", "asc")
-
-  function togglePermission(permissionId: string) {
-    setPermissionIds((current) =>
-      current.includes(permissionId)
-        ? current.filter((id) => id !== permissionId)
-        : [...current, permissionId],
-    )
-  }
-
-  function toggleResourcePermissions(resource: string) {
-    const resourcePerms =
-      permissions?.filter((p) => p.resource === resource) ?? []
-    const allSelected = resourcePerms.every((p) =>
-      permissionIds.includes(p.id),
-    )
-    setPermissionIds((current) =>
-      allSelected
-        ? current.filter((id) => !resourcePerms.some((p) => p.id === id))
-        : [...new Set([...current, ...resourcePerms.map((p) => p.id)])],
-    )
-  }
 
   if (!hasPermission("roles.read")) {
     return (
@@ -88,106 +60,46 @@ export default function RolesPage() {
         </Can>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="roles">{t("roles.tabRoles")}</TabsTrigger>
-          <TabsTrigger value="permissions">{t("roles.tabPermissions")}</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="roles" className="space-y-4">
-          <Card>
-            <CardContent className="p-0">
-              <DataTable<Role>
-                columns={[
-                  { key: "name", label: t("roles.name"), sortable: true, render: (r) => <span className="font-medium">{r.name}</span> },
-                  { key: "description", label: t("roles.description"), sortable: true, render: (r) => <span className="text-muted-foreground">{r.description || "—"}</span> },
-                  { key: "permissions", label: t("roles.permissions"), sortable: true, render: (r) => <Badge variant="secondary">{r.permissions?.length ?? 0}</Badge> },
-                  {
-                    key: "is_system",
-                    label: t("roles.status"),
-                    sortable: true,
-                    render: (r) => (r.is_system ? <Badge>{t("roles.system")}</Badge> : <Badge variant="outline">{t("roles.custom")}</Badge>),
-                  },
-                  { key: "created_at", label: t("roles.created"), sortable: true, render: (r) => <span className="text-muted-foreground">{formatDate(r.created_at)}</span> },
-                  {
-                    key: "actions",
-                    label: "",
-                    className: "w-10",
-                    stickyRight: true,
-                    render: (role) =>
-                      !role.is_system ? (
-                        <RowActions
-                          items={[
-                            { label: t("common.edit"), icon: <Pencil className="size-4" />, permission: "roles.update", onClick: () => { setEditing(role); setDialogOpen(true) } },
-                            { label: t("common.delete"), icon: <Trash2 className="size-4" />, permission: "roles.delete", destructive: true, onClick: () => setDeleting(role) },
-                          ]}
-                        />
-                      ) : null,
-                  },
-                ]}
-                data={sortedRoles}
-                sort={sort}
-                onSort={toggleSort}
-                isLoading={rolesLoading}
-                emptyIcon={<Shield className="size-6 text-muted-foreground" />}
-                emptyText={t("roles.empty")}
-                rowKey={(r) => r.id}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="permissions" className="space-y-4">
-          <Card>
-            <CardContent className="p-6">
-              {permissionsLoading ? (
-                <p className="text-center text-muted-foreground">{t("common.loading")}</p>
-              ) : (
-                <div className="space-y-6">
-                  {RESOURCES.map((resource) => {
-                    const resourcePerms =
-                      permissions?.filter((p) => p.resource === resource) ?? []
-                    const allSelected = resourcePerms.every((p) =>
-                      permissionIds.includes(p.id),
-                    )
-                    return (
-                      <div key={resource} className="space-y-3">
-                        <div className="flex items-center gap-3">
-                          <Checkbox
-                            checked={allSelected}
-                            onCheckedChange={() =>
-                              toggleResourcePermissions(resource)
-                            }
-                          />
-                          <h3 className="text-sm font-semibold capitalize">
-                            {t(`roles.resource.${resource}`)}
-                          </h3>
-                        </div>
-                        <div className="ml-6 flex flex-wrap gap-2">
-                          {resourcePerms.map((perm) => (
-                            <Badge
-                              key={perm.id}
-                              variant={
-                                permissionIds.includes(perm.id)
-                                  ? "default"
-                                  : "outline"
-                              }
-                              className="cursor-pointer"
-                              onClick={() => togglePermission(perm.id)}
-                            >
-                              {t(`roles.action.${perm.action}`)}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      <Card>
+        <CardContent className="p-0">
+          <DataTable<Role>
+            columns={[
+              { key: "name", label: t("roles.name"), sortable: true, render: (r) => <span className="font-medium">{r.name}</span> },
+              { key: "description", label: t("roles.description"), sortable: true, render: (r) => <span className="text-muted-foreground">{r.description || "—"}</span> },
+              { key: "permissions", label: t("roles.permissions"), sortable: true, render: (r) => <Badge variant="secondary">{r.permissions?.length ?? 0}</Badge> },
+              {
+                key: "is_system",
+                label: t("roles.status"),
+                sortable: true,
+                render: (r) => (r.is_system ? <Badge>{t("roles.system")}</Badge> : <Badge variant="outline">{t("roles.custom")}</Badge>),
+              },
+              { key: "created_at", label: t("roles.created"), sortable: true, render: (r) => <span className="text-muted-foreground">{formatDate(r.created_at)}</span> },
+              {
+                key: "actions",
+                label: "",
+                className: "w-10",
+                stickyRight: true,
+                render: (role) =>
+                  !role.is_system ? (
+                    <RowActions
+                      items={[
+                        { label: t("common.edit"), icon: <Pencil className="size-4" />, permission: "roles.update", onClick: () => { setEditing(role); setDialogOpen(true) } },
+                        { label: t("common.delete"), icon: <Trash2 className="size-4" />, permission: "roles.delete", destructive: true, onClick: () => setDeleting(role) },
+                      ]}
+                    />
+                  ) : null,
+              },
+            ]}
+            data={sortedRoles}
+            sort={sort}
+            onSort={toggleSort}
+            isLoading={rolesLoading}
+            emptyIcon={<Shield className="size-6 text-muted-foreground" />}
+            emptyText={t("roles.empty")}
+            rowKey={(r) => r.id}
+          />
+        </CardContent>
+      </Card>
 
       <RoleFormDialog
         open={dialogOpen}

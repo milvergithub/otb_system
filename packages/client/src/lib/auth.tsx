@@ -6,6 +6,7 @@ export function useAuth() {
   const loading = useAuthStore((s) => s.loading)
   const loadUser = useAuthStore((s) => s.loadUser)
   const login = useAuthStore((s) => s.login)
+  const changePassword = useAuthStore((s) => s.changePassword)
   const logout = useAuthStore((s) => s.logout)
   const hasPermission = useAuthStore((s) => s.hasPermission)
 
@@ -17,6 +18,7 @@ export function useAuth() {
     user,
     loading,
     login,
+    changePassword,
     logout,
     hasPermission,
   }

@@ -15,6 +15,9 @@ import { User } from '../users/entities/user.entity';
 import { Role } from '../roles/entities/role.entity';
 import { Permission } from '../roles/entities/permission.entity';
 
+// Satisfies the strength policy enforced by CreateInitialAdminDto.
+const STRONG_PASSWORD = 'S3cret-Pass!';
+
 type Db = {
   users: Array<Record<string, any>>;
   roles: Array<Record<string, any>>;
@@ -121,8 +124,8 @@ function makeService(initial: Partial<Db> = {}) {
 const validDto = (): CreateInitialAdminDto => ({
   fullName: 'Administrador',
   email: 'admin@example.com',
-  password: 'secret123',
-  passwordConfirmation: 'secret123',
+  password: STRONG_PASSWORD,
+  passwordConfirmation: STRONG_PASSWORD,
 });
 
 describe('SetupService status', () => {
@@ -187,9 +190,9 @@ describe('SetupService createInitialAdmin', () => {
 
     const created = db.users[0];
     expect(created.password).toBeUndefined();
-    expect(created.password_hash).not.toBe('secret123');
+    expect(created.password_hash).not.toBe(STRONG_PASSWORD);
     await expect(
-      bcrypt.compare('secret123', created.password_hash),
+      bcrypt.compare(STRONG_PASSWORD, created.password_hash),
     ).resolves.toBe(true);
   });
 
@@ -323,5 +326,14 @@ describe('CreateInitialAdminDto validation', () => {
     expect(properties).toEqual(
       expect.arrayContaining(['fullName', 'password']),
     );
+  });
+
+  it('rejects a password that is long enough but lacks a required class', async () => {
+    const { properties } = await errorsFor({
+      ...validDto(),
+      password: 'alllowercase',
+      passwordConfirmation: 'alllowercase',
+    });
+    expect(properties).toEqual(['password']);
   });
 });

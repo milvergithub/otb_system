@@ -3,6 +3,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from "axios"
 import i18n from "@/lib/i18n"
+import { PASSWORD_CHANGE_PATH } from "@/lib/password"
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001/api"
 
@@ -52,10 +53,23 @@ async function refreshAccessToken(): Promise<string> {
   return accessToken
 }
 
+export const PASSWORD_CHANGE_REQUIRED_CODE = "PASSWORD_CHANGE_REQUIRED"
+
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const original = error.config as RetryConfig | undefined
+
+    // Second line of defence behind the ProtectedRoute gate: catches deep
+    // links and any request made with a token minted while the account still
+    // held a temporary password.
+    if (error.response?.status === 403 && isPasswordChangeRequired(error)) {
+      if (!window.location.pathname.startsWith(PASSWORD_CHANGE_PATH)) {
+        window.location.href = PASSWORD_CHANGE_PATH
+      }
+      return Promise.reject(error)
+    }
+
     if (
       error.response?.status === 401 &&
       original &&
@@ -81,6 +95,11 @@ api.interceptors.response.use(
   },
 )
 
+function isPasswordChangeRequired(error: AxiosError): boolean {
+  const data = error.response?.data as { code?: string } | undefined
+  return data?.code === PASSWORD_CHANGE_REQUIRED_CODE
+}
+
 const EXACT_ERROR_KEYS: Record<string, string> = {
   "Invalid credentials": "errors.invalidCredentials",
   "Account is disabled": "errors.userDisabled",
@@ -89,6 +108,9 @@ const EXACT_ERROR_KEYS: Record<string, string> = {
   "Email already exists": "errors.emailAlreadyExists",
   "Initial setup has already been completed": "errors.setupAlreadyCompleted",
   "Passwords do not match": "validation.passwordsDoNotMatch",
+  "Current password is incorrect": "errors.currentPasswordIncorrect",
+  "New password must differ from the current one": "errors.passwordReused",
+  "Password change required": "errors.passwordChangeRequired",
   "User not found": "errors.userNotFound",
   "Member not found": "errors.memberNotFound",
   "Meter not found": "errors.meterNotFound",
@@ -121,6 +143,10 @@ const EXACT_ERROR_KEYS: Record<string, string> = {
 }
 
 const PREFIX_ERROR_KEYS: { prefix: string; key: string }[] = [
+  {
+    prefix: "Password does not meet the strength policy",
+    key: "validation.weakPassword",
+  },
   { prefix: "No existe tarifa base vigente", key: "errors.noValidBaseTariff" },
   { prefix: "No existe tarifa vigente para", key: "errors.noValidTariff" },
   { prefix: "El rango", key: "errors.overlappingTariff" },

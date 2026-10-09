@@ -11,8 +11,6 @@ import { usePermissions, useAddRole, useEditRole } from "@/hooks/roles"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -21,9 +19,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { toast } from "sonner"
-import { RESOURCES } from "./constants"
+import PermissionPicker from "./PermissionPicker"
 
 const roleFormSchema = (t: TFunction) =>
   z.object({
@@ -109,25 +106,6 @@ export default function RoleFormDialog({
     })()
   }
 
-  function togglePermission(permissionId: string) {
-    const next = permissionIds.includes(permissionId)
-      ? permissionIds.filter((id) => id !== permissionId)
-      : [...permissionIds, permissionId]
-    form.setValue("permission_ids", next)
-  }
-
-  function toggleResourcePermissions(resource: string) {
-    const resourcePerms =
-      permissions?.filter((p) => p.resource === resource) ?? []
-    const allSelected = resourcePerms.every((p) =>
-      permissionIds.includes(p.id),
-    )
-    const next = allSelected
-      ? permissionIds.filter((id) => !resourcePerms.some((p) => p.id === id))
-      : [...new Set([...permissionIds, ...resourcePerms.map((p) => p.id)])]
-    form.setValue("permission_ids", next)
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
@@ -157,48 +135,11 @@ export default function RoleFormDialog({
           </div>
           <div className="space-y-3">
             <Label>{t("roles.permissions")}</Label>
-            <ScrollArea className="h-[300px] rounded-md border p-4">
-              <div className="space-y-4">
-                {RESOURCES.map((resource) => {
-                  const resourcePerms =
-                    permissions?.filter((p) => p.resource === resource) ?? []
-                  const allSelected = resourcePerms.every((p) =>
-                    permissionIds.includes(p.id),
-                  )
-                  return (
-                    <div key={resource} className="space-y-2">
-                      <div className="flex items-center gap-3">
-                        <Checkbox
-                          checked={allSelected}
-                          onCheckedChange={() =>
-                            toggleResourcePermissions(resource)
-                          }
-                        />
-                        <span className="text-sm font-semibold capitalize">
-                          {t(`roles.resource.${resource}`)}
-                        </span>
-                      </div>
-                      <div className="ml-6 flex flex-wrap gap-2">
-                        {resourcePerms.map((perm) => (
-                          <Badge
-                            key={perm.id}
-                            variant={
-                              permissionIds.includes(perm.id)
-                                ? "default"
-                                : "outline"
-                            }
-                            className="cursor-pointer"
-                            onClick={() => togglePermission(perm.id)}
-                          >
-                            {t(`roles.action.${perm.action}`)}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </ScrollArea>
+            <PermissionPicker
+              permissions={permissions ?? []}
+              value={permissionIds}
+              onChange={(ids) => form.setValue("permission_ids", ids)}
+            />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

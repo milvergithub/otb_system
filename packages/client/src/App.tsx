@@ -1,11 +1,13 @@
 import { lazy, Suspense } from "react"
-import { Route, Routes, Navigate } from "react-router-dom"
+import { Route, Routes, Navigate, useLocation } from "react-router-dom"
 import { useAuth } from "@/lib/auth"
+import { PASSWORD_CHANGE_PATH } from "@/lib/password"
 import { Layout } from "@/components/layout"
 import InstallAppDialog from "@/components/InstallAppDialog"
 import { PageLoader } from "@/components/ui/page-loader"
 import { SetupGate, SETUP_PATH } from "@/components/setup-gate"
 const LoginPage = lazy(() => import("@/pages/login"))
+const ChangePasswordPage = lazy(() => import("@/pages/change-password"))
 const SetupPage = lazy(() => import("@/pages/setup"))
 const DashboardPage = lazy(() => import("@/pages/dashboard"))
 const MembersPage = lazy(() => import("@/pages/members"))
@@ -28,11 +30,20 @@ const MemberFinesPage = lazy(() => import("@/pages/activities/member-fines"))
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
+  const location = useLocation()
   if (loading) {
     return <PageLoader />
   }
   if (!user) {
     return <Navigate to="/login" replace />
+  }
+  // Everything else stays unreachable until the temporary password is
+  // replaced, so the screen cannot be skipped with a hand-typed URL.
+  if (
+    user.must_change_password &&
+    !location.pathname.startsWith(PASSWORD_CHANGE_PATH)
+  ) {
+    return <Navigate to={PASSWORD_CHANGE_PATH} replace />
   }
   return <>{children}</>
 }
@@ -45,6 +56,14 @@ export default function App() {
       <Routes>
       <Route path={SETUP_PATH} element={<SetupPage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route
+        path={PASSWORD_CHANGE_PATH}
+        element={
+          <ProtectedRoute>
+            <ChangePasswordPage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/"
         element={

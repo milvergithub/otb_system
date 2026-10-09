@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api"
 import { ApiPath } from "@/lib/apiPath"
 import { queryKeys } from "@/lib/utils/query"
-import type { UserWithRoles } from "@/lib/types"
+import type { CreateResponse, UserWithRoles } from "@/lib/types"
 
 export function useSearchUsers(search?: string, enabled = true) {
   return useQuery<UserWithRoles[]>({
@@ -15,9 +15,12 @@ export function useSearchUsers(search?: string, enabled = true) {
   })
 }
 
+/**
+ * No password field: the server mints a temporary secret on create and on
+ * regeneration, and never accepts a credential over this endpoint.
+ */
 export interface UserRequest {
   email: string
-  password?: string
   fullName: string
   roleIds?: string[]
 }
@@ -26,7 +29,7 @@ export function useAddUser() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (payload: UserRequest) =>
-      api.post(ApiPath.Users.BASE, payload).then((r) => r.data),
+      api.post<CreateResponse>(ApiPath.Users.BASE, payload).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.users.all })
     },
@@ -59,6 +62,19 @@ export function useToggleUserActive() {
   return useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
       api.patch(ApiPath.Users.TOGGLE_ACTIVE(id), { isActive }).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.users.all })
+    },
+  })
+}
+
+export function useRegeneratePassword() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      api
+        .post<CreateResponse>(ApiPath.Users.REGENERATE_PASSWORD(id))
+        .then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.users.all })
     },

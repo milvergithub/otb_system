@@ -49,6 +49,14 @@ export class User {
   @Column({ default: true })
   is_active: boolean;
 
+  /**
+   * Set whenever the account is provisioned by someone else, so the holder
+   * knows only a temporary secret. Cleared by the self-service change endpoint
+   * and by every admin-driven regeneration.
+   */
+  @Column({ default: false })
+  must_change_password: boolean;
+
   @Column({ type: 'uuid', nullable: true })
   member_id: string | null;
 

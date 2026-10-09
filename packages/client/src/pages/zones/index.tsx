@@ -313,7 +313,7 @@ export default function ZonesPage() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-3rem)] gap-4">
+    <div className="flex lg:flex-row sm:flex-col h-[calc(100dvh-8rem)] gap-4">
       <Card className="flex-1 flex flex-col min-h-0">
         <CardContent className="flex-1 p-0 min-h-0 h-[calc(100dvh-3rem)]">
           {isLoading ? (
@@ -362,7 +362,7 @@ export default function ZonesPage() {
         </CardContent>
       </Card>
 
-      <Card className="w-80 flex flex-col">
+      <Card className="flex flex-col">
         <CardContent className="flex-1 overflow-auto p-4">
           {isLoading ? (
             <div className="space-y-2">

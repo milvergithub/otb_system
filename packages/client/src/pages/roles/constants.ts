@@ -1,6 +1,7 @@
-export const RESOURCES = [
+export const RESOURCE_ORDER = [
   "members",
   "meters",
+  "meter_types",
   "consumption",
   "billing",
   "tariffs",
@@ -14,7 +15,7 @@ export const RESOURCES = [
   "shares",
   "discounts",
   "zones",
+  "zone_types",
   "assets",
   "finances",
-  "meter_types"
 ]

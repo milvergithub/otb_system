@@ -13,9 +13,11 @@ import { JwtService } from '@nestjs/jwt';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { SkipPasswordChange } from '../../common/decorators/skip-password-change.decorator';
 import { AuthUser } from './interfaces/auth-user.interface';
 import { AuthService } from './auth.service';
 import { LoginDto, RefreshTokenDto } from './dto/auth.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -45,6 +47,7 @@ export class AuthController {
   }
 
   @Public()
+  @SkipPasswordChange()
   @UseGuards(ThrottlerGuard)
   @Throttle({ default: { ttl: 10000, limit: 5 } })
   @Post('refresh')
@@ -60,6 +63,7 @@ export class AuthController {
     }
   }
 
+  @SkipPasswordChange()
   @Get('me')
   async me(@CurrentUser() user: AuthUser) {
     const fullUser = await this.authService.getUserById(user.id);
@@ -69,5 +73,24 @@ export class AuthController {
       permissions: user.permissions,
       roles: user.roles,
     };
+  }
+
+  /**
+   * Deliberately left without a `@Public()` decorator and with no role
+   * requirement: every authenticated account must be able to rotate its own
+   * credential, including while the forced-change block is still active.
+   *
+   * Throttled with the global limit because this endpoint accepts a password
+   * guess the same way `login` does.
+   */
+  @SkipPasswordChange()
+  @UseGuards(ThrottlerGuard)
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(user.id, dto);
   }
 }

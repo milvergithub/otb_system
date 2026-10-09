@@ -8,6 +8,11 @@ interface AuthState {
   loading: boolean
   loadUser: () => Promise<void>
   login: (email: string, password: string) => Promise<void>
+  changePassword: (
+    currentPassword: string,
+    newPassword: string,
+    newPasswordConfirmation: string,
+  ) => Promise<void>
   applySession: (data: AuthResponse) => void
   logout: () => void
   hasPermission: (permission: string) => boolean
@@ -34,6 +39,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   login: async (email: string, password: string) => {
     const res = await api.post<AuthResponse>(ApiPath.Auth.LOGIN, { email, password })
+    get().applySession(res.data)
+  },
+
+  changePassword: async (
+    currentPassword,
+    newPassword,
+    newPasswordConfirmation,
+  ) => {
+    // The server reissues both tokens here so the must-change claim clears
+    // straight away instead of surviving until the old access token expires.
+    const res = await api.post<AuthResponse>(ApiPath.Auth.CHANGE_PASSWORD, {
+      currentPassword,
+      newPassword,
+      newPasswordConfirmation,
+    })
     get().applySession(res.data)
   },
 

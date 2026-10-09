@@ -49,6 +49,12 @@ export class UsersController {
     return this.usersService.toggleActive(id, dto.isActive);
   }
 
+  @Post(':id/regenerate-password')
+  @Roles('users.update')
+  regeneratePassword(@Param('id') id: string) {
+    return this.usersService.regeneratePassword(id);
+  }
+
   @Delete(':id')
   @Roles('users.delete')
   remove(@Param('id') id: string) {

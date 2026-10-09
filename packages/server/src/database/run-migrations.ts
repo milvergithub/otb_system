@@ -73,6 +73,10 @@ const MIGRATIONS = [
     timestamp: 1755000000020,
     name: 'AddCodeToMeterTypes1755000000020',
   },
+  {
+    timestamp: 1755000000021,
+    name: 'AddMustChangePassword1755000000021',
+  },
 ];
 
 async function isFreshDatabase(ds: DataSource): Promise<boolean> {
