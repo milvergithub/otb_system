@@ -5,6 +5,7 @@ import { ConsumptionModule } from '../consumption/consumption.module';
 import { FinancesModule } from '../finances/finances.module';
 import { SettingsModule } from '../settings/settings.module';
 import { TariffsModule } from '../tariffs/tariffs.module';
+import { PaymentMethodsModule } from '../payment-methods/payment-methods.module';
 import { BillingController } from './billing.controller';
 import { BillingService } from './billing.service';
 import { DiscountController } from './discount.controller';
@@ -28,6 +29,7 @@ import { ReceiptService } from './receipt.service';
     SettingsModule,
     ConsumptionModule,
     FinancesModule,
+    PaymentMethodsModule,
   ],
   controllers: [DiscountController, BillingController],
   providers: [BillingService, ReceiptService, DiscountService],

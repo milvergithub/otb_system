@@ -1,14 +1,16 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { SKIP_PASSWORD_CHANGE_KEY } from '../../common/decorators/skip-password-change.decorator';
+import { AppError } from '../../common/errors/app-error';
+import type { ErrorCode } from '../../common/errors/error-codes';
 
-export const PASSWORD_CHANGE_REQUIRED = 'Password change required';
-export const PASSWORD_CHANGE_REQUIRED_CODE = 'PASSWORD_CHANGE_REQUIRED';
+/**
+ * The wire `code` the client branches on (`PASSWORD_CHANGE_REQUIRED_CODE` in
+ * `packages/client/src/lib/api.ts`). The message is localized from the
+ * catalogue by `I18nExceptionFilter`; see its spec for the rendered body.
+ */
+export const PASSWORD_CHANGE_REQUIRED_CODE: ErrorCode =
+  'PASSWORD_CHANGE_REQUIRED';
 
 /**
  * Blocks every non-exempt endpoint while the caller's token carries the
@@ -40,11 +42,6 @@ export class PasswordChangeGuard implements CanActivate {
       return true;
     }
 
-    throw new ForbiddenException({
-      statusCode: 403,
-      error: 'Forbidden',
-      message: PASSWORD_CHANGE_REQUIRED,
-      code: PASSWORD_CHANGE_REQUIRED_CODE,
-    });
+    throw new AppError(PASSWORD_CHANGE_REQUIRED_CODE);
   }
 }

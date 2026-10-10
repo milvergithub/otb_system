@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { ActivityEvidenceService } from './activity-evidence.service';
 import { EvidenceType } from './entities/activity-evidence.entity';
+import { AppError } from '../../common/errors/app-error';
 
 function makeService() {
   const repo = {
@@ -50,7 +51,7 @@ describe('ActivityEvidenceService', () => {
         dto({ mimeType: 'video/mp4', fileName: 'v.mp4' }),
         'u-1',
       ),
-    ).rejects.toThrow(BadRequestException);
+    ).rejects.toThrow(new AppError('ACTIVITY_EVIDENCE_ONLY_IMAGES_AND_PDF'));
     expect(storageService.uploadDocument).not.toHaveBeenCalled();
   });
 
@@ -59,7 +60,7 @@ describe('ActivityEvidenceService', () => {
 
     await expect(
       service.create('act-1', dto({ type: EvidenceType.VIDEO }), 'u-1'),
-    ).rejects.toThrow('Solo se permiten imágenes y PDF');
+    ).rejects.toThrow(new AppError('ACTIVITY_EVIDENCE_ONLY_IMAGES_AND_PDF'));
     expect(storageService.uploadDocument).not.toHaveBeenCalled();
   });
 
@@ -72,7 +73,7 @@ describe('ActivityEvidenceService', () => {
         dto({ mimeType: 'text/plain', fileName: 'a.txt' }),
         'u-1',
       ),
-    ).rejects.toThrow(BadRequestException);
+    ).rejects.toThrow(new AppError('ACTIVITY_EVIDENCE_ONLY_IMAGES_AND_PDF'));
     expect(storageService.uploadDocument).not.toHaveBeenCalled();
   });
 

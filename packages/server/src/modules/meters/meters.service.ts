@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { setImmediate } from 'node:timers';
@@ -18,8 +13,10 @@ import { SharePayment } from '../shares/entities/share-payment.entity';
 import { SharePaymentsService } from '../shares/share-payments.service';
 import { SharesService } from '../shares/shares.service';
 import { BaseTariffService } from '../tariffs/base-tariff.service';
+import { PaymentMethodsService } from '../payment-methods/payment-methods.service';
 import { CreateMeterDto, UpdateMeterDto } from './dto/meter.dto';
 import { Meter, MeterStatus } from './entities/meter.entity';
+import { AppError } from '../../common/errors/app-error';
 
 export interface MeterListItem extends Meter {
   sharePaid: number;
@@ -50,6 +47,7 @@ export class MetersService {
     private readonly sharePaymentsService: SharePaymentsService,
     private readonly sharesService: SharesService,
     private readonly baseTariffService: BaseTariffService,
+    private readonly paymentMethodsService: PaymentMethodsService,
     private readonly eventEmitter: EventEmitter2,
     @InjectDataSource()
     private readonly dataSource: DataSource,
@@ -63,7 +61,9 @@ export class MetersService {
     const query = this.metersRepository
       .createQueryBuilder('meter')
       .leftJoinAndSelect('meter.member', 'member')
-      .leftJoinAndSelect('meter.type', 'type');
+      .leftJoinAndSelect('meter.type', 'type')
+      // Meters keep the member name for display even after a logical deletion.
+      .withDeleted();
 
     if (filters.status) {
       query.andWhere('meter.status = :status', { status: filters.status });
@@ -121,9 +121,10 @@ export class MetersService {
     const meter = await this.metersRepository.findOne({
       where: { id },
       relations: ['member', 'consumptions'],
+      withDeleted: true,
     });
     if (!meter) {
-      throw new NotFoundException('Meter not found');
+      throw new AppError('METER_NOT_FOUND');
     }
     return meter;
   }
@@ -131,6 +132,7 @@ export class MetersService {
   async findAllForMap(): Promise<Meter[]> {
     return this.metersRepository.find({
       relations: ['member'],
+      withDeleted: true,
     });
   }
 
@@ -138,6 +140,7 @@ export class MetersService {
     return this.metersRepository.find({
       where: { member_id: memberId },
       relations: ['member'],
+      withDeleted: true,
     });
   }
 
@@ -146,14 +149,15 @@ export class MetersService {
       where: { code: dto.code },
     });
     if (existing) {
-      throw new BadRequestException('A meter with this code already exists');
+      throw new AppError('METER_CODE_EXISTS');
     }
     const member = await this.membersRepository.findOne({
       where: { id: dto.memberId },
     });
     if (!member) {
-      throw new BadRequestException('Member not found');
+      throw new AppError('MEMBER_NOT_FOUND');
     }
+    await this.paymentMethodsService.validateCode(dto.sharePaymentMethod);
 
     const evidenceKey = dto.shareEvidenceBase64
       ? await this.sharePaymentsService.uploadEvidence(dto.shareEvidenceBase64)
@@ -275,7 +279,7 @@ export class MetersService {
         where: { code: dto.code },
       });
       if (existing) {
-        throw new BadRequestException('A meter with this code already exists');
+        throw new AppError('METER_CODE_EXISTS');
       }
     }
     if (dto.memberId) {
@@ -283,7 +287,7 @@ export class MetersService {
         where: { id: dto.memberId },
       });
       if (!member) {
-        throw new BadRequestException('Member not found');
+        throw new AppError('MEMBER_NOT_FOUND');
       }
     }
     Object.assign(meter, {

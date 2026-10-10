@@ -24,17 +24,21 @@ export function useAllMembers() {
 export interface SearchMembersParams {
   page: number
   search?: string
+  memberTypeId?: string
   sortBy?: string
   sortOrder?: SortOrder
+  status?: "active" | "deleted" | "all"
 }
 
-export function useSearchMembers({ page, search, sortBy, sortOrder }: SearchMembersParams) {
+export function useSearchMembers({ page, search, memberTypeId, sortBy, sortOrder, status = "active" }: SearchMembersParams) {
   return useQuery<Paginated<Member>>({
     queryKey: queryKeys.members.list(
       page,
       search ?? "",
+      memberTypeId ?? "",
       sortBy ?? "",
       sortOrder ?? "",
+      status,
     ),
     queryFn: () =>
       api
@@ -43,8 +47,10 @@ export function useSearchMembers({ page, search, sortBy, sortOrder }: SearchMemb
             page,
             limit: 10,
             search: search || undefined,
+            memberTypeId: memberTypeId || undefined,
             sortBy: sortBy || undefined,
             sortOrder: sortOrder ? sortOrder.toUpperCase() : undefined,
+            status: status === "active" ? undefined : status,
           },
         })
         .then((r) => r.data),
@@ -66,6 +72,7 @@ export interface MemberRequest {
   phone?: string
   phoneCountry?: string
   address?: string
+  memberTypeId?: string | null
 }
 
 export function useAddMember() {
@@ -76,6 +83,7 @@ export function useAddMember() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.members.all })
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard })
+      queryClient.invalidateQueries({ queryKey: queryKeys.memberTypes.all })
     },
   })
 }
@@ -88,6 +96,7 @@ export function useEditMember() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.members.all })
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard })
+      queryClient.invalidateQueries({ queryKey: queryKeys.memberTypes.all })
     },
   })
 }
@@ -99,6 +108,19 @@ export function useDeleteMember() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.members.all })
       queryClient.invalidateQueries({ queryKey: queryKeys.dashboard })
+    },
+  })
+}
+
+export function useRestoreMember() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.patch(ApiPath.Members.RESTORE(id)).then((r) => r.data as Member),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.members.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard })
+      queryClient.invalidateQueries({ queryKey: queryKeys.memberTypes.all })
     },
   })
 }

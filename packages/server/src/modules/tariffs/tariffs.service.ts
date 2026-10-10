@@ -1,12 +1,9 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateTariffDto, UpdateTariffDto } from './dto/tariff.dto';
 import { Tariff } from './entities/tariff.entity';
+import { AppError } from '../../common/errors/app-error';
 
 @Injectable()
 export class TariffsService {
@@ -25,7 +22,7 @@ export class TariffsService {
   async findOne(id: string): Promise<Tariff> {
     const tariff = await this.tariffsRepository.findOne({ where: { id } });
     if (!tariff) {
-      throw new NotFoundException('Tariff not found');
+      throw new AppError('TARIFF_NOT_FOUND');
     }
     return tariff;
   }
@@ -88,9 +85,13 @@ export class TariffsService {
       const newMax = maxCubicMeters ?? Infinity;
 
       if (minCubicMeters <= existMax && newMax >= existMin) {
-        throw new BadRequestException(
-          `El rango ${minCubicMeters}-${maxCubicMeters || '∞'} m³ se superpone con la tarifa existente "${existing.name}" (${existMin}-${existMax === Infinity ? '∞' : existMax} m³)`,
-        );
+        throw new AppError('OVERLAPPING_TARIFF', {
+          min: minCubicMeters,
+          max: maxCubicMeters ?? '∞',
+          name: existing.name,
+          existingMin: existMin,
+          existingMax: existMax === Infinity ? '∞' : existMax,
+        });
       }
     }
   }
@@ -100,15 +101,11 @@ export class TariffsService {
       dto.maxCubicMeters !== undefined &&
       dto.maxCubicMeters <= dto.minCubicMeters
     ) {
-      throw new BadRequestException(
-        'maxCubicMeters must be greater than minCubicMeters',
-      );
+      throw new AppError('MAX_CUBIC_METERS_GREATER_THAN_MIN');
     }
 
     if (dto.validUntil && dto.validUntil <= dto.validFrom) {
-      throw new BadRequestException(
-        'La fecha de fin debe ser posterior a la fecha de inicio',
-      );
+      throw new AppError('END_DATE_AFTER_START');
     }
 
     await this.validateNoOverlap(
@@ -146,15 +143,11 @@ export class TariffsService {
       dto.validUntil !== undefined ? dto.validUntil : tariff.valid_until;
 
     if (maxCubicMeters !== undefined && maxCubicMeters <= minCubicMeters) {
-      throw new BadRequestException(
-        'maxCubicMeters must be greater than minCubicMeters',
-      );
+      throw new AppError('MAX_CUBIC_METERS_GREATER_THAN_MIN');
     }
 
     if (validUntil && validUntil <= validFrom) {
-      throw new BadRequestException(
-        'La fecha de fin debe ser posterior a la fecha de inicio',
-      );
+      throw new AppError('END_DATE_AFTER_START');
     }
 
     await this.validateNoOverlap(

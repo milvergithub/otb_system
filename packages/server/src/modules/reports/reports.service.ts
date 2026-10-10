@@ -208,20 +208,24 @@ export class ReportsService {
   }
 
   async getOverdueMembers() {
-    return this.paymentsRepository
-      .createQueryBuilder('payment')
-      .leftJoinAndSelect('payment.consumption', 'consumption')
-      .leftJoinAndSelect('consumption.meter', 'meter')
-      .leftJoinAndSelect('meter.member', 'member')
-      .where('payment.status IN (:...statuses)', {
-        statuses: [
-          PaymentStatus.OVERDUE,
-          PaymentStatus.PARTIAL,
-          PaymentStatus.PENDING,
-        ],
-      })
-      .orderBy('payment.due_date', 'ASC')
-      .getMany();
+    return (
+      this.paymentsRepository
+        .createQueryBuilder('payment')
+        .leftJoinAndSelect('payment.consumption', 'consumption')
+        .leftJoinAndSelect('consumption.meter', 'meter')
+        .leftJoinAndSelect('meter.member', 'member')
+        .where('payment.status IN (:...statuses)', {
+          statuses: [
+            PaymentStatus.OVERDUE,
+            PaymentStatus.PARTIAL,
+            PaymentStatus.PENDING,
+          ],
+        })
+        .orderBy('payment.due_date', 'ASC')
+        // Overdue debt survives a member's logical deletion: keep the name.
+        .withDeleted()
+        .getMany()
+    );
   }
 
   async exportCsv(startDate?: string, endDate?: string): Promise<string> {
@@ -251,6 +255,8 @@ export class ReportsService {
       )
       .orderBy('consumption.year', 'ASC')
       .addOrderBy('consumption.month', 'ASC')
+      // Exports keep the member name after a logical deletion.
+      .withDeleted()
       .getMany();
 
     const sharePayments = await this.sharePaymentsRepository

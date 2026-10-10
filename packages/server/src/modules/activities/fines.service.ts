@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
@@ -26,6 +20,7 @@ import { Activity } from './entities/activity.entity';
 import { PayFineDto, CancelFineDto, CreateManualFineDto } from './dto/fine.dto';
 import { FinancesService } from '../finances/finances.service';
 import { FinanceSourceType } from '../finances/entities/finance-transaction.entity';
+import { AppError } from '../../common/errors/app-error';
 
 /**
  * Registration context taken at payment time for the finance movement. The
@@ -90,7 +85,9 @@ export class FinesService {
       .createQueryBuilder('f')
       .leftJoinAndSelect('f.member', 'member')
       .leftJoinAndSelect('f.activity', 'activity')
-      .leftJoinAndSelect('f.fineType', 'fineType');
+      .leftJoinAndSelect('f.fineType', 'fineType')
+      // Fines survive a member's logical deletion: keep the member name.
+      .withDeleted();
 
     if (filters.memberId) {
       query.andWhere('f.member_id = :memberId', { memberId: filters.memberId });
@@ -135,7 +132,8 @@ export class FinesService {
       .createQueryBuilder('f')
       .leftJoinAndSelect('f.member', 'member')
       .leftJoinAndSelect('f.activity', 'activity')
-      .leftJoinAndSelect('f.fineType', 'fineType');
+      .leftJoinAndSelect('f.fineType', 'fineType')
+      .withDeleted();
 
     if (filters.status) {
       query.andWhere('f.status = :status', { status: filters.status });
@@ -207,8 +205,9 @@ export class FinesService {
     const fine = await this.repo.findOne({
       where: { id },
       relations: ['member', 'activity', 'fineType'],
+      withDeleted: true,
     });
-    if (!fine) throw new NotFoundException('Multa no encontrada');
+    if (!fine) throw new AppError('FINE_NOT_FOUND');
     return fine;
   }
 
@@ -223,24 +222,24 @@ export class FinesService {
     currentUserId?: string,
   ): Promise<Fine> {
     const activity = await this.activitiesRepo.findOneBy({ id: activityId });
-    if (!activity) throw new NotFoundException('Actividad no encontrada');
+    if (!activity) throw new AppError('ACTIVITY_NOT_FOUND');
 
     const fineType = await this.fineTypeRepo.findOneBy({
       id: dto.fineTypeId,
     });
-    if (!fineType) throw new BadRequestException('Tipo de multa no encontrado');
+    if (!fineType) throw new AppError('FINE_TYPE_NOT_FOUND');
     if (!fineType.is_active) {
-      throw new BadRequestException('El tipo de multa está inactivo');
+      throw new AppError('FINE_TYPE_INACTIVE');
     }
 
     const member = await this.membersRepo.findOneBy({ id: dto.memberId });
-    if (!member) throw new BadRequestException('Socio no encontrado');
+    if (!member) throw new AppError('MEMBER_NOT_FOUND');
 
     const amount = dto.amount?.trim()
       ? Number(dto.amount)
       : parseFloat(fineType.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
-      throw new BadRequestException('El monto de la multa es inválido');
+      throw new AppError('FINE_AMOUNT_INVALID');
     }
 
     const fine = this.repo.create({
@@ -273,12 +272,12 @@ export class FinesService {
         where: { id },
         relations: ['member', 'activity', 'fineType'],
       });
-      if (!current) throw new NotFoundException('Multa no encontrada');
+      if (!current) throw new AppError('FINE_NOT_FOUND');
       if (current.status === FineStatus.PAID) {
-        throw new NotFoundException('La multa ya fue pagada');
+        throw new AppError('FINE_ALREADY_PAID');
       }
       if (current.status === FineStatus.CANCELLED) {
-        throw new NotFoundException('La multa fue cancelada');
+        throw new AppError('FINE_ALREADY_CANCELLED');
       }
 
       // Conditional update instead of a pessimistic lock: the WHERE clause makes
@@ -298,16 +297,14 @@ export class FinesService {
         .execute();
 
       if ((result.affected ?? 0) === 0) {
-        throw new ConflictException(
-          'La multa cambió de estado mientras se procesaba el pago',
-        );
+        throw new AppError('FINE_STATE_CHANGED');
       }
 
       const updated = await repo.findOne({
         where: { id },
         relations: ['member', 'activity', 'fineType'],
       });
-      if (!updated) throw new NotFoundException('Multa no encontrada');
+      if (!updated) throw new AppError('FINE_NOT_FOUND');
 
       await this.recordFineIncome(updated, manager, attribution);
 
@@ -486,7 +483,7 @@ export class FinesService {
   async cancel(id: string, dto: CancelFineDto): Promise<Fine> {
     const fine = await this.findOne(id);
     if (fine.status === FineStatus.CANCELLED) {
-      throw new NotFoundException('La multa ya fue cancelada');
+      throw new AppError('FINE_ALREADY_CANCELLED');
     }
     fine.status = FineStatus.CANCELLED;
     fine.notes = dto.reason ?? fine.notes;

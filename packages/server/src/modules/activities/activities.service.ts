@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import {
@@ -22,6 +17,8 @@ import {
   FinanceTransactionType,
 } from '../finances/entities/finance-transaction.entity';
 import { User } from '../users/entities/user.entity';
+import { AppError } from '../../common/errors/app-error';
+import type { ErrorCode } from '../../common/errors/error-codes';
 import {
   CreateActivityDto,
   FilterActivitiesDto,
@@ -183,15 +180,21 @@ export class ActivitiesService {
         'attendances.member',
       ],
     });
-    if (!a) throw new NotFoundException('Actividad no encontrada');
+    if (!a) throw new AppError('ACTIVITY_NOT_FOUND');
     return a;
   }
 
   async create(dto: CreateActivityDto, userId: string): Promise<Activity> {
     this.validateTimes(dto.startTime, dto.endTime);
     await this.validateType(dto.typeId);
-    await this.validateUserRef(dto.responsibleUserId, 'responsable');
-    await this.validateUserRef(dto.collectorUserId, 'encargado de cobro');
+    await this.validateUserRef(
+      dto.responsibleUserId,
+      'ACTIVITY_ORGANIZER_NOT_FOUND',
+    );
+    await this.validateUserRef(
+      dto.collectorUserId,
+      'ACTIVITY_COLLECTOR_NOT_FOUND',
+    );
 
     const entity = this.repo.create({
       name: dto.name,
@@ -226,10 +229,16 @@ export class ActivitiesService {
     }
     if (dto.typeId !== undefined) await this.validateType(dto.typeId);
     if (dto.responsibleUserId !== undefined) {
-      await this.validateUserRef(dto.responsibleUserId, 'responsable');
+      await this.validateUserRef(
+        dto.responsibleUserId,
+        'ACTIVITY_ORGANIZER_NOT_FOUND',
+      );
     }
     if (dto.collectorUserId !== undefined) {
-      await this.validateUserRef(dto.collectorUserId, 'encargado de cobro');
+      await this.validateUserRef(
+        dto.collectorUserId,
+        'ACTIVITY_COLLECTOR_NOT_FOUND',
+      );
     }
     if (dto.status !== undefined && dto.status !== entity.status) {
       this.assertTransition(entity.status, dto.status);
@@ -290,9 +299,7 @@ export class ActivitiesService {
   private assertTransition(from: ActivityStatus, to: ActivityStatus): void {
     const allowed = ALLOWED_TRANSITIONS[from] ?? [];
     if (!allowed.includes(to)) {
-      throw new BadRequestException(
-        `No se puede cambiar el estado de "${from}" a "${to}"`,
-      );
+      throw new AppError('ACTIVITY_STATUS_TRANSITION_INVALID', { from, to });
     }
   }
 
@@ -307,33 +314,29 @@ export class ActivitiesService {
       entity.responsible_user_id !== null &&
       entity.responsible_user_id === userId;
     if (!isCreator && !isResponsible) {
-      throw new ForbiddenException(
-        'Solo el creador o el responsable puede modificar esta actividad',
-      );
+      throw new AppError('ACTIVITY_NOT_MODIFIABLE');
     }
   }
 
   private validateTimes(startTime: string, endTime: string): void {
     if (startTime >= endTime) {
-      throw new BadRequestException(
-        'La hora de fin debe ser posterior a la hora de inicio',
-      );
+      throw new AppError('ACTIVITY_END_TIME_AFTER_START');
     }
   }
 
   private async validateType(typeId?: string | null): Promise<void> {
     if (!typeId) return;
     const type = await this.activityTypeRepo.findOneBy({ id: typeId });
-    if (!type) throw new BadRequestException('Tipo de actividad no encontrado');
+    if (!type) throw new AppError('ACTIVITY_TYPE_NOT_FOUND');
   }
 
   private async validateUserRef(
     userId: string | null | undefined,
-    label: string,
+    missingCode: ErrorCode,
   ): Promise<void> {
     if (!userId) return;
     const user = await this.usersRepo.findOneBy({ id: userId });
-    if (!user) throw new BadRequestException(`Usuario ${label} no encontrado`);
+    if (!user) throw new AppError(missingCode);
   }
 
   async remove(id: string, userId: string, canViewAll: boolean): Promise<void> {

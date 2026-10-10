@@ -2,7 +2,7 @@ import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { formatCurrency, formatDate } from "@/lib/utils"
 import { ApiPath } from "@/lib/apiPath"
-import { getAccessToken } from "@/lib/api"
+import { authHeaders } from "@/lib/api"
 import type { Asset, AssetMaintenance, AssetMovement } from "@/lib/types"
 import { useGetAsset, useAssetMovements, useAssetMaintenances, useAssetDocuments, useAddAssetDocument, useDeleteAssetDocument } from "@/hooks/assets"
 import { Badge } from "@/components/ui/badge"
@@ -43,9 +43,8 @@ export default function AssetDetailSheet({ asset, onOpenChange }: Props) {
   if (!asset) return null
 
   function openAssetDocument(documentId: string) {
-    const token = getAccessToken()
     fetch(`${import.meta.env.VITE_API_URL ?? "http://localhost:3001/api"}${ApiPath.Assets.DOCUMENT_CONTENT(asset!.id, documentId)}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: authHeaders(),
     })
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load document")

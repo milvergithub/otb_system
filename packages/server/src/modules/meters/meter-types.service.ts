@@ -1,13 +1,9 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MeterTypeEntity } from './entities/meter-type.entity';
 import { CreateMeterTypeDto, UpdateMeterTypeDto } from './dto/meter-type.dto';
+import { AppError } from '../../common/errors/app-error';
 
 @Injectable()
 export class MeterTypesService {
@@ -22,7 +18,7 @@ export class MeterTypesService {
 
   async findOne(id: string): Promise<MeterTypeEntity> {
     const meterType = await this.meterTypeRepo.findOneBy({ id });
-    if (!meterType) throw new NotFoundException(`Meter type ${id} not found`);
+    if (!meterType) throw new AppError('METER_TYPE_NOT_FOUND');
     return meterType;
   }
 
@@ -30,9 +26,7 @@ export class MeterTypesService {
     await this.assertCodeAvailable(dto.code);
     const existing = await this.meterTypeRepo.findOneBy({ name: dto.name });
     if (existing) {
-      throw new BadRequestException(
-        `A meter type with name "${dto.name}" already exists`,
-      );
+      throw new AppError('METER_TYPE_NAME_EXISTS', { name: dto.name });
     }
     const meterType = this.meterTypeRepo.create({
       code: dto.code.trim().toUpperCase(),
@@ -46,9 +40,7 @@ export class MeterTypesService {
     if (dto.name && dto.name !== meterType.name) {
       const existing = await this.meterTypeRepo.findOneBy({ name: dto.name });
       if (existing) {
-        throw new BadRequestException(
-          `A meter type with name "${dto.name}" already exists`,
-        );
+        throw new AppError('METER_TYPE_NAME_EXISTS', { name: dto.name });
       }
     }
     if (dto.name !== undefined) meterType.name = dto.name;
@@ -65,13 +57,13 @@ export class MeterTypesService {
     currentId?: string,
   ): Promise<void> {
     if (!code?.trim()) {
-      throw new BadRequestException('El código es obligatorio');
+      throw new AppError('METER_TYPE_CODE_REQUIRED');
     }
     const existing = await this.meterTypeRepo.findOneBy({
       code: code.trim().toUpperCase(),
     });
     if (existing && existing.id !== currentId) {
-      throw new ConflictException('Ya existe un tipo con ese código');
+      throw new AppError('METER_TYPE_CODE_EXISTS');
     }
   }
 }

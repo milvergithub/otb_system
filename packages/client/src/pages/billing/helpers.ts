@@ -20,12 +20,6 @@ export const STATUS_VARIANT: Record<
   partial: "secondary",
 }
 
-export const PAYMENT_METHODS = [
-  { value: "cash", label: "common.method.cash" },
-  { value: "transfer", label: "common.method.transfer" },
-  { value: "card", label: "common.method.card" },
-]
-
 export function memberName(p: Payment): string {
   const member = p.consumption?.meter?.member
   return member ? `${member.first_name} ${member.last_name}` : "—"

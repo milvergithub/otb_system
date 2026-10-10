@@ -1,12 +1,8 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ActivityType } from './entities/activity-type.entity';
+import { AppError } from '../../common/errors/app-error';
 import {
   CreateActivityTypeDto,
   UpdateActivityTypeDto,
@@ -25,7 +21,7 @@ export class ActivityTypesService {
 
   async findOne(id: string): Promise<ActivityType> {
     const type = await this.repo.findOneBy({ id });
-    if (!type) throw new NotFoundException('Tipo de actividad no encontrado');
+    if (!type) throw new AppError('ACTIVITY_TYPE_NOT_FOUND');
     return type;
   }
 
@@ -63,13 +59,13 @@ export class ActivityTypesService {
     currentId?: string,
   ): Promise<void> {
     if (!code?.trim()) {
-      throw new BadRequestException('El código es obligatorio');
+      throw new AppError('ACTIVITY_TYPE_CODE_REQUIRED');
     }
     const existing = await this.repo.findOneBy({
       code: code.trim().toUpperCase(),
     });
     if (existing && existing.id !== currentId) {
-      throw new ConflictException('Ya existe un tipo con ese código');
+      throw new AppError('ACTIVITY_TYPE_CODE_EXISTS');
     }
   }
 }

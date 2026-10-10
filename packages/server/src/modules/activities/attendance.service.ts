@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -14,6 +10,7 @@ import { Activity } from './entities/activity.entity';
 import { Member } from '../members/entities/member.entity';
 import { Fine, FineSource, FineStatus } from './entities/fine.entity';
 import { FineType, FineTypeAppliesTo } from './entities/fine-type.entity';
+import { AppError } from '../../common/errors/app-error';
 import {
   ActivityAttendanceSession,
   AttendanceSessionType,
@@ -46,15 +43,19 @@ export class AttendanceService {
     const activity = await this.activityRepo.findOne({
       where: { id: activityId },
     });
-    if (!activity) throw new NotFoundException('Actividad no encontrada');
+    if (!activity) throw new AppError('ACTIVITY_NOT_FOUND');
 
-    return this.attendanceRepo
-      .createQueryBuilder('a')
-      .leftJoinAndSelect('a.member', 'member')
-      .where('a.activity_id = :activityId', { activityId })
-      .orderBy('member.last_name', 'ASC')
-      .addOrderBy('member.first_name', 'ASC')
-      .getMany();
+    return (
+      this.attendanceRepo
+        .createQueryBuilder('a')
+        .leftJoinAndSelect('a.member', 'member')
+        .where('a.activity_id = :activityId', { activityId })
+        .orderBy('member.last_name', 'ASC')
+        .addOrderBy('member.first_name', 'ASC')
+        // Saved attendance keeps the member name after a logical deletion.
+        .withDeleted()
+        .getMany()
+    );
   }
 
   /**
@@ -106,11 +107,9 @@ export class AttendanceService {
     const activity = await this.activityRepo.findOne({
       where: { id: activityId },
     });
-    if (!activity) throw new NotFoundException('Actividad no encontrada');
+    if (!activity) throw new AppError('ACTIVITY_NOT_FOUND');
     if (activity.final_control_at) {
-      throw new BadRequestException(
-        'El control inicial no puede modificarse una vez realizado el control final',
-      );
+      throw new AppError('ATTENDANCE_INITIAL_CONTROL_LOCKED');
     }
 
     const presentIds = new Set(dto.memberIds);
@@ -187,11 +186,9 @@ export class AttendanceService {
     const activity = await this.activityRepo.findOne({
       where: { id: activityId },
     });
-    if (!activity) throw new NotFoundException('Actividad no encontrada');
+    if (!activity) throw new AppError('ACTIVITY_NOT_FOUND');
     if (!activity.initial_control_at) {
-      throw new BadRequestException(
-        'Debe realizarse primero el control de asistencia inicial',
-      );
+      throw new AppError('ATTENDANCE_INITIAL_CONTROL_REQUIRED');
     }
 
     const presentIds = new Set(dto.memberIds);
@@ -301,7 +298,8 @@ export class AttendanceService {
     const query = this.attendanceRepo
       .createQueryBuilder('a')
       .leftJoinAndSelect('a.member', 'member')
-      .leftJoinAndSelect('a.activity', 'activity');
+      .leftJoinAndSelect('a.activity', 'activity')
+      .withDeleted();
 
     if (filters.memberId) {
       query.andWhere('a.member_id = :memberId', { memberId: filters.memberId });

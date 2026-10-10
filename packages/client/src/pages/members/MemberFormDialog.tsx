@@ -1,5 +1,5 @@
-import { useEffect, type FormEvent } from "react"
-import { useForm, Controller } from "react-hook-form"
+import { useEffect, useMemo, type FormEvent } from "react"
+import { useForm, useWatch, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useTranslation } from "react-i18next"
@@ -8,10 +8,12 @@ import { requiredString } from "@/lib/validation"
 import { getApiErrorMessage } from "@/lib/api"
 import type { Member } from "@/lib/types"
 import { useAddMember, useEditMember } from "@/hooks/members"
+import { useActiveMemberTypes } from "@/hooks/memberTypes"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PhoneInput } from "@/components/ui/phone-input"
+import { ComboboxSelect } from "@/components/ui/combobox"
 import {
   Dialog,
   DialogContent,
@@ -21,6 +23,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
+
+const NO_TYPE = "__none__"
 
 const memberFormSchema = (t: TFunction) =>
   z.object({
@@ -36,6 +40,7 @@ const memberFormSchema = (t: TFunction) =>
       ),
     phoneCountry: z.string().default("BO"),
     address: z.string().optional(),
+    memberTypeId: z.string().optional(),
   })
 
 type MemberFormValues = z.infer<ReturnType<typeof memberFormSchema>>
@@ -47,6 +52,7 @@ const DEFAULT_FORM: MemberFormValues = {
   phone: "",
   phoneCountry: "BO",
   address: "",
+  memberTypeId: "",
 }
 
 interface MemberFormDialogProps {
@@ -68,6 +74,23 @@ export default function MemberFormDialog({
 
   const addMember = useAddMember()
   const editMember = useEditMember()
+  const { data: activeTypes } = useActiveMemberTypes()
+
+  const typeOptions = useMemo(() => {
+    const options = (activeTypes ?? [])
+      .map((mt) => ({ label: mt.name, value: mt.id }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+    const current = editing?.member_type
+    if (
+      current &&
+      !current.is_active &&
+      !options.some((o) => o.value === current.id)
+    ) {
+      options.push({ label: `${current.name}`, value: current.id })
+    }
+    options.unshift({ label: t("memberTypes.noType"), value: NO_TYPE })
+    return options
+  }, [activeTypes, editing, t])
 
   useEffect(() => {
     if (!open) return
@@ -80,10 +103,13 @@ export default function MemberFormDialog({
             phone: editing.phone ?? "",
             phoneCountry: editing.phone_country ?? "BO",
             address: editing.address ?? "",
+            memberTypeId: editing.member_type?.id ?? "",
           }
         : DEFAULT_FORM,
     )
   }, [open, editing, form])
+
+  const watchMemberTypeId = useWatch({ control: form.control, name: "memberTypeId" })
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -95,6 +121,10 @@ export default function MemberFormDialog({
         phone: values.phone || undefined,
         phoneCountry: values.phoneCountry,
         address: values.address || undefined,
+        memberTypeId:
+          values.memberTypeId && values.memberTypeId !== NO_TYPE
+            ? values.memberTypeId
+            : null,
       }
       if (editing) {
         editMember.mutate(
@@ -190,6 +220,16 @@ export default function MemberFormDialog({
           <div className="space-y-2">
             <Label htmlFor="address">{t("members.address")}</Label>
             <Input id="address" {...form.register("address")} />
+          </div>
+          <div className="space-y-2">
+            <Label>{t("memberTypes.label")}</Label>
+            <ComboboxSelect
+              value={watchMemberTypeId}
+              onValueChange={(v) => form.setValue("memberTypeId", v)}
+              placeholder={t("memberTypes.selectPlaceholder")}
+              className="w-full"
+              options={typeOptions}
+            />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

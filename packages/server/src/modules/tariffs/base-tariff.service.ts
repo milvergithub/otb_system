@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -10,6 +6,7 @@ import {
   UpdateBaseTariffDto,
 } from './dto/base-tariff.dto';
 import { BaseTariff } from './entities/base-tariff.entity';
+import { AppError } from '../../common/errors/app-error';
 
 @Injectable()
 export class BaseTariffService {
@@ -42,7 +39,7 @@ export class BaseTariffService {
   async findOne(id: string): Promise<BaseTariff> {
     const tariff = await this.repository.findOne({ where: { id } });
     if (!tariff) {
-      throw new NotFoundException('Base tariff not found');
+      throw new AppError('BASE_TARIFF_NOT_FOUND');
     }
     return tariff;
   }
@@ -113,17 +110,13 @@ export class BaseTariffService {
     const overlapping = await query.getOne();
 
     if (overlapping) {
-      throw new BadRequestException(
-        `Ya existe una tarifa base vigente para este período: "${overlapping.name}"`,
-      );
+      throw new AppError('OVERLAPPING_BASE_TARIFF', { name: overlapping.name });
     }
   }
 
   async create(dto: CreateBaseTariffDto): Promise<BaseTariff> {
     if (dto.validUntil && dto.validUntil <= dto.validFrom) {
-      throw new BadRequestException(
-        'La fecha de fin debe ser posterior a la fecha de inicio',
-      );
+      throw new AppError('END_DATE_AFTER_START');
     }
 
     await this.validateNoOverlap(dto.validFrom, dto.validUntil, dto.typeId);
@@ -147,9 +140,7 @@ export class BaseTariffService {
       dto.validUntil !== undefined ? dto.validUntil : tariff.valid_until;
 
     if (validUntil && validUntil <= validFrom) {
-      throw new BadRequestException(
-        'La fecha de fin debe ser posterior a la fecha de inicio',
-      );
+      throw new AppError('END_DATE_AFTER_START');
     }
 
     await this.validateNoOverlap(

@@ -35,8 +35,12 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import ImageCropDialog from "@/components/ImageCropDialog"
-import { SHARE_STATUS_LABEL, PAYMENT_METHODS } from "./constants"
+import { SHARE_STATUS_LABEL } from "./constants"
 import { shareStatusOf } from "./helpers"
+import {
+  usePaymentMethodMap,
+  usePaymentMethods,
+} from "@/hooks/paymentMethods"
 
 const sharePaymentFormSchema = (t: TFunction) =>
   z.object({
@@ -87,6 +91,8 @@ export default function SharePaymentsDialog({
   const addSharePayment = useAddSharePayment(meter?.id ?? "")
   const canPickCollector = hasPermission("users.read")
   const { data: users } = useSearchUsers(undefined, canPickCollector)
+  const { data: paymentMethods } = usePaymentMethods()
+  const { map: methodNames } = usePaymentMethodMap()
 
   useEffect(() => {
     if (meter) sharePayForm.reset(DEFAULT_SHARE_PAY_FORM)
@@ -204,7 +210,9 @@ export default function SharePaymentsDialog({
                         {formatCurrency(p.amount)}
                       </TableCell>
                       <TableCell className="text-sm capitalize">
-                        {p.payment_method ? t(`common.method.${p.payment_method}`) : "—"}
+                        {p.payment_method
+                          ? (methodNames[p.payment_method] ?? p.payment_method)
+                          : "—"}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {p.reference ?? "—"}
@@ -240,7 +248,9 @@ export default function SharePaymentsDialog({
                     onValueChange={(v) => sharePayForm.setValue("method", v)}
                     placeholder={t("meters.selectMethod")}
                     className="w-full"
-                    options={PAYMENT_METHODS.map((m) => ({ label: t(m.label), value: m.value }))}
+                    options={
+                      paymentMethods?.map((m) => ({ label: m.name, value: m.code })) ?? []
+                    }
                   />
                 </div>
               </div>

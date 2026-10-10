@@ -2,6 +2,7 @@ import * as bcrypt from 'bcrypt';
 import { UsersService } from './users.service';
 import { UserRole, legacyRoleFromRoles } from './entities/user.entity';
 import { checkPasswordStrength } from '../../common/utils/password';
+import { AppError } from '../../common/errors/app-error';
 
 const ADMIN = { id: 'role-admin', name: 'admin' };
 const CASHIER = { id: 'role-cashier', name: 'cajero' };
@@ -141,7 +142,7 @@ describe('UsersService credential handling', () => {
   it('reports a missing user when regenerating', async () => {
     const { service } = makeService();
     await expect(service.regeneratePassword('nope')).rejects.toThrow(
-      'User not found',
+      new AppError('USER_NOT_FOUND'),
     );
   });
 

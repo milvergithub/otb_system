@@ -27,9 +27,4 @@ export const SHARE_STATUS_LABEL: Record<ShareStatus, string> = {
   pending: "common.status.pending",
 }
 
-export const PAYMENT_METHODS = [
-  { value: "cash", label: "common.method.cash" },
-  { value: "transfer", label: "common.method.transferQR" },
-] as const
-
 export const DEFAULT_CENTER: [number, number] = [-17.359527, -66.241607]

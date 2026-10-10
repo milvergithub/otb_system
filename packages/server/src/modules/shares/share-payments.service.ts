@@ -12,6 +12,8 @@ import { SharesService } from './shares.service';
 import { FinancesService } from '../finances/finances.service';
 import { FinancialResponsibilityService } from '../finances/financial-responsibility.service';
 import { FinanceSourceType } from '../finances/entities/finance-transaction.entity';
+import { PaymentMethodsService } from '../payment-methods/payment-methods.service';
+import { AppError } from '../../common/errors/app-error';
 
 export interface SharePaymentSummary {
   paid: number;
@@ -31,6 +33,7 @@ export class SharePaymentsService {
     private readonly eventEmitter: EventEmitter2,
     private readonly financesService: FinancesService,
     private readonly responsibilityService: FinancialResponsibilityService,
+    private readonly paymentMethodsService: PaymentMethodsService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -71,8 +74,9 @@ export class SharePaymentsService {
       where: { id: meterId },
     });
     if (!meter) {
-      throw new NotFoundException('Meter not found');
+      throw new AppError('METER_NOT_FOUND');
     }
+    await this.paymentMethodsService.validateCode(dto.paymentMethod);
 
     const evidenceKey = await this.uploadEvidence(dto.evidenceBase64);
 
@@ -201,6 +205,10 @@ export class SharePaymentsService {
     const meter = await this.metersRepository.findOne({
       where: { id: meterId },
       relations: ['member'],
+      // Resolve the member even when it was logically deleted so a new share
+      // payment is blocked by the finance validation instead of silently being
+      // recorded without member attribution.
+      withDeleted: true,
     });
     return meter?.member ?? null;
   }

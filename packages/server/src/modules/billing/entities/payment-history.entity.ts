@@ -32,7 +32,7 @@ export class PaymentHistory {
   amount: string;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
-  payment_method: PaymentMethod;
+  payment_method: string | null;
 
   @Column({ nullable: true })
   reference: string;

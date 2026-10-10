@@ -10,6 +10,26 @@ export const DEFAULT_PERMISSIONS = [
   { resource: 'members', action: 'create', description: 'Create members' },
   { resource: 'members', action: 'update', description: 'Update members' },
   { resource: 'members', action: 'delete', description: 'Delete members' },
+  {
+    resource: 'memberTypes',
+    action: 'read',
+    description: 'View member types',
+  },
+  {
+    resource: 'memberTypes',
+    action: 'create',
+    description: 'Create member types',
+  },
+  {
+    resource: 'memberTypes',
+    action: 'update',
+    description: 'Update member types',
+  },
+  {
+    resource: 'memberTypes',
+    action: 'delete',
+    description: 'Delete member types',
+  },
   { resource: 'meters', action: 'read', description: 'View meters' },
   { resource: 'meters', action: 'create', description: 'Create meters' },
   { resource: 'meters', action: 'update', description: 'Update meters' },
@@ -246,6 +266,87 @@ export const DEFAULT_PERMISSIONS = [
     resource: 'finances',
     action: 'export',
     description: 'Export finance reports',
+  },
+  {
+    resource: 'contributions',
+    action: 'read',
+    description: 'View contributions',
+  },
+  {
+    resource: 'contributions',
+    action: 'create',
+    description: 'Create contribution campaigns',
+  },
+  {
+    resource: 'contributions',
+    action: 'update',
+    description: 'Edit contribution campaigns and obligations',
+  },
+  {
+    resource: 'contributions',
+    action: 'delete',
+    description: 'Delete draft contribution campaigns',
+  },
+  {
+    resource: 'contributions',
+    action: 'activate',
+    description: 'Activate and pause contribution campaigns',
+  },
+  {
+    resource: 'contributions',
+    action: 'cancel',
+    description: 'Cancel contribution campaigns',
+  },
+  {
+    resource: 'contributions',
+    action: 'complete',
+    description: 'Finalize contribution campaigns',
+  },
+  {
+    resource: 'contributions',
+    action: 'collect',
+    description: 'Register contribution payments',
+  },
+  {
+    resource: 'contributions',
+    action: 'void',
+    description: 'Void contribution payments',
+  },
+  {
+    resource: 'contributions',
+    action: 'exonerate',
+    description: 'Exonerate contribution obligations',
+  },
+  {
+    resource: 'contributions',
+    action: 'review',
+    description: 'Review contribution rendiciones',
+  },
+  {
+    resource: 'contributions',
+    action: 'all',
+    description:
+      'View all contribution campaigns (visibility only, never responsibility)',
+  },
+  {
+    resource: 'payment_methods',
+    action: 'read',
+    description: 'View payment methods',
+  },
+  {
+    resource: 'payment_methods',
+    action: 'create',
+    description: 'Create payment methods',
+  },
+  {
+    resource: 'payment_methods',
+    action: 'update',
+    description: 'Edit payment methods',
+  },
+  {
+    resource: 'payment_methods',
+    action: 'delete',
+    description: 'Delete payment methods',
   },
 ];
 

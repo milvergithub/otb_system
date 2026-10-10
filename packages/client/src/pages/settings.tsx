@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { Save, Settings as SettingsIcon, Gauge, Map, HandCoins, Percent, TrendingUp, MessageSquare, Boxes, Wallet } from "lucide-react"
+import { Save, Settings as SettingsIcon, Gauge, Map, HandCoins, Percent, TrendingUp, MessageSquare, Boxes, Wallet, Tags, CreditCard } from "lucide-react"
 import { getApiErrorMessage } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useSettings, useUpdateSettings } from "@/hooks/settings"
@@ -21,6 +21,8 @@ import SharesPage from "./shares"
 import DiscountsPage from "./discounts"
 import TariffsPage from "./tariffs"
 import WhatsAppSettingsPanel from "./settings/WhatsAppSettingsPanel"
+import MemberTypesPanel from "./settings/members/MemberTypesPanel"
+import PaymentMethodsPanel from "./settings/paymentMethods/PaymentMethodsPanel"
 import Can from "@/components/Can"
 import { toast } from "sonner"
 
@@ -126,6 +128,18 @@ export default function SettingsPage() {
               <TabsTrigger value="zoneTypes" className="gap-2">
                 <Map className="size-4" />
                 {t("settings.zoneTypes")}
+              </TabsTrigger>
+            </Can>
+            <Can permission="memberTypes.read">
+              <TabsTrigger value="memberTypes" className="gap-2">
+                <Tags className="size-4" />
+                {t("settings.memberTypes")}
+              </TabsTrigger>
+            </Can>
+            <Can permission="payment_methods.read">
+              <TabsTrigger value="paymentMethods" className="gap-2">
+                <CreditCard className="size-4" />
+                {t("settings.paymentMethods.tab")}
               </TabsTrigger>
             </Can>
             <Can permission="shares.read">
@@ -283,6 +297,22 @@ export default function SettingsPage() {
           <TabsContent value="zoneTypes" className="min-w-0">
             <div className="mt-4">
               <ZoneTypesPanel />
+            </div>
+          </TabsContent>
+        </Can>
+
+        <Can permission="memberTypes.read">
+          <TabsContent value="memberTypes" className="min-w-0">
+            <div className="mt-4">
+              <MemberTypesPanel />
+            </div>
+          </TabsContent>
+        </Can>
+
+        <Can permission="payment_methods.read">
+          <TabsContent value="paymentMethods" className="min-w-0">
+            <div className="mt-4">
+              <PaymentMethodsPanel />
             </div>
           </TabsContent>
         </Can>

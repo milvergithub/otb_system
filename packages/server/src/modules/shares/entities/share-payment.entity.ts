@@ -7,7 +7,6 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Meter } from '../../meters/entities/meter.entity';
-import { PaymentMethod } from '../../billing/entities/payment-history.entity';
 import { WaterShare } from './water-share.entity';
 
 @Entity('share_payments')
@@ -33,7 +32,7 @@ export class SharePayment {
   amount: string;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
-  payment_method: PaymentMethod;
+  payment_method: string | null;
 
   @Column({ nullable: true })
   reference: string;

@@ -94,10 +94,22 @@ export const queryKeys = {
   },
   members: {
     all: ["members"] as const,
-    list: (page: number, search: string, sortBy: string, sortOrder: string) =>
-      ["members", page, search, sortBy, sortOrder] as const,
+    list: (
+      page: number,
+      search: string,
+      memberTypeId: string,
+      sortBy: string,
+      sortOrder: string,
+      status: string,
+    ) => ["members", page, search, memberTypeId, sortBy, sortOrder, status] as const,
     detail: (id: string) => ["members", "detail", id] as const,
     select: ["members", "select"] as const,
+  },
+  memberTypes: {
+    all: ["member-types"] as const,
+    list: (search: string, includeInactive: boolean) =>
+      ["member-types", search, includeInactive] as const,
+    active: ["member-types", "active"] as const,
   },
   shares: {
     all: ["shares"] as const,
@@ -110,6 +122,10 @@ export const queryKeys = {
   },
   meterTypes: {
     all: ["meter-types"] as const,
+  },
+  paymentMethods: {
+    all: ["payment-methods"] as const,
+    list: ["payment-methods", "list"] as const,
   },
   consumptions: {
     all: ["consumptions"] as const,
@@ -165,8 +181,26 @@ export const queryKeys = {
     list: ["base-tariffs", "list"] as const,
     detail: (id: string) => ["base-tariffs", "detail", id] as const,
   },
-  dashboard: ["dashboard"] as const,
-   reports: {
+  contributions: {
+    all: ["contributions"] as const,
+    list: (
+      page: number,
+      search: string,
+      status: string,
+      sortBy: string,
+      sortOrder: string,
+    ) => ["contributions", "list", page, search, status, sortBy, sortOrder] as const,
+    detail: (id: string) => ["contributions", "detail", id] as const,
+    summary: (id: string) => ["contributions", "summary", id] as const,
+    obligations: (id: string, page: number, search: string, status: string) =>
+      ["contributions", "obligations", id, page, search, status] as const,
+    payments: (id: string, page: number, status: string) =>
+      ["contributions", "payments", id, page, status] as const,
+    finances: (id: string, page: number) =>
+      ["contributions", "finances", id, page] as const,
+    documents: (id: string) => ["contributions", "documents", id] as const,
+  },
+  dashboard: ["dashboard"] as const,   reports: {
     revenue: (startDate: string, endDate: string) =>
       ["reports", "revenue", startDate, endDate] as const,
     overdue: ["reports", "overdue"] as const,

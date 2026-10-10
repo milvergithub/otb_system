@@ -7,7 +7,7 @@ import type { TFunction } from "i18next"
 import { toast } from "sonner"
 import { requiredString } from "@/lib/validation"
 import { getApiErrorMessage } from "@/lib/api"
-import type { FinanceTransaction, FinanceTransactionType, PaymentMethod } from "@/lib/types"
+import type { FinanceTransaction, FinanceTransactionType } from "@/lib/types"
 import { useAssetsSelect } from "@/hooks/assets"
 import { useAllMembers } from "@/hooks/members"
 import { useSearchUsers } from "@/hooks/users"
@@ -33,7 +33,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import FileUpload from "@/components/FileUpload"
-import { METHOD_OPTIONS } from "./constants"
+import { usePaymentMethods } from "@/hooks/paymentMethods"
 
 const financeFormSchema = (t: TFunction) =>
   z.object({
@@ -45,7 +45,7 @@ const financeFormSchema = (t: TFunction) =>
       .refine((v) => Number(v) > 0, t("finances.amountPositive")),
     concept: requiredString(t),
     categoryId: z.string().optional(),
-    paymentMethod: z.enum(["cash", "transfer", "card", "qr", "other"]),
+    paymentMethod: z.string().optional(),
     reference: z.string().optional(),
     memberId: z.string().optional(),
     assetId: z.string().optional(),
@@ -63,7 +63,7 @@ const DEFAULT_FORM: FinanceFormValues = {
   amount: "",
   concept: "",
   categoryId: "",
-  paymentMethod: "cash",
+  paymentMethod: "",
   reference: "",
   memberId: "",
   assetId: "",
@@ -107,6 +107,7 @@ export default function FinanceTransactionFormDialog({
   const addMutation = useAddFinanceTransaction()
   const editMutation = useEditFinanceTransaction()
   const addDocumentMutation = useAddFinanceDocument()
+  const { data: paymentMethods } = usePaymentMethods()
 
   const type = useWatch({ control: form.control, name: "type" })
   const filteredCategories =
@@ -122,7 +123,7 @@ export default function FinanceTransactionFormDialog({
             amount: String(editing.amount),
             concept: editing.concept,
             categoryId: editing.category_id ?? "",
-            paymentMethod: (editing.payment_method as PaymentMethod) ?? "cash",
+            paymentMethod: editing.payment_method ?? "",
             reference: editing.reference ?? "",
             memberId: editing.member_id ?? "",
             assetId: editing.asset_id ?? "",
@@ -268,8 +269,10 @@ export default function FinanceTransactionFormDialog({
                   <ComboboxSelect
                     value={field.value || ""}
                     onValueChange={field.onChange}
-                    options={METHOD_OPTIONS.map((m) => ({ label: t(`finances.method.${m}`), value: m }))}
-                    placeholder={t("common.select")}
+                    options={
+                      paymentMethods?.map((m) => ({ label: m.name, value: m.code })) ?? []
+                    }
+                    placeholder={t("common.none")}
                   />
                 )}
               />

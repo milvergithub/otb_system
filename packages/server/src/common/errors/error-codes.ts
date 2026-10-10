@@ -1,0 +1,239 @@
+import { HttpStatus } from '@nestjs/common';
+
+/**
+ * Stable, language-independent identifiers for every error the API can emit.
+ *
+ * The `code` is what clients should branch on; the human-readable `message` is
+ * localized by the API according to the request's `Accept-Language` header.
+ * Codes are part of the public contract: rename them only with a migration
+ * note, never retranslate them.
+ *
+ * The HTTP status is declared here so a code can never be thrown with two
+ * different statuses. Sites that historically deviated from the canonical
+ * status pass an explicit override to `AppError`.
+ */
+export const ERROR_STATUS = {
+  // ---------------------------------------------------------------- auth
+  AUTHENTICATION_REQUIRED: HttpStatus.UNAUTHORIZED,
+  INVALID_CREDENTIALS: HttpStatus.UNAUTHORIZED,
+  INVALID_TOKEN: HttpStatus.UNAUTHORIZED,
+  INVALID_REFRESH_TOKEN: HttpStatus.UNAUTHORIZED,
+  ACCOUNT_DISABLED: HttpStatus.UNAUTHORIZED,
+  PASSWORD_CHANGE_REQUIRED: HttpStatus.FORBIDDEN,
+  INSUFFICIENT_PERMISSIONS: HttpStatus.FORBIDDEN,
+  CURRENT_PASSWORD_INCORRECT: HttpStatus.BAD_REQUEST,
+  PASSWORD_REUSED: HttpStatus.BAD_REQUEST,
+  PASSWORDS_DO_NOT_MATCH: HttpStatus.BAD_REQUEST,
+  PASSWORD_TOO_WEAK: HttpStatus.BAD_REQUEST,
+
+  // --------------------------------------------------------------- setup
+  SETUP_ALREADY_COMPLETED: HttpStatus.CONFLICT,
+  EMAIL_ALREADY_EXISTS: HttpStatus.CONFLICT,
+
+  // --------------------------------------------------------------- users
+  USER_NOT_FOUND: HttpStatus.NOT_FOUND,
+
+  // --------------------------------------------------------------- roles
+  ROLE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  ROLE_NAME_EXISTS: HttpStatus.BAD_REQUEST,
+  CANNOT_MODIFY_SYSTEM_ROLE: HttpStatus.BAD_REQUEST,
+  CANNOT_DELETE_SYSTEM_ROLE: HttpStatus.BAD_REQUEST,
+  CANNOT_DELETE_ROLE_IN_USE: HttpStatus.BAD_REQUEST,
+  CANNOT_MODIFY_SYSTEM_ROLE_PERMISSIONS: HttpStatus.BAD_REQUEST,
+
+  // ------------------------------------------------------------- members
+  MEMBER_NOT_FOUND: HttpStatus.NOT_FOUND,
+  MEMBER_CI_EXISTS: HttpStatus.CONFLICT,
+  MEMBER_ALREADY_DELETED: HttpStatus.CONFLICT,
+  MEMBER_NOT_DELETED: HttpStatus.BAD_REQUEST,
+  MEMBER_TYPE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  MEMBER_TYPE_IN_USE: HttpStatus.CONFLICT,
+  MEMBER_TYPE_CODE_REQUIRED: HttpStatus.BAD_REQUEST,
+  MEMBER_TYPE_CODE_EXISTS: HttpStatus.CONFLICT,
+  MEMBER_TYPE_NAME_REQUIRED: HttpStatus.BAD_REQUEST,
+  MEMBER_TYPE_NAME_EXISTS: HttpStatus.CONFLICT,
+  MEMBER_TYPE_INACTIVE: HttpStatus.BAD_REQUEST,
+
+  // -------------------------------------------------------------- meters
+  METER_NOT_FOUND: HttpStatus.NOT_FOUND,
+  METER_CODE_EXISTS: HttpStatus.CONFLICT,
+  METER_TYPE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  METER_TYPE_NAME_EXISTS: HttpStatus.BAD_REQUEST,
+  METER_TYPE_CODE_REQUIRED: HttpStatus.BAD_REQUEST,
+  METER_TYPE_CODE_EXISTS: HttpStatus.CONFLICT,
+
+  // --------------------------------------------------------- consumption
+  CONSUMPTION_NOT_FOUND: HttpStatus.NOT_FOUND,
+  CONSUMPTION_EXISTS: HttpStatus.CONFLICT,
+  CONSUMPTION_HAS_BILL: HttpStatus.BAD_REQUEST,
+  CURRENT_READING_LOWER: HttpStatus.BAD_REQUEST,
+
+  // ------------------------------------------------------------- billing
+  NO_VALID_BASE_TARIFF: HttpStatus.BAD_REQUEST,
+  NO_VALID_TARIFF: HttpStatus.BAD_REQUEST,
+  PAYMENT_NOT_FOUND: HttpStatus.NOT_FOUND,
+  PAYMENT_RECORD_NOT_FOUND: HttpStatus.NOT_FOUND,
+  BILL_ALREADY_EXISTS: HttpStatus.CONFLICT,
+  BILL_FULLY_PAID: HttpStatus.CONFLICT,
+  BILL_PAID_OR_EXCEEDS_BALANCE: HttpStatus.CONFLICT,
+  PAYMENT_EXCEEDS_BALANCE: HttpStatus.BAD_REQUEST,
+
+  // ------------------------------------------------------------ discount
+  DISCOUNT_NOT_FOUND: HttpStatus.NOT_FOUND,
+  DISCOUNT_NAME_EXISTS: HttpStatus.CONFLICT,
+
+  // ------------------------------------------------------------- tariffs
+  TARIFF_NOT_FOUND: HttpStatus.NOT_FOUND,
+  BASE_TARIFF_NOT_FOUND: HttpStatus.NOT_FOUND,
+  OVERLAPPING_TARIFF: HttpStatus.CONFLICT,
+  OVERLAPPING_BASE_TARIFF: HttpStatus.CONFLICT,
+  END_DATE_AFTER_START: HttpStatus.BAD_REQUEST,
+  MAX_CUBIC_METERS_GREATER_THAN_MIN: HttpStatus.BAD_REQUEST,
+
+  // -------------------------------------------------------------- shares
+  WATER_SHARE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  SHARE_PAYMENT_NOT_FOUND: HttpStatus.NOT_FOUND,
+  OVERLAPPING_WATER_SHARE: HttpStatus.CONFLICT,
+
+  // --------------------------------------------------------------- zones
+  ZONE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  ZONE_TYPE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  ZONE_TYPE_NAME_EXISTS: HttpStatus.BAD_REQUEST,
+
+  // ---------------------------------------------------------- activities
+  ACTIVITY_NOT_FOUND: HttpStatus.NOT_FOUND,
+  ACTIVITY_TYPE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  ACTIVITY_TYPE_CODE_REQUIRED: HttpStatus.BAD_REQUEST,
+  ACTIVITY_TYPE_CODE_EXISTS: HttpStatus.CONFLICT,
+  ACTIVITY_STATUS_TRANSITION_INVALID: HttpStatus.BAD_REQUEST,
+  ACTIVITY_NOT_MODIFIABLE: HttpStatus.FORBIDDEN,
+  ACTIVITY_END_TIME_AFTER_START: HttpStatus.BAD_REQUEST,
+  ACTIVITY_ORGANIZER_NOT_FOUND: HttpStatus.BAD_REQUEST,
+  ACTIVITY_COLLECTOR_NOT_FOUND: HttpStatus.BAD_REQUEST,
+  ACTIVITY_EVIDENCE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  ACTIVITY_EVIDENCE_ONLY_IMAGES_AND_PDF: HttpStatus.BAD_REQUEST,
+  ACTIVITY_EVIDENCE_STORAGE_UNAVAILABLE: HttpStatus.SERVICE_UNAVAILABLE,
+  ACTIVITY_EVIDENCE_UPLOAD_FAILED: HttpStatus.BAD_REQUEST,
+  ATTENDANCE_INITIAL_CONTROL_LOCKED: HttpStatus.BAD_REQUEST,
+  ATTENDANCE_INITIAL_CONTROL_REQUIRED: HttpStatus.BAD_REQUEST,
+
+  // --------------------------------------------------------------- fines
+  FINE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  FINES_NOT_FOUND: HttpStatus.NOT_FOUND,
+  FINE_TYPE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  FINE_TYPE_CODE_EXISTS: HttpStatus.CONFLICT,
+  FINE_TYPE_INACTIVE: HttpStatus.BAD_REQUEST,
+  FINE_AMOUNT_INVALID: HttpStatus.BAD_REQUEST,
+  FINE_ALREADY_PAID: HttpStatus.CONFLICT,
+  FINE_ALREADY_CANCELLED: HttpStatus.CONFLICT,
+  FINE_STATE_CHANGED: HttpStatus.CONFLICT,
+
+  // -------------------------------------------------------------- assets
+  ASSET_NOT_FOUND: HttpStatus.NOT_FOUND,
+  ASSET_CATEGORY_NOT_FOUND: HttpStatus.NOT_FOUND,
+  ASSET_CATEGORY_NAME_EXISTS: HttpStatus.BAD_REQUEST,
+  ASSET_CATEGORY_IN_USE: HttpStatus.BAD_REQUEST,
+  ASSET_LOCATION_NOT_FOUND: HttpStatus.NOT_FOUND,
+  ASSET_LOCATION_NAME_EXISTS: HttpStatus.BAD_REQUEST,
+  ASSET_LOCATION_IN_USE: HttpStatus.BAD_REQUEST,
+  ASSET_CODES_TAKEN: HttpStatus.CONFLICT,
+  ASSET_RETIRED_CANNOT_EDIT: HttpStatus.BAD_REQUEST,
+  ASSET_HAS_HISTORY_CANNOT_DELETE: HttpStatus.BAD_REQUEST,
+  ASSET_RETIRED_CANNOT_LOAN: HttpStatus.BAD_REQUEST,
+  ASSET_LOAN_ALREADY_OPEN: HttpStatus.BAD_REQUEST,
+  ASSET_LOAN_REQUIRES_RESPONSIBLE: HttpStatus.BAD_REQUEST,
+  ASSET_NO_OPEN_LOAN: HttpStatus.BAD_REQUEST,
+  ASSET_RETIRED_CANNOT_RETURN: HttpStatus.BAD_REQUEST,
+  ASSET_RETIRED_CANNOT_TRANSFER: HttpStatus.BAD_REQUEST,
+  ASSET_RETURN_BEFORE_LOCATION_CHANGE: HttpStatus.BAD_REQUEST,
+  ASSET_SAME_LOCATION: HttpStatus.BAD_REQUEST,
+  ASSET_ALREADY_LOST: HttpStatus.BAD_REQUEST,
+  ASSET_RETIRED_CANNOT_MARK_LOST: HttpStatus.BAD_REQUEST,
+  ASSET_RETURN_BEFORE_MARK_LOST: HttpStatus.BAD_REQUEST,
+  ASSET_ALREADY_RETIRED: HttpStatus.BAD_REQUEST,
+  ASSET_RETURN_BEFORE_RETIRE: HttpStatus.BAD_REQUEST,
+  ASSET_MAINTENANCE_BLOCKS_LOAN: HttpStatus.BAD_REQUEST,
+  ASSET_MAINTENANCE_BLOCKS_LOST: HttpStatus.BAD_REQUEST,
+  ASSET_MAINTENANCE_BLOCKS_RETIRE: HttpStatus.BAD_REQUEST,
+  ASSET_ONLY_RETIRED_CAN_RESTORE: HttpStatus.BAD_REQUEST,
+  ASSET_RETIRED_CANNOT_MAINTENANCE: HttpStatus.BAD_REQUEST,
+  ASSET_RETURN_BEFORE_MAINTENANCE: HttpStatus.BAD_REQUEST,
+  ASSET_LOST_CANNOT_MAINTENANCE: HttpStatus.BAD_REQUEST,
+  ASSET_MAINTENANCE_ALREADY_OPEN: HttpStatus.BAD_REQUEST,
+  ASSET_MAINTENANCE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  ASSET_MAINTENANCE_ALREADY_CLOSED: HttpStatus.BAD_REQUEST,
+  ASSET_DOCUMENT_NOT_FOUND: HttpStatus.NOT_FOUND,
+  ASSET_CODE_GENERATION_FAILED: HttpStatus.INTERNAL_SERVER_ERROR,
+  ASSET_RESPONSIBLE_CONFLICT: HttpStatus.BAD_REQUEST,
+
+  // ------------------------------------------------------- contributions
+  CONTRIBUTION_NOT_FOUND: HttpStatus.NOT_FOUND,
+  CONTRIBUTION_FORBIDDEN: HttpStatus.FORBIDDEN,
+  CONTRIBUTION_NOT_MODIFIABLE: HttpStatus.FORBIDDEN,
+  CONTRIBUTION_STATUS_TRANSITION_INVALID: HttpStatus.BAD_REQUEST,
+  CONTRIBUTION_RESPONSIBLE_NOT_FOUND: HttpStatus.BAD_REQUEST,
+  CONTRIBUTION_COLLECTOR_NOT_FOUND: HttpStatus.BAD_REQUEST,
+  CONTRIBUTION_AMOUNT_LOCKED: HttpStatus.BAD_REQUEST,
+  CONTRIBUTION_RESPONSIBLE_LOCKED: HttpStatus.BAD_REQUEST,
+  CONTRIBUTION_ONLY_DRAFT_DELETABLE: HttpStatus.BAD_REQUEST,
+  CONTRIBUTION_HAS_OBLIGATIONS: HttpStatus.CONFLICT,
+  CONTRIBUTION_COLLECTOR_REQUIRED: HttpStatus.BAD_REQUEST,
+  CONTRIBUTION_RENDERER_REQUIRED: HttpStatus.BAD_REQUEST,
+  CONTRIBUTION_REQUIRES_MEMBERS: HttpStatus.BAD_REQUEST,
+  CONTRIBUTION_PENDING_OBLIGATIONS: HttpStatus.CONFLICT,
+  CONTRIBUTION_MEMBERS_NOT_ADDABLE: HttpStatus.BAD_REQUEST,
+  CONTRIBUTION_SELECT_MEMBERS: HttpStatus.BAD_REQUEST,
+  CONTRIBUTION_MEMBERS_NOT_FOUND: HttpStatus.BAD_REQUEST,
+  CONTRIBUTION_NOT_COLLECTABLE: HttpStatus.CONFLICT,
+  CONTRIBUTION_PAYMENT_NOT_FOUND: HttpStatus.NOT_FOUND,
+  CONTRIBUTION_PAYMENT_ALREADY_VOIDED: HttpStatus.CONFLICT,
+  CONTRIBUTION_EVIDENCE_UPLOAD_FAILED: HttpStatus.BAD_REQUEST,
+  OBLIGATION_NOT_FOUND: HttpStatus.NOT_FOUND,
+  OBLIGATION_NOT_EXONERABLE: HttpStatus.CONFLICT,
+  OBLIGATION_ALREADY_CANCELLED: HttpStatus.CONFLICT,
+  OBLIGATION_PAID_CANNOT_CANCEL: HttpStatus.CONFLICT,
+  OBLIGATION_HAS_PAYMENTS: HttpStatus.CONFLICT,
+  OBLIGATION_EXONERATED: HttpStatus.CONFLICT,
+  OBLIGATION_CANCELLED: HttpStatus.CONFLICT,
+  OBLIGATION_EXCEEDS_BALANCE: HttpStatus.CONFLICT,
+  OBLIGATION_STATE_CHANGED: HttpStatus.CONFLICT,
+
+  // ------------------------------------------------------------ finances
+  FINANCE_TRANSACTION_NOT_FOUND: HttpStatus.NOT_FOUND,
+  FINANCE_TRANSACTION_FORBIDDEN: HttpStatus.FORBIDDEN,
+  FINANCE_TRANSACTION_VOIDED: HttpStatus.BAD_REQUEST,
+  FINANCE_RESPONSIBLE_REQUIRES_ALL_PERMISSION: HttpStatus.FORBIDDEN,
+  FINANCE_CATEGORY_NOT_FOUND: HttpStatus.NOT_FOUND,
+  FINANCE_CATEGORY_IN_USE: HttpStatus.BAD_REQUEST,
+  FINANCE_CATEGORY_NAME_EXISTS: HttpStatus.BAD_REQUEST,
+  FINANCE_DOCUMENT_NOT_FOUND: HttpStatus.NOT_FOUND,
+  FINANCE_SOURCE_ID_REQUIRED: HttpStatus.BAD_REQUEST,
+
+  // ---------------------------------------------------- payment methods
+  PAYMENT_METHOD_NOT_FOUND: HttpStatus.NOT_FOUND,
+  PAYMENT_METHOD_CODE_REQUIRED: HttpStatus.BAD_REQUEST,
+  PAYMENT_METHOD_CODE_EXISTS: HttpStatus.CONFLICT,
+  PAYMENT_METHOD_NAME_EXISTS: HttpStatus.CONFLICT,
+  PAYMENT_METHOD_IN_USE: HttpStatus.CONFLICT,
+
+  // ------------------------------------------------------------- generic
+  VALIDATION_ERROR: HttpStatus.BAD_REQUEST,
+  DOCUMENT_UPLOAD_FAILED: HttpStatus.BAD_REQUEST,
+  INTERNAL_ERROR: HttpStatus.INTERNAL_SERVER_ERROR,
+} as const;
+
+export type ErrorCode = keyof typeof ERROR_STATUS;
+
+export const ERROR_CODES = Object.keys(ERROR_STATUS) as ErrorCode[];
+
+/**
+ * Translation key for an error code. Keeping it derived guarantees the wire
+ * `code` and the catalogue key can never drift apart.
+ */
+export function errorKey(code: ErrorCode): string {
+  return `errors.${code}`;
+}
+
+export function statusForError(code: ErrorCode): HttpStatus {
+  return ERROR_STATUS[code];
+}

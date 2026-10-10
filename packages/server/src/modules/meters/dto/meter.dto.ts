@@ -6,9 +6,9 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
 } from 'class-validator';
-import { PaymentMethod } from '../../billing/entities/payment-history.entity';
 import { MeterStatus } from '../entities/meter.entity';
 
 export class CreateMeterDto {
@@ -46,8 +46,9 @@ export class CreateMeterDto {
   shareAmount?: number;
 
   @IsOptional()
-  @IsEnum(PaymentMethod)
-  sharePaymentMethod?: PaymentMethod;
+  @IsString()
+  @MaxLength(50)
+  sharePaymentMethod?: string;
 
   @IsOptional()
   @IsString()

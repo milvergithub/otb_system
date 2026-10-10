@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { RolesService } from './roles.service';
 import { UserRole } from '../users/entities/user.entity';
+import { AppError } from '../../common/errors/app-error';
 
 const ADMIN = { id: 'role-admin', name: 'admin' };
 const CASHIER = { id: 'role-cashier', name: 'cajero' };
@@ -48,6 +49,6 @@ describe('RolesService.assignRolesToUser legacy role sync', () => {
     const { service } = makeService(null);
     await expect(
       service.assignRolesToUser('missing', [ADMIN.id]),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    ).rejects.toThrow(new AppError('USER_NOT_FOUND'));
   });
 });

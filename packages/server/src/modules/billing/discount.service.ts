@@ -1,12 +1,9 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Discount, DiscountType } from './entities/discount.entity';
 import { CreateDiscountDto, UpdateDiscountDto } from './dto/discount.dto';
+import { AppError } from '../../common/errors/app-error';
 
 @Injectable()
 export class DiscountService {
@@ -29,7 +26,7 @@ export class DiscountService {
   async findOne(id: string): Promise<Discount> {
     const discount = await this.discountRepository.findOne({ where: { id } });
     if (!discount) {
-      throw new NotFoundException('Discount not found');
+      throw new AppError('DISCOUNT_NOT_FOUND');
     }
     return discount;
   }
@@ -39,7 +36,7 @@ export class DiscountService {
       where: { name: dto.name },
     });
     if (existing) {
-      throw new BadRequestException('Discount name already exists');
+      throw new AppError('DISCOUNT_NAME_EXISTS');
     }
 
     const discount = this.discountRepository.create({
@@ -60,7 +57,7 @@ export class DiscountService {
         where: { name: dto.name },
       });
       if (existing) {
-        throw new BadRequestException('Discount name already exists');
+        throw new AppError('DISCOUNT_NAME_EXISTS');
       }
       discount.name = dto.name;
     }

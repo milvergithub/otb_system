@@ -27,6 +27,10 @@ const ActivitiesPage = lazy(() => import("@/pages/activities/activities"))
 const AttendancePage = lazy(() => import("@/pages/activities/attendance"))
 const ActivityDetailPage = lazy(() => import("@/pages/activities/detail"))
 const MemberFinesPage = lazy(() => import("@/pages/activities/member-fines"))
+const ContributionsPage = lazy(() => import("@/pages/contributions"))
+const ContributionDetailPage = lazy(
+  () => import("@/pages/contributions/detail"),
+)
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -80,6 +84,8 @@ export default function App() {
         <Route path="consumption" element={<ConsumptionPage />} />
         <Route path="billing" element={<BillingPage />} />
         <Route path="finanzas" element={<FinancesPage />} />
+        <Route path="contributions" element={<ContributionsPage />} />
+        <Route path="contributions/:id" element={<ContributionDetailPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="settings" element={<SettingsPage />} />

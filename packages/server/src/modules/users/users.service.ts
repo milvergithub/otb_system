@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -11,6 +6,7 @@ import { generateStrongPassword } from '../../common/utils/password';
 import { User, legacyRoleFromRoles } from './entities/user.entity';
 import { Role } from '../roles/entities/role.entity';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
+import { AppError } from '../../common/errors/app-error';
 
 @Injectable()
 export class UsersService {
@@ -35,7 +31,7 @@ export class UsersService {
       where: { id },
       relations: ['roles'],
     });
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new AppError('USER_NOT_FOUND');
     const { password_hash, ...safe } = user;
     return safe;
   }
@@ -45,7 +41,7 @@ export class UsersService {
       where: { email: dto.email },
     });
     if (existing) {
-      throw new ConflictException('Email already exists');
+      throw new AppError('EMAIL_ALREADY_EXISTS');
     }
 
     const password = generateStrongPassword();
@@ -77,14 +73,14 @@ export class UsersService {
       where: { id },
       relations: ['roles'],
     });
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new AppError('USER_NOT_FOUND');
 
     if (dto.email && dto.email !== user.email) {
       const existing = await this.usersRepository.findOne({
         where: { email: dto.email },
       });
       if (existing) {
-        throw new ConflictException('Email already exists');
+        throw new AppError('EMAIL_ALREADY_EXISTS');
       }
       user.email = dto.email;
     }
@@ -114,7 +110,7 @@ export class UsersService {
    */
   async regeneratePassword(id: string) {
     const existing = await this.usersRepository.findOne({ where: { id } });
-    if (!existing) throw new NotFoundException('User not found');
+    if (!existing) throw new AppError('USER_NOT_FOUND');
 
     const password = generateStrongPassword();
     await this.usersRepository.update(id, {
@@ -129,7 +125,7 @@ export class UsersService {
 
   async toggleActive(id: string, isActive: boolean) {
     const user = await this.usersRepository.findOne({ where: { id } });
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new AppError('USER_NOT_FOUND');
 
     user.is_active = isActive;
     const saved = await this.usersRepository.save(user);
@@ -139,7 +135,7 @@ export class UsersService {
 
   async remove(id: string) {
     const user = await this.usersRepository.findOne({ where: { id } });
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new AppError('USER_NOT_FOUND');
 
     await this.usersRepository.remove(user);
     return { success: true };

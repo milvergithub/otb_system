@@ -7,6 +7,7 @@ import { OpenwaConfig } from '../../config/openwa.config';
 import { ReceiptService } from '../billing/receipt.service';
 import { ShareReceiptService } from '../shares/share-receipt.service';
 import { FinesReceiptService } from '../activities/fines-receipt.service';
+import { ContributionsReceiptService } from '../contributions/contributions-receipt.service';
 import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
@@ -20,6 +21,7 @@ export class WhatsAppService {
     private readonly receiptService: ReceiptService,
     private readonly shareReceiptService: ShareReceiptService,
     private readonly finesReceiptService: FinesReceiptService,
+    private readonly contributionsReceiptService: ContributionsReceiptService,
     private readonly settingsService: SettingsService,
   ) {
     this.envConfig = this.configService.get<OpenwaConfig>('openwa')!;
@@ -318,6 +320,34 @@ export class WhatsAppService {
     } catch (error) {
       this.logger.warn(
         `Share receipt send failed in background: ${
+          (error as Error).message ?? error
+        }`,
+      );
+    }
+  }
+
+  @OnEvent('contribution.payment.created')
+  async handleContributionPaymentCreated(payload: {
+    paymentId: string;
+    phone: string;
+    phone_country?: string;
+    filename: string;
+  }): Promise<void> {
+    try {
+      const buffer =
+        await this.contributionsReceiptService.generatePaymentReceiptById(
+          payload.paymentId,
+        );
+      await this.sendDocument(
+        payload.phone,
+        buffer.toString('base64'),
+        payload.filename,
+        'application/pdf',
+        payload.phone_country ?? 'BO',
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Contribution receipt send failed in background: ${
           (error as Error).message ?? error
         }`,
       );

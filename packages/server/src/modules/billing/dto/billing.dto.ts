@@ -6,9 +6,9 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
 } from 'class-validator';
-import { PaymentMethod } from '../entities/payment-history.entity';
 import { PaymentStatus } from '../entities/payment.entity';
 
 export class PayBillDto {
@@ -17,8 +17,9 @@ export class PayBillDto {
   amount: number;
 
   @IsOptional()
-  @IsEnum(PaymentMethod)
-  paymentMethod?: PaymentMethod;
+  @IsString()
+  @MaxLength(50)
+  paymentMethod?: string;
 
   @IsOptional()
   @IsString()

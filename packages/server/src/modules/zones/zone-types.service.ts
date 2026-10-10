@@ -1,12 +1,9 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ZoneTypeEntity } from './entities/zone-type.entity';
 import { CreateZoneTypeDto, UpdateZoneTypeDto } from './dto/zone-type.dto';
+import { AppError } from '../../common/errors/app-error';
 
 @Injectable()
 export class ZoneTypesService {
@@ -21,16 +18,14 @@ export class ZoneTypesService {
 
   async findOne(id: string): Promise<ZoneTypeEntity> {
     const zoneType = await this.zoneTypeRepo.findOneBy({ id });
-    if (!zoneType) throw new NotFoundException(`Zone type ${id} not found`);
+    if (!zoneType) throw new AppError('ZONE_TYPE_NOT_FOUND');
     return zoneType;
   }
 
   async create(dto: CreateZoneTypeDto): Promise<ZoneTypeEntity> {
     const existing = await this.zoneTypeRepo.findOneBy({ name: dto.name });
     if (existing) {
-      throw new BadRequestException(
-        `A zone type with name "${dto.name}" already exists`,
-      );
+      throw new AppError('ZONE_TYPE_NAME_EXISTS', { name: dto.name });
     }
     const zoneType = this.zoneTypeRepo.create(dto);
     return this.zoneTypeRepo.save(zoneType);
@@ -41,9 +36,7 @@ export class ZoneTypesService {
     if (dto.name && dto.name !== zoneType.name) {
       const existing = await this.zoneTypeRepo.findOneBy({ name: dto.name });
       if (existing) {
-        throw new BadRequestException(
-          `A zone type with name "${dto.name}" already exists`,
-        );
+        throw new AppError('ZONE_TYPE_NAME_EXISTS', { name: dto.name });
       }
     }
     Object.assign(zoneType, dto);

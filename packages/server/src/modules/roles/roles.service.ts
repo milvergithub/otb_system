@@ -1,14 +1,11 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Role } from './entities/role.entity';
 import { Permission } from './entities/permission.entity';
 import { User, legacyRoleFromRoles } from '../users/entities/user.entity';
 import { CreateRoleDto, UpdateRoleDto } from './dto/role.dto';
+import { AppError } from '../../common/errors/app-error';
 
 @Injectable()
 export class RolesService {
@@ -28,7 +25,7 @@ export class RolesService {
       where: { id },
       relations: ['permissions'],
     });
-    if (!role) throw new NotFoundException('Role not found');
+    if (!role) throw new AppError('ROLE_NOT_FOUND');
     return role;
   }
 
@@ -36,7 +33,7 @@ export class RolesService {
     const existing = await this.rolesRepository.findOne({
       where: { name: dto.name },
     });
-    if (existing) throw new BadRequestException('Role name already exists');
+    if (existing) throw new AppError('ROLE_NAME_EXISTS');
 
     const role = this.rolesRepository.create({
       name: dto.name,
@@ -54,14 +51,13 @@ export class RolesService {
 
   async updateRole(id: string, dto: UpdateRoleDto) {
     const role = await this.findRoleById(id);
-    if (role.is_system)
-      throw new BadRequestException('Cannot modify system role');
+    if (role.is_system) throw new AppError('CANNOT_MODIFY_SYSTEM_ROLE');
 
     if (dto.name && dto.name !== role.name) {
       const existing = await this.rolesRepository.findOne({
         where: { name: dto.name },
       });
-      if (existing) throw new BadRequestException('Role name already exists');
+      if (existing) throw new AppError('ROLE_NAME_EXISTS');
       role.name = dto.name;
     }
 
@@ -80,8 +76,7 @@ export class RolesService {
 
   async deleteRole(id: string) {
     const role = await this.findRoleById(id);
-    if (role.is_system)
-      throw new BadRequestException('Cannot delete system role');
+    if (role.is_system) throw new AppError('CANNOT_DELETE_SYSTEM_ROLE');
 
     const usersWithRole = await this.usersRepository
       .createQueryBuilder('user')
@@ -89,7 +84,7 @@ export class RolesService {
       .getCount();
 
     if (usersWithRole > 0) {
-      throw new BadRequestException('Cannot delete role assigned to users');
+      throw new AppError('CANNOT_DELETE_ROLE_IN_USE');
     }
 
     await this.rolesRepository.remove(role);
@@ -104,7 +99,7 @@ export class RolesService {
   async assignPermissionsToRole(roleId: string, permissionIds: string[]) {
     const role = await this.findRoleById(roleId);
     if (role.is_system)
-      throw new BadRequestException('Cannot modify system role permissions');
+      throw new AppError('CANNOT_MODIFY_SYSTEM_ROLE_PERMISSIONS');
 
     role.permissions = await this.permissionsRepository.findBy({
       id: In(permissionIds),
@@ -133,7 +128,7 @@ export class RolesService {
       where: { id: userId },
       relations: ['roles'],
     });
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new AppError('USER_NOT_FOUND');
     return user.roles;
   }
 
@@ -142,7 +137,7 @@ export class RolesService {
       where: { id: userId },
       relations: ['roles'],
     });
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new AppError('USER_NOT_FOUND');
 
     user.roles = await this.rolesRepository.findBy({ id: In(roleIds) });
     user.role = legacyRoleFromRoles(user.roles);

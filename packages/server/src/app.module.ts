@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { WinstonModule } from 'nest-winston';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { I18nModule } from 'nestjs-i18n';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import auditConfig from './config/audit.config';
@@ -34,9 +35,14 @@ import { ZonesModule } from './modules/zones/zones.module';
 import { ActivitiesModule } from './modules/activities/activities.module';
 import { AssetsModule } from './modules/assets/assets.module';
 import { FinancesModule } from './modules/finances/finances.module';
+import { ContributionsModule } from './modules/contributions/contributions.module';
 import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
+import { PaymentMethodsModule } from './modules/payment-methods/payment-methods.module';
 import { SetupModule } from './modules/setup/setup.module';
 import { AuditSubscriber } from './modules/audit/audit.subscriber';
+import { buildI18nOptions } from './common/i18n/i18n-options';
+import { MessageResolver } from './common/i18n/message-resolver';
+import { I18nExceptionFilter } from './core/filters/i18n-exception.filter';
 
 @Module({
   imports: [
@@ -88,6 +94,7 @@ import { AuditSubscriber } from './modules/audit/audit.subscriber';
       },
     }),
     ContextModule,
+    I18nModule.forRoot(buildI18nOptions()),
     AuditModule,
     AuthModule,
     SetupModule,
@@ -106,9 +113,16 @@ import { AuditSubscriber } from './modules/audit/audit.subscriber';
     ActivitiesModule,
     AssetsModule,
     FinancesModule,
+    ContributionsModule,
+    PaymentMethodsModule,
     WhatsAppModule,
   ],
   providers: [
+    MessageResolver,
+    {
+      provide: APP_FILTER,
+      useClass: I18nExceptionFilter,
+    },
     {
       provide: APP_INTERCEPTOR,
       useClass: AuditContextInterceptor,

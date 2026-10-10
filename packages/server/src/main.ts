@@ -1,5 +1,4 @@
 import { NestFactory } from '@nestjs/core';
-import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
@@ -8,6 +7,7 @@ import helmet from 'helmet';
 import * as express from 'express';
 import { AppModule } from './app.module';
 import { AppConfig } from './config/app.config';
+import { LocalizedValidationPipe } from './common/errors/localized-validation.pipe';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
@@ -32,16 +32,9 @@ async function bootstrap() {
     credentials: true,
   });
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: false,
-      transform: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
-    }),
-  );
+  // Validation failures are classified by constraint name and localized by
+  // `I18nExceptionFilter` using the request's `Accept-Language`.
+  app.useGlobalPipes(new LocalizedValidationPipe());
 
   app.setGlobalPrefix('api');
 

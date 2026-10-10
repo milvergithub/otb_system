@@ -1,15 +1,7 @@
 import { IsNotEmpty, IsString } from 'class-validator';
-import {
-  IsStrongPassword,
-  PASSWORD_TOO_WEAK,
-} from '../../../common/decorators/is-strong-password.decorator';
+import { IsStrongPassword } from '../../../common/decorators/is-strong-password.decorator';
 import { Match } from '../../../common/decorators/match.decorator';
-
-export const CURRENT_PASSWORD_INVALID = 'Current password is incorrect';
-
-export const PASSWORD_REUSED = 'New password must differ from the current one';
-
-export const PASSWORDS_DO_NOT_MATCH = 'Passwords do not match';
+import { i18nMessage } from '../../../common/errors/i18n-message';
 
 /**
  * Validation only — the service enforces the current-password check and
@@ -21,10 +13,12 @@ export class ChangePasswordDto {
   currentPassword: string;
 
   @IsString()
-  @IsStrongPassword({ message: PASSWORD_TOO_WEAK })
+  @IsStrongPassword({ message: i18nMessage('errors.PASSWORD_TOO_WEAK') })
   newPassword: string;
 
   @IsString()
-  @Match('newPassword', { message: PASSWORDS_DO_NOT_MATCH })
+  @Match('newPassword', {
+    message: i18nMessage('errors.PASSWORDS_DO_NOT_MATCH'),
+  })
   newPasswordConfirmation: string;
 }

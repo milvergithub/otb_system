@@ -16,7 +16,7 @@ import { Member } from '../../members/entities/member.entity';
 import { User } from '../../users/entities/user.entity';
 import { Asset } from '../../assets/entities/asset.entity';
 import { Activity } from '../../activities/entities/activity.entity';
-import { PaymentMethod } from '../../billing/entities/payment-history.entity';
+import { Contribution } from '../../contributions/entities/contribution.entity';
 
 export enum FinanceTransactionType {
   INCOME = 'income',
@@ -38,6 +38,7 @@ export enum FinanceSourceType {
   WATER_BILL_PAYMENT = 'water_bill_payment',
   WATER_MEMBERSHIP_FEE = 'water_membership_fee',
   FINE_PAYMENT = 'fine_payment',
+  CONTRIBUTION_PAYMENT = 'contribution_payment',
   ASSET_PURCHASE = 'asset_purchase',
   ASSET_MAINTENANCE = 'asset_maintenance',
   DONATION = 'donation',
@@ -49,6 +50,7 @@ export const MACHINE_SOURCE_TYPES: FinanceSourceType[] = [
   FinanceSourceType.WATER_BILL_PAYMENT,
   FinanceSourceType.WATER_MEMBERSHIP_FEE,
   FinanceSourceType.FINE_PAYMENT,
+  FinanceSourceType.CONTRIBUTION_PAYMENT,
   FinanceSourceType.ASSET_PURCHASE,
   FinanceSourceType.ASSET_MAINTENANCE,
 ];
@@ -60,6 +62,7 @@ export const MACHINE_SOURCE_TYPES: FinanceSourceType[] = [
 @Index(['member_id'])
 @Index(['asset_id'])
 @Index(['activity_id'])
+@Index(['contribution_id'])
 @Index(['responsible_user_id'])
 @Index(['collector_user_id'])
 @Index(['registered_by_user_id'])
@@ -91,7 +94,7 @@ export class FinanceTransaction {
   category: FinanceCategory | null;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
-  payment_method: PaymentMethod | null;
+  payment_method: string | null;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   reference: string | null;
@@ -172,6 +175,21 @@ export class FinanceTransaction {
   @ManyToOne(() => Activity, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'activity_id' })
   activity: Activity | null;
+
+  /**
+   * Extraordinary contribution campaign this movement belongs to. Set on both
+   * income (contribution payments) and expenses (related gastos), so the
+   * campaign's balance comes from the ledger instead of a parallel accounting.
+   */
+  @Column({ type: 'uuid', nullable: true })
+  contribution_id: string | null;
+
+  @ManyToOne(() => Contribution, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'contribution_id' })
+  contribution: Contribution | null;
 
   @Column({ type: 'text', nullable: true })
   notes: string | null;

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Zone } from './zone.entity';
 import { CreateZoneDto, UpdateZoneDto } from './dto/zone.dto';
+import { AppError } from '../../common/errors/app-error';
 
 @Injectable()
 export class ZonesService {
@@ -20,7 +21,7 @@ export class ZonesService {
 
   async findOne(id: string): Promise<Zone> {
     const zone = await this.zoneRepo.findOneBy({ id });
-    if (!zone) throw new NotFoundException(`Zone ${id} not found`);
+    if (!zone) throw new AppError('ZONE_NOT_FOUND');
     return zone;
   }
 

@@ -29,9 +29,10 @@ import type { FinanceTransaction } from "@/lib/types"
 import FinanceTransactionFormDialog from "./FinanceTransactionFormDialog"
 import FinanceTransactionDetailSheet from "./FinanceDetailSheet"
 import VoidFinanceTransactionDialog from "./VoidFinanceTransactionDialog"
-import { TRANSACTION_TYPE_LABEL, SOURCE_LABEL, METHOD_LABEL } from "./constants"
+import { TRANSACTION_TYPE_LABEL, SOURCE_LABEL } from "./constants"
 import Can from "@/components/Can"
 import { useAuth } from "@/lib/auth"
+import { usePaymentMethodMap } from "@/hooks/paymentMethods"
 
 type Tab = "transactions" | "reports"
 type Scope = "mine" | "all"
@@ -57,6 +58,7 @@ export default function FinancesPage() {
   const { sort, toggleSort } = useTableSort({ key: "date", order: "desc" }, () => setPage(1))
   const { data, isLoading } = useSearchFinances({ page, search, type: typeFilter, categoryIds, dateFrom, dateTo, scope, sortBy: sort?.key, sortOrder: sort?.order })
   const { data: categories } = useFinanceCategories()
+  const { map: methodNames } = usePaymentMethodMap()
 
   const items = data?.items ?? []
   const totalPages = data?.totalPages ?? 1
@@ -73,7 +75,7 @@ export default function FinancesPage() {
     { key: "type", label: t("finances.typeLabel"), sortable: true, render: (row: FinanceTransaction) => <Badge variant={row.type === "income" ? "default" : "destructive"}>{t(TRANSACTION_TYPE_LABEL[row.type])}</Badge> },
     { key: "concept", label: t("finances.concept"), sortable: true, render: (row: FinanceTransaction) => <span>{row.concept}</span> },
     { key: "amount", label: t("finances.amount"), sortable: true, align: "right", render: (row: FinanceTransaction) => <span className="font-medium">{formatCurrency(row.amount)}</span> },
-    { key: "payment_method", label: t("finances.paymentMethod"), sortable: false, render: (row: FinanceTransaction) => <span>{row.payment_method ? t(METHOD_LABEL[row.payment_method]) : t("common.none")}</span> },
+    { key: "payment_method", label: t("finances.paymentMethod"), sortable: false, render: (row: FinanceTransaction) => <span>{row.payment_method ? (methodNames[row.payment_method] ?? row.payment_method) : t("common.none")}</span> },
     { key: "category", label: t("finances.category"), sortable: false, render: (row: FinanceTransaction) => <span>{row.category?.name ?? (row.category_id ? t("finances.uncategorized") : t("common.none"))}</span> },
     { key: "responsibleUser", label: t("finances.responsible"), render: (row: FinanceTransaction) => <span>{row.responsibleUser?.full_name ?? t("finances.noResponsible")}</span> },
     { key: "source_type", label: t("finances.sourceType"), render: (row: FinanceTransaction) => <span>{row.source_type ? t(SOURCE_LABEL[row.source_type]) : t("common.none")}</span> },
@@ -213,6 +215,7 @@ export default function FinancesPage() {
 
 function ReportsPanel({ scope }: { scope: Scope }) {
   const { t } = useTranslation()
+  const { map: methodNames } = usePaymentMethodMap()
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const { data: summary, isLoading: summaryLoading } = useFinanceReportSummary(startDate || undefined, endDate || undefined, scope)
@@ -278,7 +281,7 @@ function ReportsPanel({ scope }: { scope: Scope }) {
             <div className="space-y-1">
               {byMethod?.map((r) => (
                 <div key={r.method} className="flex justify-between text-sm">
-                  <span>{r.method}</span>
+                  <span>{methodNames[r.method] ?? r.method}</span>
                   <span>{r.total}</span>
                 </div>
               )) ?? <span className="text-muted-foreground text-sm">{t("common.noData")}</span>}

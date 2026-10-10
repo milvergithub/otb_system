@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConsumptionModule } from '../consumption/consumption.module';
 import { SettingsModule } from '../settings/settings.module';
+import { PaymentMethodsModule } from '../payment-methods/payment-methods.module';
 import { Asset } from '../assets/entities/asset.entity';
 import { AssetCategory } from '../assets/entities/asset-category.entity';
 import { AssetLocation } from '../assets/entities/asset-location.entity';
@@ -11,6 +12,7 @@ import { Meter } from '../meters/entities/meter.entity';
 import { Member } from '../members/entities/member.entity';
 import { User } from '../users/entities/user.entity';
 import { Activity } from '../activities/entities/activity.entity';
+import { Contribution } from '../contributions/entities/contribution.entity';
 import { FinanceCategoriesController } from './finance-categories.controller';
 import { FinanceCategoriesService } from './finance-categories.service';
 import { FinancesController } from './finances.controller';
@@ -35,9 +37,11 @@ import { FinanceTransaction } from './entities/finance-transaction.entity';
       Consumption,
       Meter,
       Activity,
+      Contribution,
     ]),
     ConsumptionModule,
     SettingsModule,
+    PaymentMethodsModule,
   ],
   controllers: [FinancesController, FinanceCategoriesController],
   providers: [

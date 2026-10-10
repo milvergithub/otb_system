@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { User } from '../modules/users/entities/user.entity';
 import { Member } from '../modules/members/entities/member.entity';
+import { MemberType } from '../modules/members/entities/member-type.entity';
 import { Meter } from '../modules/meters/entities/meter.entity';
 import { MeterTypeEntity } from '../modules/meters/entities/meter-type.entity';
 import { Tariff } from '../modules/tariffs/entities/tariff.entity';
@@ -36,6 +37,10 @@ import { AssetDocument } from '../modules/assets/entities/asset-document.entity'
 import { FinanceTransaction } from '../modules/finances/entities/finance-transaction.entity';
 import { FinanceCategory } from '../modules/finances/entities/finance-category.entity';
 import { FinanceDocument } from '../modules/finances/entities/finance-document.entity';
+import { Contribution } from '../modules/contributions/entities/contribution.entity';
+import { ContributionObligation } from '../modules/contributions/entities/contribution-obligation.entity';
+import { ContributionPayment } from '../modules/contributions/entities/contribution-payment.entity';
+import { PaymentMethodEntity } from '../modules/payment-methods/entities/payment-method.entity';
 
 const isCompiled = __dirname.includes('dist');
 const migrationsPath = isCompiled
@@ -52,6 +57,7 @@ export const AppDataSource = new DataSource({
   entities: [
     User,
     Member,
+    MemberType,
     Meter,
     MeterTypeEntity,
     Tariff,
@@ -86,6 +92,10 @@ export const AppDataSource = new DataSource({
     FinanceTransaction,
     FinanceCategory,
     FinanceDocument,
+    Contribution,
+    ContributionObligation,
+    ContributionPayment,
+    PaymentMethodEntity,
   ],
   migrations: migrationsPath,
   synchronize: false,

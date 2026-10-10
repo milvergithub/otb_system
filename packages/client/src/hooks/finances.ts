@@ -9,7 +9,6 @@ import type {
   FinanceTransaction,
   FinanceTransactionStatus,
   FinanceTransactionType,
-  PaymentMethod,
   FinanceSourceType,
   Paginated,
 } from "@/lib/types"
@@ -116,7 +115,7 @@ export interface FinanceTransactionRequest {
   amount: number
   concept: string
   categoryId?: string
-  paymentMethod?: PaymentMethod
+  paymentMethod?: string
   reference?: string
   memberId?: string
   sourceType?: FinanceSourceType

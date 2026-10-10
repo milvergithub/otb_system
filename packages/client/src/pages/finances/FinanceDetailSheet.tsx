@@ -5,6 +5,7 @@ import { api } from "@/lib/api"
 import { ApiPath } from "@/lib/apiPath"
 import { queryKeys } from "@/lib/utils/query"
 import { useGetFinanceTransaction, useAddFinanceDocument, useDeleteFinanceDocument } from "@/hooks/finances"
+import { usePaymentMethodMap } from "@/hooks/paymentMethods"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -24,6 +25,7 @@ export default function FinanceTransactionDetailSheet({ transaction, onOpenChang
   const addDocument = useAddFinanceDocument()
   const deleteDocument = useDeleteFinanceDocument()
   const { data: detail } = useGetFinanceTransaction(transaction?.id)
+  const { map: methodNames } = usePaymentMethodMap()
 
   const documents = detail?.documents ?? []
   const categoryName = detail?.category?.name ?? t("common.none")
@@ -93,7 +95,11 @@ export default function FinanceTransactionDetailSheet({ transaction, onOpenChang
             <dt className="font-medium text-muted-foreground">{t("finances.category")}</dt>
             <dd>{categoryName}</dd>
             <dt className="font-medium text-muted-foreground">{t("finances.paymentMethod")}</dt>
-            <dd>{tx.payment_method ?? t("common.none")}</dd>
+            <dd>
+              {tx.payment_method
+                ? (methodNames[tx.payment_method] ?? tx.payment_method)
+                : t("common.none")}
+            </dd>
             <dt className="font-medium text-muted-foreground">{t("finances.provider")}</dt>
             <dd>{tx.provider ?? t("common.none")}</dd>
             <dt className="font-medium text-muted-foreground">{t("finances.sourceType")}</dt>

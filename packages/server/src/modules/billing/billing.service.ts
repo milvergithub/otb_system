@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -27,6 +22,9 @@ import { PayBillDto } from './dto/billing.dto';
 import { FinancesService } from '../finances/finances.service';
 import { FinancialResponsibilityService } from '../finances/financial-responsibility.service';
 import { FinanceSourceType } from '../finances/entities/finance-transaction.entity';
+import { PaymentMethodsService } from '../payment-methods/payment-methods.service';
+import { AppError } from '../../common/errors/app-error';
+import { formatDateForMessage } from '../../common/i18n/format';
 
 const SORT_COLUMNS: Record<string, string | string[]> = {
   total_amount: 'payment.total_amount',
@@ -58,6 +56,7 @@ export class BillingService {
     private readonly storageService: StorageService,
     private readonly financesService: FinancesService,
     private readonly responsibilityService: FinancialResponsibilityService,
+    private readonly paymentMethodsService: PaymentMethodsService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -79,9 +78,9 @@ export class BillingService {
       typeId,
     );
     if (!baseTariff) {
-      throw new BadRequestException(
-        `No existe tarifa base vigente para ${date.toLocaleDateString('es-BO')}`,
-      );
+      throw new AppError('NO_VALID_BASE_TARIFF', {
+        date: formatDateForMessage(date),
+      });
     }
 
     // 2. Find valid range tariff for the consumption
@@ -90,9 +89,10 @@ export class BillingService {
       cubicMeters,
     );
     if (!rangeTariff) {
-      throw new BadRequestException(
-        `No existe tarifa vigente para ${cubicMeters} m³ en ${date.toLocaleDateString('es-BO')}`,
-      );
+      throw new AppError('NO_VALID_TARIFF', {
+        cubicMeters,
+        date: formatDateForMessage(date),
+      });
     }
 
     // 3. Calculate total
@@ -118,7 +118,10 @@ export class BillingService {
       .leftJoinAndSelect('meter.member', 'member')
       .leftJoinAndSelect('payment.history', 'history')
       .leftJoinAndSelect('payment.paymentDiscounts', 'paymentDiscounts')
-      .leftJoinAndSelect('paymentDiscounts.discount', 'pd_discount');
+      .leftJoinAndSelect('paymentDiscounts.discount', 'pd_discount')
+      // Historical payments keep the member name even if it was logically
+      // deleted afterwards.
+      .withDeleted();
 
     if (filters.month) {
       query.andWhere('consumption.month = :month', { month: filters.month });
@@ -175,9 +178,13 @@ export class BillingService {
         'paymentDiscounts',
         'paymentDiscounts.discount',
       ],
+      // The pay flow resolves the member from this relation; keep it visible for
+      // deleted members so the central finance validation can still block new
+      // movements instead of silently recording them without attribution.
+      withDeleted: true,
     });
     if (!payment) {
-      throw new NotFoundException('Payment record not found');
+      throw new AppError('PAYMENT_RECORD_NOT_FOUND');
     }
     return payment;
   }
@@ -194,16 +201,14 @@ export class BillingService {
       relations: ['meter', 'meter.type', 'meter.member'],
     });
     if (!consumption) {
-      throw new BadRequestException('Consumption record not found');
+      throw new AppError('CONSUMPTION_NOT_FOUND');
     }
 
     const existing = await this.paymentsRepository.findOne({
       where: { consumption_id: consumptionId },
     });
     if (existing) {
-      throw new BadRequestException(
-        'A bill already exists for this consumption',
-      );
+      throw new AppError('BILL_ALREADY_EXISTS');
     }
 
     const cubicMeters = parseFloat(consumption.cubic_meters);
@@ -311,8 +316,9 @@ export class BillingService {
   ): Promise<Payment> {
     const payment = await this.findOne(id);
     if (payment.status === PaymentStatus.PAID) {
-      throw new BadRequestException('This bill has already been fully paid');
+      throw new AppError('BILL_FULLY_PAID');
     }
+    await this.paymentMethodsService.validateCode(dto.paymentMethod);
 
     let total = parseFloat(payment.total_amount);
     const alreadyPaid = parseFloat(payment.amount_paid);
@@ -336,9 +342,7 @@ export class BillingService {
     const newPaidTotal = alreadyPaid + dto.amount;
 
     if (newPaidTotal > total + 0.001) {
-      throw new BadRequestException(
-        'Payment amount exceeds the remaining balance',
-      );
+      throw new AppError('PAYMENT_EXCEEDS_BALANCE');
     }
 
     const member = payment.consumption?.meter?.member;
@@ -388,9 +392,9 @@ export class BillingService {
       const fresh = await paymentsRepo.findOne({
         where: { id },
       });
-      if (!fresh) throw new NotFoundException('Payment not found');
+      if (!fresh) throw new AppError('PAYMENT_NOT_FOUND');
       if (fresh.status === PaymentStatus.PAID) {
-        throw new BadRequestException('This bill has already been fully paid');
+        throw new AppError('BILL_FULLY_PAID');
       }
 
       if (dto.discountIds) {
@@ -444,9 +448,7 @@ export class BillingService {
         .execute();
 
       if (!increment.raw?.length) {
-        throw new ConflictException(
-          'This bill was already paid or the amount exceeds its remaining balance',
-        );
+        throw new AppError('BILL_PAID_OR_EXCEEDS_BALANCE');
       }
 
       const paidTotalAfter = parseFloat(increment.raw[0].amount_paid);

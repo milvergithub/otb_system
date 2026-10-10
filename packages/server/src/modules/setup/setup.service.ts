@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { DataSource, EntityManager, Repository } from 'typeorm';
@@ -11,16 +6,15 @@ import { User, UserRole } from '../users/entities/user.entity';
 import { Role } from '../roles/entities/role.entity';
 import { Permission } from '../roles/entities/permission.entity';
 import { AuthService } from '../auth/auth.service';
-import {
-  CreateInitialAdminDto,
-  PASSWORDS_DO_NOT_MATCH,
-} from './dto/create-initial-admin.dto';
+import { CreateInitialAdminDto } from './dto/create-initial-admin.dto';
+import { AppError } from '../../common/errors/app-error';
+import type { ErrorCode } from '../../common/errors/error-codes';
 
 export const ADMIN_ROLE_NAME = 'admin';
 export const SETUP_ADVISORY_LOCK_KEY = 7_310_001;
-export const SETUP_ALREADY_COMPLETED =
-  'Initial setup has already been completed';
-export const EMAIL_ALREADY_EXISTS = 'Email already exists';
+export const SETUP_ALREADY_COMPLETED_CODE: ErrorCode =
+  'SETUP_ALREADY_COMPLETED';
+export const EMAIL_ALREADY_EXISTS_CODE: ErrorCode = 'EMAIL_ALREADY_EXISTS';
 
 export interface SetupStatus {
   setupCompleted: boolean;
@@ -46,10 +40,10 @@ export class SetupService {
 
   async createInitialAdmin(dto: CreateInitialAdminDto) {
     if (dto.password !== dto.passwordConfirmation) {
-      throw new BadRequestException(PASSWORDS_DO_NOT_MATCH);
+      throw new AppError('PASSWORDS_DO_NOT_MATCH');
     }
     if (await this.isConfigured()) {
-      throw new ConflictException(SETUP_ALREADY_COMPLETED);
+      throw new AppError(SETUP_ALREADY_COMPLETED_CODE);
     }
 
     const email = dto.email.trim().toLowerCase();
@@ -65,10 +59,10 @@ export class SetupService {
 
         const usersRepo = manager.getRepository(User);
         if (await this.hasActiveAdmin(usersRepo)) {
-          throw new ConflictException(SETUP_ALREADY_COMPLETED);
+          throw new AppError(SETUP_ALREADY_COMPLETED_CODE);
         }
         if (await usersRepo.exists({ where: { email } })) {
-          throw new ConflictException(EMAIL_ALREADY_EXISTS);
+          throw new AppError(EMAIL_ALREADY_EXISTS_CODE);
         }
 
         const adminRole = await this.resolveAdminRole(manager);
@@ -85,7 +79,7 @@ export class SetupService {
       });
     } catch (error: any) {
       if (error?.driverError?.code === '23505' || error?.code === '23505') {
-        throw new ConflictException(EMAIL_ALREADY_EXISTS);
+        throw new AppError(EMAIL_ALREADY_EXISTS_CODE);
       }
       throw error;
     }

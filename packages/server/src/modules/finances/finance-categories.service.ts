@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -14,6 +10,7 @@ import {
   UpdateFinanceCategoryDto,
 } from './dto/finance-category.dto';
 import { FinanceTransaction } from './entities/finance-transaction.entity';
+import { AppError } from '../../common/errors/app-error';
 
 @Injectable()
 export class FinanceCategoriesService {
@@ -30,8 +27,7 @@ export class FinanceCategoriesService {
 
   async findOne(id: string): Promise<FinanceCategory> {
     const category = await this.categoriesRepo.findOneBy({ id });
-    if (!category)
-      throw new NotFoundException(`Finance category ${id} not found`);
+    if (!category) throw new AppError('FINANCE_CATEGORY_NOT_FOUND');
     return category;
   }
 
@@ -68,9 +64,10 @@ export class FinanceCategoriesService {
       where: { category_id: id },
     });
     if (inUse > 0) {
-      throw new BadRequestException(
-        `Cannot delete category "${category.name}" because it is used by ${inUse} transaction(s). Deactivate it instead.`,
-      );
+      throw new AppError('FINANCE_CATEGORY_IN_USE', {
+        name: category.name,
+        count: inUse,
+      });
     }
     await this.categoriesRepo.remove(category);
   }
@@ -78,9 +75,7 @@ export class FinanceCategoriesService {
   private async assertNameIsFree(name: string): Promise<void> {
     const existing = await this.categoriesRepo.findOneBy({ name });
     if (existing) {
-      throw new BadRequestException(
-        `A finance category with name "${name}" already exists`,
-      );
+      throw new AppError('FINANCE_CATEGORY_NAME_EXISTS', { name });
     }
   }
 }

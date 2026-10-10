@@ -27,7 +27,8 @@ import {
 import { toast } from "sonner"
 import { Banknote, SwitchCamera, Trash } from "lucide-react"
 import ImageCropDialog from "@/components/ImageCropDialog"
-import { PAYMENT_METHODS, memberName, remaining } from "./helpers"
+import { memberName, remaining } from "./helpers"
+import { usePaymentMethods } from "@/hooks/paymentMethods"
 
 const payFormSchema = (t: TFunction) =>
   z.object({
@@ -42,7 +43,7 @@ type PayFormValues = z.infer<ReturnType<typeof payFormSchema>>
 
 const DEFAULT_PAY_FORM: PayFormValues = {
   amount: "",
-  method: "cash",
+  method: "",
   reference: "",
   discount_ids: [],
   collectorUserId: "",
@@ -76,6 +77,9 @@ export default function PayBillDialog({
   const { hasPermission } = useAuth()
   const canPickCollector = hasPermission("users.read")
   const { data: users } = useSearchUsers(undefined, canPickCollector)
+  const { data: paymentMethods } = usePaymentMethods(
+    hasPermission("payment_methods.read"),
+  )
 
   const [imageSrc, setImageSrc] = useState<string | null>(null)
   const [croppedBase64, setCroppedBase64] = useState<string | null>(null)
@@ -219,8 +223,11 @@ export default function PayBillDialog({
               <ComboboxSelect
                 value={watchMethod}
                 onValueChange={(v) => form.setValue("method", v)}
+                placeholder={t("meters.selectMethod")}
                 className="w-full"
-                options={PAYMENT_METHODS.map((m) => ({ label: t(m.label), value: m.value }))}
+                options={
+                  paymentMethods?.map((m) => ({ label: m.name, value: m.code })) ?? []
+                }
               />
             </div>
           </div>

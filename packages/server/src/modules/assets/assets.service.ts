@@ -1,11 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, IsNull, Not, Repository } from 'typeorm';
 import type { StoredDocument } from '../consumption/storage.service';
@@ -53,6 +46,7 @@ import {
 import { FilterAssetDto } from './dto/filter-asset.dto';
 import { FinancesService } from '../finances/finances.service';
 import { FinanceSourceType } from '../finances/entities/finance-transaction.entity';
+import { AppError } from '../../common/errors/app-error';
 
 const SORT_COLUMNS: Record<string, string> = {
   code: 'asset.code',
@@ -114,7 +108,9 @@ export class AssetsService {
       .leftJoinAndSelect('asset.category', 'category')
       .leftJoinAndSelect('asset.location', 'location')
       .leftJoinAndSelect('asset.currentResponsibleUser', 'responsibleUser')
-      .leftJoinAndSelect('asset.currentResponsibleMember', 'responsibleMember');
+      .leftJoinAndSelect('asset.currentResponsibleMember', 'responsibleMember')
+      // Assets keep the responsible member name after a logical deletion.
+      .withDeleted();
 
     if (filter.search) {
       query.andWhere(
@@ -191,9 +187,10 @@ export class AssetsService {
     const asset = await this.assetsRepo.findOne({
       where: { id },
       relations: ASSET_RELATIONS,
+      withDeleted: true,
     });
     if (!asset) {
-      throw new NotFoundException('Asset not found');
+      throw new AppError('ASSET_NOT_FOUND');
     }
 
     if (includeHistory) {
@@ -245,7 +242,7 @@ export class AssetsService {
       ],
     });
     if (!asset) {
-      throw new NotFoundException('Asset not found');
+      throw new AppError('ASSET_NOT_FOUND');
     }
 
     const member = asset.currentResponsibleMember;
@@ -413,9 +410,7 @@ export class AssetsService {
       .where('a.code IN (:...codes)', { codes })
       .getCount();
     if (taken > 0) {
-      throw new ConflictException(
-        'Asset codes were already taken, please retry the bulk creation',
-      );
+      throw new AppError('ASSET_CODES_TAKEN');
     }
 
     const unitValue =
@@ -452,9 +447,7 @@ export class AssetsService {
   async update(id: string, dto: UpdateAssetDto): Promise<Asset> {
     const asset = await this.findOne(id);
     if (asset.status === AssetStatus.RETIRED) {
-      throw new BadRequestException(
-        'A retired asset cannot be edited. Restore it first.',
-      );
+      throw new AppError('ASSET_RETIRED_CANNOT_EDIT');
     }
     await this.assertAssetReferences(dto);
     this.assertSingleResponsible(dto);
@@ -495,9 +488,7 @@ export class AssetsService {
     ]);
 
     if (movements > 0 || maintenances > 0) {
-      throw new BadRequestException(
-        'Assets with movement or maintenance history cannot be deleted. Retire the asset instead.',
-      );
+      throw new AppError('ASSET_HAS_HISTORY_CANNOT_DELETE');
     }
 
     await this.deleteStoredDocuments(asset.id);
@@ -508,21 +499,17 @@ export class AssetsService {
     const asset = await this.findOne(id);
 
     if (asset.status === AssetStatus.RETIRED) {
-      throw new BadRequestException('A retired asset cannot be loaned');
+      throw new AppError('ASSET_RETIRED_CANNOT_LOAN');
     }
     if (asset.status === AssetStatus.IN_MAINTENANCE) {
-      throw new BadRequestException(
-        'Finish the maintenance before loaning this asset',
-      );
+      throw new AppError('ASSET_MAINTENANCE_BLOCKS_LOAN');
     }
     if (asset.status === AssetStatus.LOANED) {
-      throw new BadRequestException('This asset already has an open loan');
+      throw new AppError('ASSET_LOAN_ALREADY_OPEN');
     }
 
     if (!dto.responsibleUserId && !dto.responsibleMemberId) {
-      throw new BadRequestException(
-        'A loan requires a responsible user or member',
-      );
+      throw new AppError('ASSET_LOAN_REQUIRES_RESPONSIBLE');
     }
     this.assertSingleResponsible(dto);
     await this.assertLocationExists(dto.toLocationId);
@@ -556,12 +543,12 @@ export class AssetsService {
     const asset = await this.findOne(id);
 
     if (asset.status === AssetStatus.RETIRED) {
-      throw new BadRequestException('A retired asset cannot be returned');
+      throw new AppError('ASSET_RETIRED_CANNOT_RETURN');
     }
 
     const openLoan = await this.findOpenLoan(asset.id);
     if (!openLoan) {
-      throw new BadRequestException('This asset has no open loan');
+      throw new AppError('ASSET_NO_OPEN_LOAN');
     }
 
     await this.assertLocationExists(dto.returnLocationId);
@@ -589,17 +576,13 @@ export class AssetsService {
     const asset = await this.findOne(id);
 
     if (asset.status === AssetStatus.RETIRED) {
-      throw new BadRequestException('A retired asset cannot be transferred');
+      throw new AppError('ASSET_RETIRED_CANNOT_TRANSFER');
     }
     if (asset.status === AssetStatus.LOANED) {
-      throw new BadRequestException(
-        'Return the asset before changing its location',
-      );
+      throw new AppError('ASSET_RETURN_BEFORE_LOCATION_CHANGE');
     }
     if (dto.toLocationId === asset.location_id) {
-      throw new BadRequestException(
-        'The destination location is already the current location',
-      );
+      throw new AppError('ASSET_SAME_LOCATION');
     }
     await this.assertLocationExists(dto.toLocationId);
 
@@ -629,20 +612,16 @@ export class AssetsService {
     const asset = await this.findOne(id);
 
     if (asset.status === AssetStatus.LOST) {
-      throw new BadRequestException('This asset is already marked as lost');
+      throw new AppError('ASSET_ALREADY_LOST');
     }
     if (asset.status === AssetStatus.RETIRED) {
-      throw new BadRequestException('A retired asset cannot be marked as lost');
+      throw new AppError('ASSET_RETIRED_CANNOT_MARK_LOST');
     }
     if (asset.status === AssetStatus.LOANED) {
-      throw new BadRequestException(
-        'Return the asset before marking it as lost',
-      );
+      throw new AppError('ASSET_RETURN_BEFORE_MARK_LOST');
     }
     if (asset.status === AssetStatus.IN_MAINTENANCE) {
-      throw new BadRequestException(
-        'Finish the maintenance before marking it as lost',
-      );
+      throw new AppError('ASSET_MAINTENANCE_BLOCKS_LOST');
     }
 
     await this.movementsRepo.save(
@@ -673,18 +652,16 @@ export class AssetsService {
     const asset = await this.findOne(id);
 
     if (asset.status === AssetStatus.RETIRED) {
-      throw new BadRequestException('This asset is already retired');
+      throw new AppError('ASSET_ALREADY_RETIRED');
     }
 
     const openLoan = await this.findOpenLoan(asset.id);
     if (openLoan) {
-      throw new BadRequestException('Return the asset before retiring it');
+      throw new AppError('ASSET_RETURN_BEFORE_RETIRE');
     }
     const openMaintenance = await this.findOpenMaintenance(asset.id);
     if (openMaintenance) {
-      throw new BadRequestException(
-        'Finish the maintenance before retiring this asset',
-      );
+      throw new AppError('ASSET_MAINTENANCE_BLOCKS_RETIRE');
     }
     await this.assertUserExists(dto.responsibleUserId);
 
@@ -721,7 +698,7 @@ export class AssetsService {
     const asset = await this.findOne(id);
 
     if (asset.status !== AssetStatus.RETIRED) {
-      throw new BadRequestException('Only retired assets can be restored');
+      throw new AppError('ASSET_ONLY_RETIRED_CAN_RESTORE');
     }
 
     await this.movementsRepo.save(
@@ -754,26 +731,18 @@ export class AssetsService {
     const asset = await this.findOne(id);
 
     if (asset.status === AssetStatus.RETIRED) {
-      throw new BadRequestException(
-        'A retired asset cannot be sent to maintenance',
-      );
+      throw new AppError('ASSET_RETIRED_CANNOT_MAINTENANCE');
     }
     if (asset.status === AssetStatus.LOANED) {
-      throw new BadRequestException(
-        'Return the asset before sending it to maintenance',
-      );
+      throw new AppError('ASSET_RETURN_BEFORE_MAINTENANCE');
     }
     if (asset.status === AssetStatus.LOST) {
-      throw new BadRequestException(
-        'A lost asset cannot be sent to maintenance',
-      );
+      throw new AppError('ASSET_LOST_CANNOT_MAINTENANCE');
     }
 
     const existing = await this.findOpenMaintenance(asset.id);
     if (existing) {
-      throw new BadRequestException(
-        'This asset already has an open maintenance',
-      );
+      throw new AppError('ASSET_MAINTENANCE_ALREADY_OPEN');
     }
 
     const maintenance = await this.maintenancesRepo.save(
@@ -808,12 +777,10 @@ export class AssetsService {
       asset_id: asset.id,
     });
     if (!maintenance) {
-      throw new NotFoundException(
-        `Asset maintenance ${maintenanceId} not found`,
-      );
+      throw new AppError('ASSET_MAINTENANCE_NOT_FOUND');
     }
     if (maintenance.finished_at) {
-      throw new BadRequestException('This maintenance is already closed');
+      throw new AppError('ASSET_MAINTENANCE_ALREADY_CLOSED');
     }
 
     maintenance.finished_at = dto.finishedAt ?? this.today();
@@ -895,6 +862,7 @@ export class AssetsService {
         'responsibleMember',
       ],
       order: { moved_at: 'DESC', created_at: 'DESC' },
+      withDeleted: true,
     });
   }
 
@@ -926,11 +894,12 @@ export class AssetsService {
         'assets/documents',
         dto.fileName,
       );
-    } catch (error) {
-      throw new BadRequestException((error as Error).message);
+    } catch {
+      // Storage internals must not leak into the API response.
+      throw new AppError('DOCUMENT_UPLOAD_FAILED');
     }
     if (!stored) {
-      throw new BadRequestException('Could not store the uploaded document');
+      throw new AppError('DOCUMENT_UPLOAD_FAILED');
     }
 
     return this.documentsRepo.save(
@@ -956,7 +925,7 @@ export class AssetsService {
       asset_id: assetId,
     });
     if (!document) {
-      throw new NotFoundException(`Asset document ${documentId} not found`);
+      throw new AppError('ASSET_DOCUMENT_NOT_FOUND');
     }
 
     await this.documentsRepo.remove(document);
@@ -972,7 +941,7 @@ export class AssetsService {
       asset_id: assetId,
     });
     if (!document) {
-      throw new NotFoundException(`Asset document ${documentId} not found`);
+      throw new AppError('ASSET_DOCUMENT_NOT_FOUND');
     }
     return this.storageService.getObjectStream(document.file_key);
   }
@@ -1050,9 +1019,7 @@ export class AssetsService {
       const existing = await this.assetsRepo.findOneBy({ code });
       if (!existing) return code;
     }
-    throw new InternalServerErrorException(
-      'Could not generate a unique asset code',
-    );
+    throw new AppError('ASSET_CODE_GENERATION_FAILED');
   }
 
   private assertSingleResponsible(dto: {
@@ -1067,9 +1034,7 @@ export class AssetsService {
       dto.currentResponsibleMemberId ?? dto.responsibleMemberId ?? undefined;
 
     if (userId && memberId) {
-      throw new BadRequestException(
-        'An asset can only have one responsible party at a time',
-      );
+      throw new AppError('ASSET_RESPONSIBLE_CONFLICT');
     }
   }
 
@@ -1084,7 +1049,7 @@ export class AssetsService {
         id: dto.categoryId,
       });
       if (!category) {
-        throw new BadRequestException('Asset category not found');
+        throw new AppError('ASSET_CATEGORY_NOT_FOUND');
       }
     }
     if (dto.locationId) {
@@ -1098,7 +1063,7 @@ export class AssetsService {
         id: dto.currentResponsibleMemberId,
       });
       if (!member) {
-        throw new BadRequestException('Member not found');
+        throw new AppError('MEMBER_NOT_FOUND');
       }
     }
   }
@@ -1115,7 +1080,7 @@ export class AssetsService {
         id: dto.responsibleMemberId,
       });
       if (!member) {
-        throw new BadRequestException('Member not found');
+        throw new AppError('MEMBER_NOT_FOUND');
       }
     }
   }
@@ -1124,7 +1089,7 @@ export class AssetsService {
     if (!userId) return;
     const user = await this.usersRepo.findOneBy({ id: userId });
     if (!user) {
-      throw new BadRequestException('User not found');
+      throw new AppError('USER_NOT_FOUND');
     }
   }
 
@@ -1134,7 +1099,7 @@ export class AssetsService {
     if (!locationId) return;
     const location = await this.locationsRepo.findOneBy({ id: locationId });
     if (!location) {
-      throw new BadRequestException('Asset location not found');
+      throw new AppError('ASSET_LOCATION_NOT_FOUND');
     }
   }
 

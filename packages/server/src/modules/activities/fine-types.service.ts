@@ -1,12 +1,9 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FineType } from './entities/fine-type.entity';
 import { CreateFineTypeDto, UpdateFineTypeDto } from './dto/fine-type.dto';
+import { AppError } from '../../common/errors/app-error';
 
 @Injectable()
 export class FineTypesService {
@@ -21,7 +18,7 @@ export class FineTypesService {
 
   async findOne(id: string): Promise<FineType> {
     const ft = await this.repo.findOne({ where: { id } });
-    if (!ft) throw new NotFoundException('Tipo de multa no encontrado');
+    if (!ft) throw new AppError('FINE_TYPE_NOT_FOUND');
     return ft;
   }
 
@@ -32,9 +29,7 @@ export class FineTypesService {
   async create(dto: CreateFineTypeDto): Promise<FineType> {
     const existing = await this.findByCode(dto.code);
     if (existing) {
-      throw new BadRequestException(
-        'Ya existe un tipo de multa activo con ese código',
-      );
+      throw new AppError('FINE_TYPE_CODE_EXISTS');
     }
     const entity = this.repo.create({
       code: dto.code,

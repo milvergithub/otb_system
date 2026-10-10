@@ -2,6 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { FinancesService, FinanceAccess } from './finances.service';
 import { FinanceScope } from './dto/finance-transaction.dto';
 import type { FinanceTransaction } from './entities/finance-transaction.entity';
+import { AppError } from '../../common/errors/app-error';
 
 type ServiceInternals = {
   applyScope: (qb: unknown, access: FinanceAccess) => void;
@@ -15,6 +16,8 @@ function makeService(): {
   // Repositories are irrelevant for these helpers: no query is executed.
   const noop = {} as never;
   const service = new FinancesService(
+    noop,
+    noop,
     noop,
     noop,
     noop,
@@ -123,7 +126,7 @@ describe('FinancesService responsibility scope', () => {
           userId: 'user-a',
           canViewAll: false,
         }),
-      ).toThrow(ForbiddenException);
+      ).toThrow(new AppError('FINANCE_TRANSACTION_FORBIDDEN'));
     });
 
     it('rejects movements of other users even with finances.all when scope=mine', () => {
@@ -134,7 +137,7 @@ describe('FinancesService responsibility scope', () => {
           canViewAll: true,
           scope: FinanceScope.MINE,
         }),
-      ).toThrow(ForbiddenException);
+      ).toThrow(new AppError('FINANCE_TRANSACTION_FORBIDDEN'));
     });
 
     it('allows any movement with finances.all and scope=all (visibility only)', () => {
@@ -156,7 +159,7 @@ describe('FinancesService responsibility scope', () => {
           canViewAll: true,
           scope: FinanceScope.MINE,
         }),
-      ).toThrow(ForbiddenException);
+      ).toThrow(new AppError('FINANCE_TRANSACTION_FORBIDDEN'));
     });
   });
 });

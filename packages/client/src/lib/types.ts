@@ -83,11 +83,33 @@ export interface Member {
   phone?: string | null
   phone_country?: string | null
   address?: string | null
+  member_type?: MemberType | null
   created_at: string
+  deleted_at?: string | null
   meters?: Meter[]
 }
 
+export interface MemberType {
+  id: string
+  code: string
+  name: string
+  description?: string | null
+  is_active: boolean
+  sort_order: number
+  member_count?: number
+  created_at: string
+  updated_at: string
+}
+
 export interface MeterTypeItem {
+  id: string
+  code: string
+  name: string
+  created_at: string
+  updated_at: string
+}
+
+export interface PaymentMethodItem {
   id: string
   code: string
   name: string
@@ -113,7 +135,7 @@ export interface SharePayment {
   share_id?: string | null
   share?: WaterShare | null
   amount: string
-  payment_method?: PaymentMethod | null
+  payment_method?: string | null
   reference?: string | null
   notes?: string | null
   evidence_key?: string | null
@@ -193,7 +215,7 @@ export interface PaymentHistory {
   id: string
   payment_id: string
   amount: string
-  payment_method?: PaymentMethod | null
+  payment_method?: string | null
   reference?: string | null
   notes?: string | null
   created_at: string
@@ -661,7 +683,7 @@ export interface FinanceTransaction {
   concept: string
   category_id?: string | null
   category?: FinanceCategory | null
-  payment_method?: PaymentMethod | null
+  payment_method?: string | null
   reference?: string | null
   member_id?: string | null
   member?: Pick<Member, "id" | "first_name" | "last_name"> | null
@@ -687,4 +709,106 @@ export interface FinanceTransaction {
   documents?: FinanceDocument[]
   created_at: string
   updated_at: string
+}
+
+// ---------------------------------------------------------------------------
+// Contributions (aportes económicos extraordinarios)
+// ---------------------------------------------------------------------------
+
+export type ContributionStatus =
+  | "draft"
+  | "active"
+  | "paused"
+  | "completed"
+  | "cancelled"
+
+export type ContributionObligationStatus =
+  | "pending"
+  | "partial"
+  | "paid"
+  | "exonerated"
+  | "cancelled"
+
+export type ContributionPaymentStatus = "active" | "voided"
+
+export interface Contribution {
+  id: string
+  title: string
+  purpose?: string | null
+  amount_per_member: string
+  status: ContributionStatus
+  collector_user_id?: string | null
+  collectorUser?: Pick<User, "id" | "full_name"> | null
+  responsible_user_id?: string | null
+  responsibleUser?: Pick<User, "id" | "full_name"> | null
+  created_by: string
+  creator?: Pick<User, "id" | "full_name"> | null
+  activated_at?: string | null
+  completed_at?: string | null
+  cancelled_at?: string | null
+  cancel_reason?: string | null
+  notes?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ContributionObligation {
+  id: string
+  contribution_id: string
+  member_id: string
+  member?: Member | null
+  amount: string
+  status: ContributionObligationStatus
+  exonerated_reason?: string | null
+  exonerated_by?: string | null
+  exonerated_at?: string | null
+  cancel_reason?: string | null
+  paid_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ContributionPayment {
+  id: string
+  obligation_id: string
+  obligation?: ContributionObligation | null
+  contribution_id: string
+  member_id?: string | null
+  member?: Member | null
+  amount: string
+  payment_method?: string | null
+  reference?: string | null
+  notes?: string | null
+  evidence_key?: string | null
+  collector_user_id?: string | null
+  collectorUser?: Pick<User, "id" | "full_name"> | null
+  registered_by_user_id?: string | null
+  registeredByUser?: Pick<User, "id" | "full_name"> | null
+  paid_at: string
+  status: ContributionPaymentStatus
+  voided_at?: string | null
+  voided_reason?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ContributionSummaryData {
+  contribution: Contribution
+  obligations: {
+    total: number
+    pending: number
+    partial: number
+    paid: number
+    exonerated: number
+    cancelled: number
+    expectedAmount: number
+    exoneratedAmount: number
+    collectedAmount: number
+    pendingRecoveryAmount: number
+  }
+  finance: {
+    income: number
+    expenses: number
+    balance: number
+  }
 }

@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import * as bcrypt from 'bcrypt';
@@ -8,9 +8,10 @@ import { CreateInitialAdminDto } from './dto/create-initial-admin.dto';
 import {
   ADMIN_ROLE_NAME,
   SETUP_ADVISORY_LOCK_KEY,
-  SETUP_ALREADY_COMPLETED,
+  SETUP_ALREADY_COMPLETED_CODE,
   SetupService,
 } from './setup.service';
+import { AppError } from '../../common/errors/app-error';
 import { User } from '../users/entities/user.entity';
 import { Role } from '../roles/entities/role.entity';
 import { Permission } from '../roles/entities/permission.entity';
@@ -221,7 +222,7 @@ describe('SetupService createInitialAdmin', () => {
     });
 
     await expect(service.createInitialAdmin(validDto())).rejects.toThrow(
-      new ConflictException(SETUP_ALREADY_COMPLETED),
+      new AppError(SETUP_ALREADY_COMPLETED_CODE),
     );
     expect(db.users).toHaveLength(1);
   });
@@ -233,7 +234,7 @@ describe('SetupService createInitialAdmin', () => {
         ...validDto(),
         passwordConfirmation: 'other123',
       }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toThrow(new AppError('PASSWORDS_DO_NOT_MATCH'));
   });
 
   it('rejects a duplicate email with 409', async () => {
@@ -249,7 +250,7 @@ describe('SetupService createInitialAdmin', () => {
       ],
     });
     await expect(service.createInitialAdmin(validDto())).rejects.toThrow(
-      ConflictException,
+      new AppError('EMAIL_ALREADY_EXISTS'),
     );
   });
 
@@ -261,7 +262,7 @@ describe('SetupService createInitialAdmin', () => {
       }),
     );
     await expect(service.createInitialAdmin(validDto())).rejects.toThrow(
-      ConflictException,
+      new AppError('EMAIL_ALREADY_EXISTS'),
     );
   });
 
@@ -282,7 +283,9 @@ describe('SetupService createInitialAdmin', () => {
     );
     expect(fulfilled).toHaveLength(1);
     expect(rejected).toHaveLength(1);
-    expect(rejected[0].reason).toBeInstanceOf(ConflictException);
+    expect((rejected[0].reason as AppError).code).toBe(
+      SETUP_ALREADY_COMPLETED_CODE,
+    );
     expect(db.users.filter(isAdmin)).toHaveLength(1);
   });
 });

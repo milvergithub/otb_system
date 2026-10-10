@@ -1,12 +1,8 @@
 import { Transform } from 'class-transformer';
 import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
-import {
-  IsStrongPassword,
-  PASSWORD_TOO_WEAK,
-} from '../../../common/decorators/is-strong-password.decorator';
+import { IsStrongPassword } from '../../../common/decorators/is-strong-password.decorator';
 import { Match } from '../../../common/decorators/match.decorator';
-
-export const PASSWORDS_DO_NOT_MATCH = 'Passwords do not match';
+import { i18nMessage } from '../../../common/errors/i18n-message';
 
 export class CreateInitialAdminDto {
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
@@ -21,10 +17,10 @@ export class CreateInitialAdminDto {
   email: string;
 
   @IsString()
-  @IsStrongPassword({ message: PASSWORD_TOO_WEAK })
+  @IsStrongPassword({ message: i18nMessage('errors.PASSWORD_TOO_WEAK') })
   password: string;
 
   @IsString()
-  @Match('password', { message: PASSWORDS_DO_NOT_MATCH })
+  @Match('password', { message: i18nMessage('errors.PASSWORDS_DO_NOT_MATCH') })
   passwordConfirmation: string;
 }

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConsumptionModule } from '../consumption/consumption.module';
 import { FinancesModule } from '../finances/finances.module';
+import { PaymentMethodsModule } from '../payment-methods/payment-methods.module';
 import { Meter } from '../meters/entities/meter.entity';
 import { SharePayment } from './entities/share-payment.entity';
 import { WaterShare } from './entities/water-share.entity';
@@ -16,6 +17,7 @@ import { SharesService } from './shares.service';
     TypeOrmModule.forFeature([WaterShare, SharePayment, Meter]),
     ConsumptionModule,
     FinancesModule,
+    PaymentMethodsModule,
   ],
   controllers: [SharesController, SharePaymentsController],
   providers: [SharesService, SharePaymentsService, ShareReceiptService],

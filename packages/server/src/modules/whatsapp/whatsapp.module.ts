@@ -3,6 +3,7 @@ import { HttpModule } from '@nestjs/axios';
 import { BillingModule } from '../billing/billing.module';
 import { SharesModule } from '../shares/shares.module';
 import { ActivitiesModule } from '../activities/activities.module';
+import { ContributionsModule } from '../contributions/contributions.module';
 import { SettingsModule } from '../settings/settings.module';
 import { WhatsAppService } from './whatsapp.service';
 
@@ -12,6 +13,7 @@ import { WhatsAppService } from './whatsapp.service';
     BillingModule,
     SharesModule,
     ActivitiesModule,
+    ContributionsModule,
     SettingsModule,
   ],
   providers: [WhatsAppService],

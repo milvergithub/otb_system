@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -10,11 +6,8 @@ import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
 import { RolesService } from '../roles/roles.service';
-import {
-  ChangePasswordDto,
-  CURRENT_PASSWORD_INVALID,
-  PASSWORD_REUSED,
-} from './dto/change-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { AppError } from '../../common/errors/app-error';
 
 export interface JwtPayload {
   sub: string;
@@ -40,7 +33,7 @@ export class AuthService {
     const passwordValid = await bcrypt.compare(password, user.password_hash);
     if (!passwordValid) return null;
     if (!user.is_active) {
-      throw new Error('User is disabled');
+      throw new AppError('ACCOUNT_DISABLED');
     }
     return user;
   }
@@ -58,10 +51,10 @@ export class AuthService {
   async refreshToken(userId: string) {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
     if (!user) {
-      throw new Error('USER_NOT_FOUND');
+      throw new AppError('USER_NOT_FOUND');
     }
     if (!user.is_active) {
-      throw new Error('User is disabled');
+      throw new AppError('ACCOUNT_DISABLED');
     }
     const permissions = await this.rolesService.getUserPermissions(userId);
     const roleNames = (user.roles || []).map((r) => r.name);
@@ -71,7 +64,7 @@ export class AuthService {
   async getUserById(userId: string) {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
     if (!user) {
-      throw new Error('USER_NOT_FOUND');
+      throw new AppError('USER_NOT_FOUND');
     }
     return user;
   }
@@ -88,7 +81,7 @@ export class AuthService {
   async changePassword(userId: string, dto: ChangePasswordDto) {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new AppError('USER_NOT_FOUND');
     }
 
     const currentValid = await bcrypt.compare(
@@ -96,11 +89,11 @@ export class AuthService {
       user.password_hash,
     );
     if (!currentValid) {
-      throw new BadRequestException(CURRENT_PASSWORD_INVALID);
+      throw new AppError('CURRENT_PASSWORD_INCORRECT');
     }
 
     if (dto.newPassword === dto.currentPassword) {
-      throw new BadRequestException(PASSWORD_REUSED);
+      throw new AppError('PASSWORD_REUSED');
     }
 
     await this.usersRepository.update(userId, {

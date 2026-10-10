@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -13,9 +8,9 @@ import {
 import { ActivitiesService } from './activities.service';
 import { CreateActivityEvidenceDto } from './dto/activity-evidence.dto';
 import { StorageService } from '../consumption/storage.service';
+import { AppError } from '../../common/errors/app-error';
 
 const FOLDER = 'activities-evidence';
-const ONLY_IMAGES_AND_PDF = 'Solo se permiten imágenes y PDF';
 
 @Injectable()
 export class ActivityEvidenceService {
@@ -51,7 +46,7 @@ export class ActivityEvidenceService {
     await this.activitiesService.findOne(activityId);
 
     if (dto.type === EvidenceType.VIDEO || !this.isAllowedMime(dto.mimeType)) {
-      throw new BadRequestException(ONLY_IMAGES_AND_PDF);
+      throw new AppError('ACTIVITY_EVIDENCE_ONLY_IMAGES_AND_PDF');
     }
 
     const type = dto.type ?? this.inferType(dto.mimeType);
@@ -70,13 +65,11 @@ export class ActivityEvidenceService {
       );
     } catch (error) {
       // Storage connectivity problems must not surface as an opaque 500.
-      throw new ServiceUnavailableException(
-        'El almacenamiento de evidencias no está disponible',
-      );
+      throw new AppError('ACTIVITY_EVIDENCE_STORAGE_UNAVAILABLE');
     }
 
     if (!stored) {
-      throw new BadRequestException('No se pudo guardar el archivo');
+      throw new AppError('ACTIVITY_EVIDENCE_UPLOAD_FAILED');
     }
 
     const saved = await this.repo.save(
@@ -96,7 +89,7 @@ export class ActivityEvidenceService {
 
   async remove(activityId: string, id: string): Promise<void> {
     const evidence = await this.repo.findOneBy({ id, activity_id: activityId });
-    if (!evidence) throw new NotFoundException('Evidencia no encontrada');
+    if (!evidence) throw new AppError('ACTIVITY_EVIDENCE_NOT_FOUND');
     await this.repo.remove(evidence);
     try {
       await this.storageService.delete(evidence.file_key);

@@ -5,6 +5,7 @@ import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from 'pdf-lib';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { Fine } from './entities/fine.entity';
+import { AppError } from '../../common/errors/app-error';
 
 @Injectable()
 export class FinesReceiptService {
@@ -17,8 +18,9 @@ export class FinesReceiptService {
     const fine = await this.repo.findOne({
       where: { id: fineId },
       relations: ['member', 'activity', 'fineType'],
+      withDeleted: true,
     });
-    if (!fine) throw new NotFoundException('Multa no encontrada');
+    if (!fine) throw new AppError('FINE_NOT_FOUND');
 
     const member = fine.member;
     const data = {
@@ -38,9 +40,9 @@ export class FinesReceiptService {
     const fines = await this.repo.find({
       where: { id: In(fineIds) },
       relations: ['member', 'activity', 'fineType'],
+      withDeleted: true,
     });
-    if (fines.length === 0)
-      throw new NotFoundException('No se encontraron multas');
+    if (fines.length === 0) throw new AppError('FINES_NOT_FOUND');
 
     const member = fines[0].member;
     const total = fines.reduce(

@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import path from "path"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
@@ -46,5 +47,17 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+  },
+  test: {
+    // Reuses the `@` alias above, so no second config file is needed.
+    environment: "jsdom",
+    // jsdom only exposes `localStorage` for a non-opaque origin, and the app
+    // keeps its tokens and language preference there.
+    environmentOptions: { jsdom: { url: "http://localhost:5173" } },
+    // Specs import from "vitest" explicitly, so the app tsconfig needs no test globals.
+    globals: false,
+    setupFiles: ["./src/test/setup.ts"],
+    include: ["src/**/*.spec.{ts,tsx}"],
+    restoreMocks: true,
   },
 })

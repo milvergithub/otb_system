@@ -5,6 +5,8 @@ import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from 'pdf-lib';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { Payment } from './entities/payment.entity';
+import { PaymentMethodsService } from '../payment-methods/payment-methods.service';
+import { AppError } from '../../common/errors/app-error';
 
 export interface PaymentReceiptData {
   fullName: string;
@@ -27,6 +29,7 @@ export class ReceiptService {
   constructor(
     @InjectRepository(Payment)
     private readonly paymentsRepository: Repository<Payment>,
+    private readonly paymentMethodsService: PaymentMethodsService,
   ) {}
 
   async generateReceipt(paymentId: string): Promise<Buffer> {
@@ -39,14 +42,21 @@ export class ReceiptService {
         'consumption.meter.type',
         'history',
       ],
+      withDeleted: true,
     });
     if (!payment) {
-      throw new NotFoundException('Payment record not found');
+      throw new AppError('PAYMENT_RECORD_NOT_FOUND');
     }
 
     const member = payment.consumption.meter.member;
     const meter = payment.consumption.meter;
     const consumption = payment.consumption;
+
+    const methodNames = await this.paymentMethodsService.namesFor(
+      (payment.history ?? [])
+        .map((entry) => entry.payment_method)
+        .filter(Boolean) as string[],
+    );
 
     const data: PaymentReceiptData = {
       fullName: `${member.first_name} ${member.last_name}`,
@@ -69,7 +79,7 @@ export class ReceiptService {
         .map((entry) => ({
           date: this.formatDate(entry.created_at),
           amount: `${parseFloat(String(entry.amount)).toFixed(2)} Bs`,
-          method: this.methodLabel(entry.payment_method),
+          method: this.methodLabel(entry.payment_method, methodNames),
         })),
     };
 
@@ -319,12 +329,10 @@ export class ReceiptService {
     return map[status] ?? status.toUpperCase();
   }
 
-  private methodLabel(method: string | null | undefined): string {
-    const map: Record<string, string> = {
-      cash: 'Efectivo',
-      transfer: 'Transferencia',
-      card: 'Tarjeta',
-    };
-    return (method && map[method]) || method || '-';
+  private methodLabel(
+    method: string | null | undefined,
+    names: Record<string, string>,
+  ): string {
+    return (method && names[method]) || method || '-';
   }
 }

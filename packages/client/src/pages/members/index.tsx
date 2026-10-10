@@ -1,23 +1,29 @@
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
-import { Pencil, Plus, Search, Trash2, Users, Phone, CircleDollarSign, MapPinHouse } from "lucide-react"
+import { Pencil, Plus, RotateCcw, Search, Trash2, Users, Phone, CircleDollarSign, MapPinHouse } from "lucide-react"
 import { formatDate, getWhatsAppUrl } from "@/lib/utils"
 import type { Member } from "@/lib/types"
 import { useSearchMembers } from "@/hooks/members"
+import { useActiveMemberTypes } from "@/hooks/memberTypes"
 import { useFines } from "@/hooks/activities"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { ComboboxSelect } from "@/components/ui/combobox"
 import { useTableSort } from "@/hooks/use-sort"
 import { RowActions } from "@/components/ui/row-actions"
-import { DataTable } from "@/components/ui/data-table"
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table"
 import { DataTablePagination } from "@/components/ui/data-table-pagination"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import MemberFormDialog from "./MemberFormDialog"
 import DeleteMemberDialog from "./DeleteMemberDialog"
+import RestoreMemberDialog from "./RestoreMemberDialog"
 import Can from "@/components/Can"
+
+const NO_TYPE_FILTER = "__none__"
 
 export default function MembersPage() {
   const { t } = useTranslation()
@@ -30,20 +36,40 @@ export default function MembersPage() {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState("")
   const [searchInput, setSearchInput] = useState("")
+  const [memberTypeFilter, setMemberTypeFilter] = useState("")
+  const [status, setStatus] = useState<"active" | "deleted" | "all">("active")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Member | null>(null)
   const [deleting, setDeleting] = useState<Member | null>(null)
+  const [restoring, setRestoring] = useState<Member | null>(null)
 
   const { sort, toggleSort } = useTableSort(
     { key: "first_name", order: "asc" },
     () => setPage(1),
   )
 
+  const { data: memberTypes } = useActiveMemberTypes()
+  const memberTypeFilterOptions = useMemo(
+    () => [
+      { label: t("members.allTypes"), value: "" },
+      { label: t("memberTypes.noType"), value: NO_TYPE_FILTER },
+      ...(memberTypes ?? [])
+        .map((mt) => ({ label: mt.name, value: mt.id }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    ],
+    [memberTypes, t],
+  )
+
   const { data, isLoading } = useSearchMembers({
     page,
     search,
+    memberTypeId:
+      memberTypeFilter === NO_TYPE_FILTER
+        ? "none"
+        : memberTypeFilter || undefined,
     sortBy: sort?.key,
     sortOrder: sort?.order,
+    status,
   })
 
   const { data: fines } = useFines()
@@ -104,19 +130,47 @@ export default function MembersPage() {
         </Can>
       </div>
 
-      <div className="relative w-full max-w-sm">
-        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          className="pl-9"
-          placeholder={t("members.searchPlaceholder")}
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              setSearch(searchInput.trim())
-              setPage(1)
-            }
+      <div className="flex flex-wrap items-center gap-3">
+        <Tabs
+          value={status}
+          onValueChange={(v) => {
+            setStatus(v as "active" | "deleted" | "all")
+            setPage(1)
           }}
+        >
+          <TabsList>
+            <TabsTrigger value="active">{t("common.active")}</TabsTrigger>
+            <Can permission="members.delete">
+              <TabsTrigger value="deleted">{t("members.deletedTab")}</TabsTrigger>
+              <TabsTrigger value="all">{t("common.all")}</TabsTrigger>
+            </Can>
+          </TabsList>
+        </Tabs>
+
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder={t("members.searchPlaceholder")}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                setSearch(searchInput.trim())
+                setPage(1)
+              }
+            }}
+          />
+        </div>
+        <ComboboxSelect
+          value={memberTypeFilter}
+          onValueChange={(v) => {
+            setMemberTypeFilter(v)
+            setPage(1)
+          }}
+          placeholder={t("memberTypes.filterBy")}
+          className="w-full sm:w-56"
+          options={memberTypeFilterOptions}
         />
       </div>
 
@@ -171,6 +225,18 @@ export default function MembersPage() {
                 ),
               },
               {
+                key: "member_type",
+                label: t("memberTypes.label"),
+                render: (member) =>
+                  member.member_type ? (
+                    <Badge variant={member.member_type.is_active ? "secondary" : "outline"} className="text-xs">
+                      {member.member_type.name}
+                    </Badge>
+                  ) : (
+                    <span className="text-muted-foreground">{"\u2014"}</span>
+                  ),
+              },
+              {
                 key: "meters",
                 label: t("members.meters"),
                 render: (member) =>
@@ -192,6 +258,20 @@ export default function MembersPage() {
                 sortable: true,
                 render: (member) => <span className="text-muted-foreground">{formatDate(member.created_at)}</span>,
               },
+              ...(status !== "active"
+                ? ([
+                    {
+                      key: "deleted_at",
+                      label: t("members.deletedAt"),
+                      render: (member: Member) =>
+                        member.deleted_at ? (
+                          <span className="text-muted-foreground">{formatDate(member.deleted_at)}</span>
+                        ) : (
+                          <span className="text-muted-foreground">{"\u2014"}</span>
+                        ),
+                    },
+                  ] as DataTableColumn<Member>[])
+                : []),
               {
                 key: "fines",
                 label: t("members.fines"),
@@ -226,31 +306,43 @@ export default function MembersPage() {
                 label: "",
                 className: "w-10",
                 stickyRight: true,
-                render: (member: Member) => (
-                  <RowActions
-                    items={[
-                      {
-                        label: t("members.viewFines"),
-                        icon: <CircleDollarSign className="size-4" />,
-                        permission: "members.viewFines",
-                        onClick: () => navigate(`/fines/${member.id}`),
-                      },
-                      {
-                        label: t("common.edit"),
-                        icon: <Pencil className="size-4" />,
-                        permission: "members.update",
-                        onClick: () => openEdit(member),
-                      },
-                      {
-                        label: t("common.delete"),
-                        icon: <Trash2 className="size-4" />,
-                        permission: "members.delete",
-                        destructive: true,
-                        onClick: () => setDeleting(member),
-                      },
-                    ]}
-                  />
-                ),
+                render: (member: Member) =>
+                  member.deleted_at ? (
+                    <RowActions
+                      items={[
+                        {
+                          label: t("members.restore"),
+                          icon: <RotateCcw className="size-4" />,
+                          permission: "members.delete",
+                          onClick: () => setRestoring(member),
+                        },
+                      ]}
+                    />
+                  ) : (
+                    <RowActions
+                      items={[
+                        {
+                          label: t("members.viewFines"),
+                          icon: <CircleDollarSign className="size-4" />,
+                          permission: "members.viewFines",
+                          onClick: () => navigate(`/fines/${member.id}`),
+                        },
+                        {
+                          label: t("common.edit"),
+                          icon: <Pencil className="size-4" />,
+                          permission: "members.update",
+                          onClick: () => openEdit(member),
+                        },
+                        {
+                          label: t("common.delete"),
+                          icon: <Trash2 className="size-4" />,
+                          permission: "members.delete",
+                          destructive: true,
+                          onClick: () => setDeleting(member),
+                        },
+                      ]}
+                    />
+                  ),
               } as const,
             ]}
             data={data?.items ?? []}
@@ -258,7 +350,9 @@ export default function MembersPage() {
             onSort={toggleSort}
             isLoading={isLoading}
             emptyIcon={<Users className="mx-auto size-6 text-muted-foreground" />}
-            emptyText={t("members.noMembers")}
+            emptyText={
+              status === "deleted" ? t("members.noDeletedMembers") : t("members.noMembers")
+            }
             rowKey={(member) => member.id}
           />
         </CardContent>
@@ -286,6 +380,12 @@ export default function MembersPage() {
         deleting={deleting}
         onOpenChange={(open) => {
           if (!open) setDeleting(null)
+        }}
+      />
+      <RestoreMemberDialog
+        restoring={restoring}
+        onOpenChange={(open) => {
+          if (!open) setRestoring(null)
         }}
       />
     </div>

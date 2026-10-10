@@ -1,10 +1,11 @@
-import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { ExecutionContext, HttpStatus } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import {
   PASSWORD_CHANGE_REQUIRED_CODE,
   PasswordChangeGuard,
 } from './password-change.guard';
 import { SKIP_PASSWORD_CHANGE_KEY } from '../../common/decorators/skip-password-change.decorator';
+import { AppError } from '../../common/errors/app-error';
 
 function makeContext(user: unknown): ExecutionContext {
   return {
@@ -29,17 +30,14 @@ describe('PasswordChangeGuard', () => {
 
     expect(() =>
       guard.canActivate(makeContext({ mustChangePassword: true })),
-    ).toThrow(ForbiddenException);
+    ).toThrow(AppError);
 
     try {
       guard.canActivate(makeContext({ mustChangePassword: true }));
     } catch (err) {
-      const body = (err as ForbiddenException).getResponse() as Record<
-        string,
-        unknown
-      >;
-      expect(body.code).toBe(PASSWORD_CHANGE_REQUIRED_CODE);
-      expect(body.statusCode).toBe(403);
+      const error = err as AppError;
+      expect(error.code).toBe(PASSWORD_CHANGE_REQUIRED_CODE);
+      expect(error.getStatus()).toBe(HttpStatus.FORBIDDEN);
     }
   });
 

@@ -57,6 +57,10 @@ function makeService(
       amount: '3000',
     })),
   };
+  const paymentMethodsService = {
+    validateCode: jest.fn().mockResolvedValue(undefined),
+    namesFor: jest.fn().mockResolvedValue({}),
+  };
   const service = new SharePaymentsService(
     {} as never,
     metersRepository as never,
@@ -65,6 +69,7 @@ function makeService(
     {} as never,
     financesService as unknown as FinancesService,
     responsibility,
+    paymentMethodsService as never,
     {} as never,
   );
   return { service, financesService, metersRepository, sharesService };
@@ -143,6 +148,7 @@ describe('SharePaymentsService.createAsPartOfTransaction', () => {
     expect(metersRepository.findOne).toHaveBeenCalledWith({
       where: { id: 'meter-1' },
       relations: ['member'],
+      withDeleted: true,
     });
     expect(financesService.recordIncome.mock.calls[0][0]).toMatchObject({
       memberId: 'member-2',

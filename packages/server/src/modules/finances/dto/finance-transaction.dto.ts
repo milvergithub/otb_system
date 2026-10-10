@@ -10,6 +10,7 @@ import {
   IsPositive,
   IsString,
   IsUUID,
+  MaxLength,
 } from 'class-validator';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 import {
@@ -17,7 +18,6 @@ import {
   FinanceTransactionStatus,
   FinanceTransactionType,
 } from '../entities/finance-transaction.entity';
-import { PaymentMethod } from '../../billing/entities/payment-history.entity';
 
 /**
  * Visibility scope for finance queries. `mine` = movements where the requester
@@ -50,8 +50,9 @@ export class CreateFinanceTransactionDto {
   categoryId?: string;
 
   @IsOptional()
-  @IsEnum(PaymentMethod)
-  paymentMethod?: PaymentMethod;
+  @IsString()
+  @MaxLength(50)
+  paymentMethod?: string;
 
   @IsOptional()
   @IsString()
@@ -100,6 +101,10 @@ export class CreateFinanceTransactionDto {
   @IsOptional()
   @IsUUID()
   activityId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  contributionId?: string;
 
   @IsOptional()
   @IsString()
@@ -176,6 +181,10 @@ export class FilterFinanceDto extends PaginationDto {
   @IsOptional()
   @IsUUID()
   activityId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  contributionId?: string;
 
   @IsOptional()
   @IsEnum(FinanceSourceType)

@@ -6,7 +6,6 @@ import {
   HttpStatus,
   Post,
   Req,
-  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -17,6 +16,7 @@ import { SkipPasswordChange } from '../../common/decorators/skip-password-change
 import { AuthUser } from './interfaces/auth-user.interface';
 import { AuthService } from './auth.service';
 import { LoginDto, RefreshTokenDto } from './dto/auth.dto';
+import { AppError } from '../../common/errors/app-error';
 import { ChangePasswordDto } from './dto/change-password.dto';
 
 @Controller('auth')
@@ -32,18 +32,11 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto) {
-    try {
-      const user = await this.authService.validateUser(dto.email, dto.password);
-      if (!user) {
-        throw new UnauthorizedException('Invalid credentials');
-      }
-      return this.authService.login(user);
-    } catch (error: any) {
-      if (error.message === 'User is disabled') {
-        throw new UnauthorizedException('Account is disabled');
-      }
-      throw error;
+    const user = await this.authService.validateUser(dto.email, dto.password);
+    if (!user) {
+      throw new AppError('INVALID_CREDENTIALS');
     }
+    return this.authService.login(user);
   }
 
   @Public()
@@ -59,7 +52,7 @@ export class AuthController {
       });
       return this.authService.refreshToken(payload.sub);
     } catch {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new AppError('INVALID_REFRESH_TOKEN');
     }
   }
 

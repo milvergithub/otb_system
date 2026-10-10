@@ -16,6 +16,12 @@ export const ApiPath = {
     BULK: "/members/bulk",
     EXPORT: "/members/export",
     ONE: (id: string) => `/members/${id}` as const,
+    RESTORE: (id: string) => `/members/${id}/restore` as const,
+  },
+  MemberTypes: {
+    BASE: "/member-types",
+    ONE: (id: string) => `/member-types/${id}` as const,
+    STATUS: (id: string) => `/member-types/${id}/status` as const,
   },
   Meters: {
     BASE: "/meters",
@@ -24,6 +30,10 @@ export const ApiPath = {
     ONE: (id: string) => `/meters/${id}` as const,
     SHARE_PAYMENTS: (id: string) => `/meters/${id}/share-payments` as const,
     SHARE_SUMMARY: (id: string) => `/meters/${id}/share-payments/summary` as const,
+  },
+  PaymentMethods: {
+    BASE: "/payment-methods",
+    ONE: (id: string) => `/payment-methods/${id}` as const,
   },
   Consumption: {
     BASE: "/consumption",
@@ -189,5 +199,28 @@ export const ApiPath = {
     PAY: (id: string) => `/fines/${id}/pay` as const,
     CANCEL: (id: string) => `/fines/${id}/cancel` as const,
     BULK_PAY: "/fines/bulk-pay",
+  },
+  Contributions: {
+    BASE: "/contributions",
+    ONE: (id: string) => `/contributions/${id}` as const,
+    ACTIVATE: (id: string) => `/contributions/${id}/activate` as const,
+    PAUSE: (id: string) => `/contributions/${id}/pause` as const,
+    COMPLETE: (id: string) => `/contributions/${id}/complete` as const,
+    CANCEL: (id: string) => `/contributions/${id}/cancel` as const,
+    MEMBERS: (id: string) => `/contributions/${id}/members` as const,
+    OBLIGATIONS: (id: string) => `/contributions/${id}/obligations` as const,
+    OBLIGATION_EXONERATE: (id: string, obligationId: string) =>
+      `/contributions/${id}/obligations/${obligationId}/exonerate` as const,
+    OBLIGATION_CANCEL: (id: string, obligationId: string) =>
+      `/contributions/${id}/obligations/${obligationId}/cancel` as const,
+    SUMMARY: (id: string) => `/contributions/${id}/summary` as const,
+    FINANCES: (id: string) => `/contributions/${id}/finances` as const,
+    PAYMENTS: (id: string) => `/contributions/${id}/payments` as const,
+    PAYMENT_VOID: (id: string, paymentId: string) =>
+      `/contributions/${id}/payments/${paymentId}/void` as const,
+    PAYMENT_RECEIPT: (id: string, paymentId: string) =>
+      `/contributions/${id}/payments/${paymentId}/receipt` as const,
+    DOCUMENTS: (id: string) => `/contributions/${id}/documents` as const,
+    RECEIPT: (id: string) => `/contributions/${id}/receipt` as const,
   },
 } as const

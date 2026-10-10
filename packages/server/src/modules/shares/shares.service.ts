@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -10,6 +6,7 @@ import {
   UpdateWaterShareDto,
 } from './dto/water-share.dto';
 import { WaterShare } from './entities/water-share.entity';
+import { AppError } from '../../common/errors/app-error';
 
 @Injectable()
 export class SharesService {
@@ -41,7 +38,7 @@ export class SharesService {
   async findOne(id: string): Promise<WaterShare> {
     const share = await this.repository.findOne({ where: { id } });
     if (!share) {
-      throw new NotFoundException('Water share not found');
+      throw new AppError('WATER_SHARE_NOT_FOUND');
     }
     return share;
   }
@@ -82,17 +79,13 @@ export class SharesService {
     const overlapping = await query.getOne();
 
     if (overlapping) {
-      throw new BadRequestException(
-        `Ya existe una tarifa de acción vigente para este período: "${overlapping.name}"`,
-      );
+      throw new AppError('OVERLAPPING_WATER_SHARE', { name: overlapping.name });
     }
   }
 
   async create(dto: CreateWaterShareDto): Promise<WaterShare> {
     if (dto.validUntil && dto.validUntil <= dto.validFrom) {
-      throw new BadRequestException(
-        'La fecha de fin debe ser posterior a la fecha de inicio',
-      );
+      throw new AppError('END_DATE_AFTER_START');
     }
 
     await this.validateNoOverlap(dto.validFrom, dto.validUntil);
@@ -115,9 +108,7 @@ export class SharesService {
       dto.validUntil !== undefined ? dto.validUntil : share.valid_until;
 
     if (validUntil && validUntil <= validFrom) {
-      throw new BadRequestException(
-        'La fecha de fin debe ser posterior a la fecha de inicio',
-      );
+      throw new AppError('END_DATE_AFTER_START');
     }
 
     await this.validateNoOverlap(validFrom, validUntil, id);

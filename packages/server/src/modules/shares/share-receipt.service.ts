@@ -5,6 +5,8 @@ import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from 'pdf-lib';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { SharePayment } from './entities/share-payment.entity';
+import { PaymentMethodsService } from '../payment-methods/payment-methods.service';
+import { AppError } from '../../common/errors/app-error';
 
 export interface ShareReceiptData {
   fullName: string;
@@ -24,19 +26,24 @@ export class ShareReceiptService {
   constructor(
     @InjectRepository(SharePayment)
     private readonly sharePaymentsRepository: Repository<SharePayment>,
+    private readonly paymentMethodsService: PaymentMethodsService,
   ) {}
 
   async generateShareReceipt(sharePaymentId: string): Promise<Buffer> {
     const payment = await this.sharePaymentsRepository.findOne({
       where: { id: sharePaymentId },
       relations: ['meter', 'meter.member', 'meter.type', 'share'],
+      withDeleted: true,
     });
     if (!payment) {
-      throw new NotFoundException('Share payment record not found');
+      throw new AppError('SHARE_PAYMENT_NOT_FOUND');
     }
 
     const member = payment.meter.member;
     const meter = payment.meter;
+    const methodNames = await this.paymentMethodsService.namesFor(
+      [payment.payment_method].filter(Boolean) as string[],
+    );
 
     const data: ShareReceiptData = {
       fullName: `${member.first_name} ${member.last_name}`,
@@ -45,7 +52,7 @@ export class ShareReceiptService {
       meterCode: meter.code,
       actionName: payment.share?.name || '-',
       amount: `${parseFloat(String(payment.amount)).toFixed(2)} Bs`,
-      method: this.methodLabel(payment.payment_method),
+      method: this.methodLabel(payment.payment_method, methodNames),
       reference: payment.reference || '-',
       notes: payment.notes || '-',
       paidDate: this.formatDate(payment.paid_at),
@@ -190,12 +197,10 @@ export class ShareReceiptService {
     return new Date(value).toLocaleDateString('es-BO');
   }
 
-  private methodLabel(method: string | null | undefined): string {
-    const map: Record<string, string> = {
-      cash: 'Efectivo',
-      transfer: 'Transferencia',
-      card: 'Tarjeta',
-    };
-    return (method && map[method]) || method || '-';
+  private methodLabel(
+    method: string | null | undefined,
+    names: Record<string, string>,
+  ): string {
+    return (method && names[method]) || method || '-';
   }
 }

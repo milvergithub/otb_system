@@ -1,12 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  InternalServerErrorException,
-  Logger,
-  NotFoundException,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   EntityManager,
@@ -22,13 +14,14 @@ import {
 import { buildOrder } from '../../common/utils/sort';
 import { Consumption } from '../consumption/entities/consumption.entity';
 import { StorageService, StoredDocument } from '../consumption/storage.service';
+import { PaymentMethodsService } from '../payment-methods/payment-methods.service';
 import { Payment } from '../billing/entities/payment.entity';
-import { PaymentMethod } from '../billing/entities/payment-history.entity';
 import { Asset } from '../assets/entities/asset.entity';
 import { Member } from '../members/entities/member.entity';
 import { User } from '../users/entities/user.entity';
 import { AssetCategory } from '../assets/entities/asset-category.entity';
 import { Activity } from '../activities/entities/activity.entity';
+import { Contribution } from '../contributions/entities/contribution.entity';
 import {
   FinanceCategory,
   FinanceCategoryType,
@@ -52,6 +45,7 @@ import {
   VoidFinanceTransactionDto,
 } from './dto/finance-transaction.dto';
 import { AddFinanceDocumentDto } from './dto/finance-document.dto';
+import { AppError } from '../../common/errors/app-error';
 
 const SORT_COLUMNS: Record<string, string> = {
   date: 'tx.date',
@@ -67,6 +61,7 @@ const CATEGORY_NAME_BY_SOURCE: Record<FinanceSourceType, string | null> = {
   [FinanceSourceType.WATER_BILL_PAYMENT]: 'Pagos de agua',
   [FinanceSourceType.WATER_MEMBERSHIP_FEE]: 'Acciones de agua',
   [FinanceSourceType.FINE_PAYMENT]: 'Multas',
+  [FinanceSourceType.CONTRIBUTION_PAYMENT]: 'Aportes extraordinarios',
   [FinanceSourceType.ASSET_PURCHASE]: 'Insumos y equipos',
   [FinanceSourceType.ASSET_MAINTENANCE]: 'Mantenimiento',
   [FinanceSourceType.DONATION]: 'Donaciones',
@@ -79,6 +74,7 @@ const ALWAY_REQUIRES_SOURCE_ID: FinanceSourceType[] = [
   FinanceSourceType.WATER_BILL_PAYMENT,
   FinanceSourceType.WATER_MEMBERSHIP_FEE,
   FinanceSourceType.FINE_PAYMENT,
+  FinanceSourceType.CONTRIBUTION_PAYMENT,
   FinanceSourceType.ASSET_PURCHASE,
   FinanceSourceType.ASSET_MAINTENANCE,
 ];
@@ -94,12 +90,14 @@ export interface RecordFinanceMovementInput {
   concept: string;
   date?: string;
   categoryId?: string;
-  paymentMethod?: PaymentMethod;
+  paymentMethod?: string;
   reference?: string;
   memberId?: string | null;
   userId?: string | null;
   assetId?: string | null;
   activityId?: string | null;
+  /** Extraordinary contribution campaign linked to this movement. */
+  contributionId?: string | null;
   provider?: string;
   notes?: string;
   /** Financially responsible user (snapshot). See FinancialResponsibilityService. */
@@ -133,6 +131,7 @@ const DEFAULT_CATEGORIES: Array<{ name: string; type: FinanceCategoryType }> = [
   { name: 'Pagos de agua', type: FinanceCategoryType.INCOME },
   { name: 'Acciones de agua', type: FinanceCategoryType.INCOME },
   { name: 'Multas', type: FinanceCategoryType.INCOME },
+  { name: 'Aportes extraordinarios', type: FinanceCategoryType.INCOME },
   { name: 'Donaciones', type: FinanceCategoryType.INCOME },
   { name: 'Alquiler de cancha', type: FinanceCategoryType.INCOME },
   { name: 'Mantenimiento', type: FinanceCategoryType.EXPENSE },
@@ -160,11 +159,14 @@ export class FinancesService implements OnModuleInit {
     private readonly assetsRepo: Repository<Asset>,
     @InjectRepository(Activity)
     private readonly activitiesRepo: Repository<Activity>,
+    @InjectRepository(Contribution)
+    private readonly contributionsRepo: Repository<Contribution>,
     @InjectRepository(Payment)
     private readonly paymentsRepo: Repository<Payment>,
     @InjectRepository(Consumption)
     private readonly consumptionsRepo: Repository<Consumption>,
     private readonly storageService: StorageService,
+    private readonly paymentMethodsService: PaymentMethodsService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -200,7 +202,9 @@ export class FinancesService implements OnModuleInit {
       .leftJoinAndSelect('tx.responsibleUser', 'responsibleUser')
       .leftJoinAndSelect('tx.collectorUser', 'collectorUser')
       .leftJoinAndSelect('tx.registeredByUser', 'registeredByUser')
-      .leftJoinAndSelect('tx.asset', 'asset');
+      .leftJoinAndSelect('tx.asset', 'asset')
+      // Historical movements keep the member name after a logical deletion.
+      .withDeleted();
 
     if (access) this.applyScope(qb, access);
 
@@ -235,6 +239,11 @@ export class FinancesService implements OnModuleInit {
     if (filter.activityId) {
       qb.andWhere('tx.activity_id = :activityId', {
         activityId: filter.activityId,
+      });
+    }
+    if (filter.contributionId) {
+      qb.andWhere('tx.contribution_id = :contributionId', {
+        contributionId: filter.contributionId,
       });
     }
     if (filter.sourceType) {
@@ -282,9 +291,10 @@ export class FinancesService implements OnModuleInit {
         'collectorUser',
         'registeredByUser',
       ],
+      withDeleted: true,
     });
     if (!tx) {
-      throw new NotFoundException(`Transaction ${id} not found`);
+      throw new AppError('FINANCE_TRANSACTION_NOT_FOUND');
     }
     if (access) this.assertCanAccess(tx, access);
     if (includeDocuments) {
@@ -311,9 +321,7 @@ export class FinancesService implements OnModuleInit {
       !access.canViewAll &&
       dto.responsibleUserId !== access.userId
     ) {
-      throw new ForbiddenException(
-        'Solo puede asignar como responsable financiero a un usuario con permiso finances.all',
-      );
+      throw new AppError('FINANCE_RESPONSIBLE_REQUIRES_ALL_PERMISSION');
     }
     return this.create(dto, access.userId);
   }
@@ -336,8 +344,10 @@ export class FinancesService implements OnModuleInit {
       dto.assetId,
       manager,
       dto.activityId,
+      dto.contributionId,
     );
     this.validateSource(dto);
+    await this.paymentMethodsService.validateCode(dto.paymentMethod);
 
     if (this.shouldBeUniqueBySource(dto.sourceType) && dto.sourceId) {
       const existing = await repo.findOne({
@@ -373,6 +383,7 @@ export class FinancesService implements OnModuleInit {
       provider: dto.provider ?? null,
       asset_id: dto.assetId ?? null,
       activity_id: dto.activityId ?? null,
+      contribution_id: dto.contributionId ?? null,
       notes: dto.notes ?? null,
     });
 
@@ -400,9 +411,7 @@ export class FinancesService implements OnModuleInit {
       !access.canViewAll &&
       dto.responsibleUserId !== access.userId
     ) {
-      throw new ForbiddenException(
-        'Solo puede asignar como responsable financiero a un usuario con permiso finances.all',
-      );
+      throw new AppError('FINANCE_RESPONSIBLE_REQUIRES_ALL_PERMISSION');
     }
     await this.validateReferences(
       dto.categoryId,
@@ -411,7 +420,9 @@ export class FinancesService implements OnModuleInit {
       dto.assetId,
       undefined,
       dto.activityId,
+      dto.contributionId,
     );
+    await this.paymentMethodsService.validateCode(dto.paymentMethod);
     Object.assign(tx, {
       date: dto.date ?? tx.date,
       amount: dto.amount !== undefined ? dto.amount.toFixed(2) : tx.amount,
@@ -428,26 +439,40 @@ export class FinancesService implements OnModuleInit {
       provider: dto.provider ?? tx.provider,
       asset_id: dto.assetId ?? tx.asset_id,
       activity_id: dto.activityId ?? tx.activity_id,
+      contribution_id: dto.contributionId ?? tx.contribution_id,
       notes: dto.notes ?? tx.notes,
     });
     return this.transactionsRepo.save(tx);
   }
 
+  /**
+   * Void a movement (logical, never destructive). When `manager` is provided the
+   * write joins that transaction, so an origin row (e.g. a contribution payment)
+   * and its ledger movement can be voided atomically and roll back together.
+   */
   async void(
     id: string,
     dto: VoidFinanceTransactionDto,
     userId?: string,
     access?: FinanceAccess,
+    manager?: EntityManager,
   ): Promise<FinanceTransaction> {
-    const tx = await this.findOne(id, false, access);
+    const repo = manager
+      ? manager.getRepository(FinanceTransaction)
+      : this.transactionsRepo;
+    const tx = await repo.findOne({ where: { id } });
+    if (!tx) {
+      throw new AppError('FINANCE_TRANSACTION_NOT_FOUND');
+    }
+    if (access) this.assertCanAccess(tx, access);
     if (tx.status === FinanceTransactionStatus.VOIDED) {
-      throw new BadRequestException('Transaction is already voided');
+      throw new AppError('FINANCE_TRANSACTION_VOIDED');
     }
     tx.status = FinanceTransactionStatus.VOIDED;
     tx.voided_at = new Date();
     tx.voided_reason = dto.reason ?? null;
     tx.voided_by = userId ?? null;
-    return this.transactionsRepo.save(tx);
+    return repo.save(tx);
   }
 
   async getDocuments(
@@ -476,11 +501,12 @@ export class FinancesService implements OnModuleInit {
         'finances/documents',
         dto.fileName,
       );
-    } catch (error) {
-      throw new BadRequestException((error as Error).message);
+    } catch {
+      // Storage internals must not leak into the API response.
+      throw new AppError('DOCUMENT_UPLOAD_FAILED');
     }
     if (!stored) {
-      throw new BadRequestException('Could not store the uploaded document');
+      throw new AppError('DOCUMENT_UPLOAD_FAILED');
     }
 
     return this.documentsRepo.save(
@@ -510,8 +536,7 @@ export class FinancesService implements OnModuleInit {
       id: documentId,
       transaction_id: transactionId,
     });
-    if (!doc)
-      throw new NotFoundException(`Finance document ${documentId} not found`);
+    if (!doc) throw new AppError('FINANCE_DOCUMENT_NOT_FOUND');
 
     await this.documentsRepo.remove(doc);
     try {
@@ -533,8 +558,7 @@ export class FinancesService implements OnModuleInit {
       id: documentId,
       transaction_id: transactionId,
     });
-    if (!doc)
-      throw new NotFoundException(`Finance document ${documentId} not found`);
+    if (!doc) throw new AppError('FINANCE_DOCUMENT_NOT_FOUND');
     return this.storageService.getObjectStream(doc.file_key);
   }
 
@@ -722,7 +746,9 @@ export class FinancesService implements OnModuleInit {
       .leftJoinAndSelect('tx.asset', 'asset')
       .where('tx.status = :status', { status: FinanceTransactionStatus.ACTIVE })
       .andWhere(buildDateFilter(startDate, endDate, 'tx'))
-      .orderBy('tx.date', 'DESC');
+      .orderBy('tx.date', 'DESC')
+      // The export keeps the member name after a logical deletion.
+      .withDeleted();
     if (access) this.applyScope(qb, access);
     const items = await qb.getMany();
 
@@ -744,6 +770,11 @@ export class FinancesService implements OnModuleInit {
       'Referencia',
     ].join(',');
 
+    const methodCodes = Array.from(
+      new Set(items.map((tx) => tx.payment_method).filter(Boolean)),
+    ) as string[];
+    const methodNames = await this.paymentMethodsService.namesFor(methodCodes);
+
     const rows = items.map((tx) => {
       const member = tx.member
         ? `${tx.member.first_name} ${tx.member.last_name}`
@@ -754,7 +785,9 @@ export class FinancesService implements OnModuleInit {
         this.csvValue(tx.concept),
         this.csvValue(tx.amount),
         this.csvValue(tx.category?.name ?? 'Sin categoría'),
-        this.csvValue(tx.payment_method),
+        this.csvValue(
+          tx.payment_method ? (methodNames[tx.payment_method] ?? '') : '',
+        ),
         this.csvValue(member),
         this.csvValue(tx.user?.full_name),
         this.csvValue(tx.responsibleUser?.full_name),
@@ -834,9 +867,7 @@ export class FinancesService implements OnModuleInit {
     const wantsMine = !access.canViewAll || access.scope === FinanceScope.MINE;
     if (!wantsMine) return;
     if (tx.responsible_user_id !== access.userId) {
-      throw new ForbiddenException(
-        'No tiene permiso para consultar este movimiento',
-      );
+      throw new AppError('FINANCE_TRANSACTION_FORBIDDEN');
     }
   }
 
@@ -897,6 +928,7 @@ export class FinancesService implements OnModuleInit {
       input.assetId,
       manager,
       input.activityId,
+      input.contributionId,
     );
     await this.validateUserReference(input.responsibleUserId, manager);
     await this.validateUserReference(input.collectorUserId, manager);
@@ -935,6 +967,7 @@ export class FinancesService implements OnModuleInit {
       provider: input.provider,
       sourceType: input.sourceType,
       sourceId: input.sourceId,
+      contributionId: input.contributionId ?? undefined,
       notes: input.notes,
       responsibleUserId: input.responsibleUserId ?? undefined,
       collectorUserId: input.collectorUserId ?? undefined,
@@ -964,6 +997,7 @@ export class FinancesService implements OnModuleInit {
     assetId?: string | null,
     manager?: EntityManager,
     activityId?: string | null,
+    contributionId?: string | null,
   ): Promise<void> {
     const categoriesRepo = manager
       ? manager.getRepository(FinanceCategory)
@@ -976,26 +1010,33 @@ export class FinancesService implements OnModuleInit {
     const activitiesRepo = manager
       ? manager.getRepository(Activity)
       : this.activitiesRepo;
+    const contributionsRepo = manager
+      ? manager.getRepository(Contribution)
+      : this.contributionsRepo;
 
     if (categoryId) {
       const cat = await categoriesRepo.findOneBy({ id: categoryId });
-      if (!cat) throw new BadRequestException('Category not found');
+      if (!cat) throw new AppError('FINANCE_CATEGORY_NOT_FOUND');
     }
     if (memberId) {
       const m = await membersRepo.findOneBy({ id: memberId });
-      if (!m) throw new BadRequestException('Member not found');
+      if (!m) throw new AppError('MEMBER_NOT_FOUND');
     }
     if (userId) {
       const u = await usersRepo.findOneBy({ id: userId });
-      if (!u) throw new BadRequestException('User not found');
+      if (!u) throw new AppError('USER_NOT_FOUND');
     }
     if (assetId) {
       const a = await assetsRepo.findOneBy({ id: assetId });
-      if (!a) throw new BadRequestException('Asset not found');
+      if (!a) throw new AppError('ASSET_NOT_FOUND');
     }
     if (activityId) {
       const a = await activitiesRepo.findOneBy({ id: activityId });
-      if (!a) throw new BadRequestException('Activity not found');
+      if (!a) throw new AppError('ACTIVITY_NOT_FOUND');
+    }
+    if (contributionId) {
+      const c = await contributionsRepo.findOneBy({ id: contributionId });
+      if (!c) throw new AppError('CONTRIBUTION_NOT_FOUND');
     }
   }
 
@@ -1006,7 +1047,7 @@ export class FinancesService implements OnModuleInit {
     if (!userId) return;
     const usersRepo = manager ? manager.getRepository(User) : this.usersRepo;
     const user = await usersRepo.findOneBy({ id: userId });
-    if (!user) throw new BadRequestException('User not found');
+    if (!user) throw new AppError('USER_NOT_FOUND');
   }
 
   private validateSource(dto: {
@@ -1015,9 +1056,9 @@ export class FinancesService implements OnModuleInit {
   }): void {
     if (!dto.sourceType) return;
     if (ALWAY_REQUIRES_SOURCE_ID.includes(dto.sourceType) && !dto.sourceId) {
-      throw new BadRequestException(
-        `sourceId is required when sourceType is ${dto.sourceType}`,
-      );
+      throw new AppError('FINANCE_SOURCE_ID_REQUIRED', {
+        sourceType: dto.sourceType,
+      });
     }
   }
 

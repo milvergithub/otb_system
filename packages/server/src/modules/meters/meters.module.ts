@@ -4,6 +4,7 @@ import { Member } from '../members/entities/member.entity';
 import { SharesModule } from '../shares/shares.module';
 import { SharePayment } from '../shares/entities/share-payment.entity';
 import { TariffsModule } from '../tariffs/tariffs.module';
+import { PaymentMethodsModule } from '../payment-methods/payment-methods.module';
 import { Meter } from './entities/meter.entity';
 import { MeterTypeEntity } from './entities/meter-type.entity';
 import { MetersController } from './meters.controller';
@@ -16,6 +17,7 @@ import { MeterTypesService } from './meter-types.service';
     TypeOrmModule.forFeature([Meter, MeterTypeEntity, Member, SharePayment]),
     SharesModule,
     TariffsModule,
+    PaymentMethodsModule,
   ],
   controllers: [MetersController, MeterTypesController],
   providers: [MetersService, MeterTypesService],

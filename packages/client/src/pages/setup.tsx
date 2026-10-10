@@ -9,7 +9,7 @@ import { useTranslation } from "react-i18next"
 import type { TFunction } from "i18next"
 import { toast } from "sonner"
 import { requiredString } from "@/lib/validation"
-import { getApiErrorMessage } from "@/lib/api"
+import { getApiErrorMessage, SETUP_ALREADY_COMPLETED_CODE } from "@/lib/api"
 import { useCreateInitialAdmin, markSetupCompleted } from "@/hooks/setup"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -86,9 +86,19 @@ export default function SetupPage() {
         toast.success(t("setup.success"))
         navigate("/", { replace: true })
       } catch (err) {
-        if (axios.isAxiosError(err) && err.response?.status === 409 &&
-          err.response.data?.message === "Initial setup has already been completed") {
-          toast.error(t("errors.setupAlreadyCompleted"))
+        // Match on the stable code first; the message check stays for older
+        // servers that answer without one.
+        const data = axios.isAxiosError(err)
+          ? (err.response?.data as { code?: string; message?: string } | undefined)
+          : undefined
+        const alreadyCompleted =
+          err != null &&
+          axios.isAxiosError(err) &&
+          err.response?.status === 409 &&
+          (data?.code === SETUP_ALREADY_COMPLETED_CODE ||
+            data?.message === "Initial setup has already been completed")
+        if (alreadyCompleted) {
+          toast.error(data?.code ? getApiErrorMessage(err) : t("errors.setupAlreadyCompleted"))
           markSetupCompleted(queryClient)
           navigate("/login", { replace: true })
           return

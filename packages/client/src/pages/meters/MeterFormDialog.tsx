@@ -26,8 +26,8 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import ImageCropDialog from "@/components/ImageCropDialog"
-import { PAYMENT_METHODS } from "./constants"
 import { useMeterTypes } from "@/hooks/meterTypes"
+import { usePaymentMethods } from "@/hooks/paymentMethods"
 import MeterLocationDialog from "./MeterLocationDialog"
 
 const meterFormSchema = (t: TFunction) =>
@@ -79,6 +79,7 @@ export default function MeterFormDialog({
   const { data: members } = useMembersSelect()
   const { data: activeShares } = useActiveShares()
   const { data: meterTypes } = useMeterTypes()
+  const { data: paymentMethods } = usePaymentMethods()
   const addMutation = useAddMeter()
   const editMutation = useEditMeter()
 
@@ -293,7 +294,9 @@ export default function MeterFormDialog({
                       onValueChange={(v) => meterForm.setValue("share_method", v)}
                       placeholder={t("meters.selectMethod")}
                       className="w-full"
-                      options={PAYMENT_METHODS.map((m) => ({ label: t(m.label), value: m.value }))}
+                      options={
+                        paymentMethods?.map((m) => ({ label: m.name, value: m.code })) ?? []
+                      }
                     />
                   </div>
                 </div>

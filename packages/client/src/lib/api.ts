@@ -28,11 +28,40 @@ export function clearTokens() {
   localStorage.removeItem(REFRESH_KEY)
 }
 
+/**
+ * The language the API should answer in for the current request.
+ *
+ * Read from the live i18next instance rather than `localStorage` so a
+ * mid-session `changeLanguage` takes effect on the very next request instead of
+ * waiting for a reload. `resolvedLanguage` already collapses `es-BO`/`en-US`
+ * down to the codes the server declares (`supportedLngs` + `nonExplicitSupportedLngs`).
+ */
+export function currentLanguage(): string {
+  return i18n.resolvedLanguage ?? i18n.language ?? "en"
+}
+
+/**
+ * Headers for the rare calls that bypass the shared axios instance (raw
+ * `fetch`, e.g. streaming an asset document to a new tab). Keeps auth and
+ * language handling identical to `api`.
+ */
+export function authHeaders(): Record<string, string> {
+  const token = getAccessToken()
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    "Accept-Language": currentLanguage(),
+  }
+}
+
 api.interceptors.request.use((config) => {
   const token = getAccessToken()
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  // Tells the API which language to localize validation, business and
+  // authorization errors in. Every request goes through this instance —
+  // including all TanStack Query `queryFn`s — so no per-service wiring is needed.
+  config.headers["Accept-Language"] = currentLanguage()
   return config
 })
 
@@ -47,13 +76,22 @@ async function refreshAccessToken(): Promise<string> {
   if (!refreshToken) {
     throw new Error("No refresh token")
   }
-  const res = await axios.post(`${API_URL}/auth/refresh`, { refreshToken })
+  // Deliberately bypasses the `api` interceptors (no Authorization header, and
+  // no 401-refresh loop), but still negotiates the error language.
+  const res = await axios.post(
+    `${API_URL}/auth/refresh`,
+    { refreshToken },
+    { headers: { "Accept-Language": currentLanguage() } },
+  )
   const { accessToken, refreshToken: newRefresh } = res.data
   setTokens(accessToken, newRefresh)
   return accessToken
 }
 
 export const PASSWORD_CHANGE_REQUIRED_CODE = "PASSWORD_CHANGE_REQUIRED"
+
+/** Server error codes the UI branches on (as opposed to just displaying). */
+export const SETUP_ALREADY_COMPLETED_CODE = "SETUP_ALREADY_COMPLETED"
 
 api.interceptors.response.use(
   (response) => response,
@@ -100,6 +138,17 @@ function isPasswordChangeRequired(error: AxiosError): boolean {
   return data?.code === PASSWORD_CHANGE_REQUIRED_CODE
 }
 
+/**
+ * LEGACY — superseded by the API's own localization.
+ *
+ * The API now resolves error text from the request's `Accept-Language` and
+ * returns it in `message` alongside a stable `code`, so `getApiErrorMessage`
+ * shows that text verbatim (see below). These maps remain only as a fallback
+ * for any endpoint that still answers with a bare, un-coded message: without
+ * them those strings would reach the UI untranslated.
+ *
+ * Do not extend these — add a catalogue entry on the server instead.
+ */
 const EXACT_ERROR_KEYS: Record<string, string> = {
   "Invalid credentials": "errors.invalidCredentials",
   "Account is disabled": "errors.userDisabled",
@@ -167,18 +216,34 @@ function translateApiMessage(message: string): string {
   return message
 }
 
+interface ApiErrorBody {
+  message?: string | string[]
+  code?: string
+}
+
+/**
+ * Turns an API error into the text to show the user.
+ *
+ * The API owns server-side wording: when a response carries a `code`, its
+ * `message` has already been localized to the language sent in
+ * `Accept-Language` and is returned untouched — re-translating it here would
+ * double-translate or, worse, treat a Spanish sentence as an i18next key.
+ *
+ * Responses without a `code` predate the error-code contract and still arrive
+ * as raw server strings; those fall back to the legacy maps above.
+ */
 export function getApiErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
-    const data = error.response?.data as
-      | { message?: string | string[] }
-      | undefined
+    const data = error.response?.data as ApiErrorBody | undefined
     if (data?.message) {
-      if (Array.isArray(data.message)) {
-        return data.message.map(translateApiMessage).join(", ")
-      }
-      return translateApiMessage(data.message)
+      const message = Array.isArray(data.message)
+        ? data.message.join(", ")
+        : data.message
+      if (data.code) return message
+      return translateApiMessage(message)
     }
-    return error.message
+    // Network errors and empty bodies have nothing localized to show.
+    return i18n.t("errors.default")
   }
   return i18n.t("errors.default")
 }

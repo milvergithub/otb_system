@@ -3,6 +3,7 @@ import { FinancesService, FinanceAccess } from './finances.service';
 import { CreateFinanceTransactionDto } from './dto/finance-transaction.dto';
 import { FinanceTransactionType } from './entities/finance-transaction.entity';
 import type { FinanceTransaction } from './entities/finance-transaction.entity';
+import { AppError } from '../../common/errors/app-error';
 
 type Repo = {
   create: jest.Mock;
@@ -20,6 +21,10 @@ function makeRepos(): Repo {
 
 function makeService(transactionsRepo: Repo = makeRepos()) {
   const noop = {} as never;
+  const paymentMethodsService = {
+    validateCode: jest.fn().mockResolvedValue(undefined),
+    namesFor: jest.fn().mockResolvedValue({}),
+  };
   const service = new FinancesService(
     transactionsRepo as never,
     noop, // categoriesRepo
@@ -31,8 +36,10 @@ function makeService(transactionsRepo: Repo = makeRepos()) {
     noop, // paymentsRepo
     noop, // consumptionsRepo
     noop, // storageService
+    noop, // contributionsRepo
+    paymentMethodsService as never,
   );
-  return { service, transactionsRepo };
+  return { service, transactionsRepo, paymentMethodsService };
 }
 
 function baseDto(
@@ -55,7 +62,9 @@ describe('FinancesService manual responsibility rules', () => {
     const { service } = makeService();
     await expect(
       service.createManual(baseDto({ responsibleUserId: 'user-b' }), userA),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(
+      new AppError('FINANCE_RESPONSIBLE_REQUIRES_ALL_PERMISSION'),
+    );
   });
 
   it('allows taking own responsibility without finances.all', async () => {
@@ -124,6 +133,8 @@ describe('FinancesService update responsibility rules', () => {
         { responsibleUserId: 'user-b', date: '2026-01-15' } as never,
         userA,
       ),
-    ).rejects.toThrow(ForbiddenException);
+    ).rejects.toThrow(
+      new AppError('FINANCE_RESPONSIBLE_REQUIRES_ALL_PERMISSION'),
+    );
   });
 });

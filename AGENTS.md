@@ -24,8 +24,9 @@
 - `npm run lint` — runs ESLint across all workspaces
   - Server lint (`eslint ... --fix`) **rewrites files in place** with `--fix`; client lint does not
   - Client lint fails on `react-hooks/set-state-in-effect` (ERROR) and a few other rules; see Client Specifics
-- `npm run test` — runs Jest (server only; client has no test setup)
-  - Unit tests live next to the code as `*.spec.ts` (`packages/server/jest.config.js`, rootDir `src`); currently 13 suites / 85 tests covering financial responsibility (scope, access, resolvers, attribution), activities (attendance, evidence, fines, manual fines), initial setup and legacy role sync
+- `npm run test` — runs Jest (server) and vitest (client)
+  - Server unit tests live next to the code as `*.spec.ts` (`packages/server/jest.config.js`, rootDir `src`); currently 22 suites / 668 tests covering financial responsibility (scope, access, resolvers, attribution), activities (attendance, evidence, fines, manual fines), initial setup, legacy role sync, and the i18n stack (`i18n.integration.spec.ts` exercises the real HTTP path)
+  - Client specs live in `src/lib/__tests__/*.spec.ts`; currently 3 files / 23 tests covering the `Accept-Language` interceptor, language switching, TanStack Query, `getApiErrorMessage` and locale key parity
 
 ## Server Specifics
 - Entry: `packages/server/src/main.ts`
@@ -66,6 +67,19 @@
 - Endpoints: `GET /activities/:id/summary`, `PATCH /activities/:id/status`, `GET /activities/:id/attendance/sessions`, `/activity-types` CRUD, `/activities/:id/evidence` CRUD, `POST /activities/:id/fines` (manual fines)
 - Permissions: `activities.manageAttendance`, `activities.manageFines`, `activities.manageEvidence` (with a temporary fallback to `activities.update`)
 
+## i18n (Server ↔ Client)
+- Languages are `en` (default/fallback) and `es`, declared twice and kept in sync by tests: `packages/server/src/common/i18n/languages.ts` and `packages/client/src/lib/i18n.ts`. English is the **source** language for every server catalogue entry
+- The client sends `Accept-Language` from the **live** i18next instance (`i18n.resolvedLanguage`) in the shared axios request interceptor (`lib/api.ts`), so a mid-session language change applies to the very next request. All TanStack Query `queryFn`s already use that instance; `authHeaders()` is the helper for the one raw-`fetch` call site
+- The server negotiates the language per request via `nestjs-i18n` (`AcceptLanguageResolver`, `defaultLanguage: 'en'`). The resolved language lives in `AsyncLocalStorage`, so concurrent requests in different languages cannot mix
+- **Division of labour**: the backend localizes everything it returns — DTO validation, HTTP/business/auth errors, and any message in a response body. The frontend localizes only its own UI copy. Never translate a server message again on the client
+- **Error contract**: `{ statusCode, error, code, message }`. `code` is stable and language-independent (`errors.<CODE>` is both the wire code and the catalogue key); `message` is already localized. Validation failures answer `{ statusCode, error, code: 'VALIDATION_ERROR', message: string[], errors: [{ property, constraints: [{ type, message }] }] }` — `message` stays a `string[]` because that is what the client already parses
+- **Throw `AppError`, never a literal**: `throw new AppError('MEMBER_NOT_FOUND')`, with interpolation as params — `new AppError('OBLIGATION_EXCEEDS_BALANCE', { balance })`. The message is resolved by `I18nExceptionFilter` at response time, so the language always matches the request. Adding a new error means adding a code to `src/common/errors/error-codes.ts` **and** an entry to both `src/locales/en.ts` and `src/locales/es.ts` — `error-codes.spec.ts` fails otherwise
+- **DTO validation needs no per-field message**: `LocalizedValidationPipe` classifies class-validator errors by constraint name and maps it to `validation.<constraint>`, which localizes every decorator that declares no `message`. A decorator whose wording isn't derivable from the constraint (e.g. `Match('newPassword')`) passes `i18nMessage('errors.PASSWORDS_DO_NOT_MATCH')` instead
+- **A translation key can never reach the client**: `MessageResolver` steps down requested language → English → literal, and treats both an unresolved key and an unfilled `{{placeholder}}` as a miss
+- Locale files are TypeScript (`src/locales/en.ts`, `es.ts`) served by `StaticI18nLoader`; no `nest-cli.json` asset copy and no `resolveJsonModule`. Placeholders use `{{name}}` in both packages (a custom `formatter` replaces `string-format`'s `{name}`)
+- The client's `EXACT_ERROR_KEYS`/`PREFIX_ERROR_KEYS` maps in `lib/api.ts` are **legacy fallbacks** for uncoded responses. `getApiErrorMessage` returns `data.message` verbatim whenever `data.code` is present. Do not extend those maps
+- Outbound text that is not a response (WhatsApp, PDF receipts, cron output) must pass an explicit `lang` to `I18nService.translate` — never rely on the request-scoped language, which would follow whoever triggered the job
+
 ## Client Specifics
 - Entry: `packages/client/src/main.tsx`
 - Vite dev server: port 5173
@@ -95,8 +109,8 @@ Required (see `packages/server/.env.example` and `packages/client/.env.example` 
 ## Testing
 - Server: `npm run test` (unit via `packages/server/jest.config.js`, `testRegex: .*\.spec\.ts`, rootDir `src`), `npm run test:e2e` (e2e with `jest-e2e.json`)
 - Jest globals (`describe`/`it`/`expect`/`jest`) are declared for `**/*.spec.ts` in `packages/server/eslint.config.mjs`
-- No client test setup present
 - Test environment: Node, ts-jest
+- Client: `npm run test` runs **vitest** (`npm run test:watch` for watch mode). Config lives in the `test` block of `packages/client/vite.config.ts` (jsdom, `src/**/*.spec.{ts,tsx}`); specs import from `"vitest"` explicitly rather than using globals, so the app tsconfig needs no test types. `src/test/setup.ts` installs an in-memory `localStorage` because Node 22+ shadows jsdom's with an undefined experimental global
 
 ## Linting & Formatting
 - ESLint 9 with `@typescript-eslint` and Prettier integration
@@ -119,7 +133,7 @@ Required (see `packages/server/.env.example` and `packages/client/.env.example` 
 
 ## API Client Patterns
 - Centralized `packages/client/src/lib/api.ts` with axios instance
-- Request interceptor adds `Authorization: Bearer <accessToken>`
+- Request interceptor adds `Authorization: Bearer <accessToken>` **and** `Accept-Language` (see i18n section)
 - Response interceptor handles 401 refresh flow (single concurrent refresh promise)
 - Error messages mapped to i18n keys via `EXACT_ERROR_KEYS` and `PREFIX_ERROR_KEYS`
 - Token storage keys: `otb_access_token`, `otb_refresh_token`

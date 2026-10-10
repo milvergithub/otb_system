@@ -25,6 +25,10 @@ export class CreateMemberDto {
   @IsOptional()
   @IsString()
   address?: string;
+
+  @IsOptional()
+  @IsString()
+  memberTypeId?: string | null;
 }
 
 export class UpdateMemberDto extends PartialType(CreateMemberDto) {}

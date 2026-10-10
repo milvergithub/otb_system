@@ -15,6 +15,7 @@ import { Download, Eye } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { STATUS_LABEL, STATUS_VARIANT, memberName, handleDownloadReceipt } from "./helpers"
 import { viewReceipt } from "@/hooks/billing"
+import { usePaymentMethodMap } from "@/hooks/paymentMethods"
 
 interface PaymentDetailsDialogProps {
   payment: Payment | null
@@ -29,6 +30,7 @@ export default function PaymentDetailsDialog({
   const { hasPermission } = useAuth()
   const canDownload = hasPermission("billing.download")
   const months = monthNames()
+  const { map: methodNames } = usePaymentMethodMap()
 
   async function handleViewReceipt() {
     try {
@@ -125,7 +127,9 @@ export default function PaymentDetailsDialog({
                           {formatCurrency(h.amount)}
                         </span>
                         <span className="ml-2 capitalize text-muted-foreground">
-                          {h.payment_method ?? "—"}
+                          {h.payment_method
+                            ? (methodNames[h.payment_method] ?? h.payment_method)
+                            : "—"}
                         </span>
                       </div>
                       <span className="text-xs text-muted-foreground">

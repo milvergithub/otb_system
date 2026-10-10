@@ -1,12 +1,9 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Asset } from './entities/asset.entity';
 import { AssetCategory } from './entities/asset-category.entity';
+import { AppError } from '../../common/errors/app-error';
 import {
   CreateAssetCategoryDto,
   UpdateAssetCategoryDto,
@@ -28,7 +25,7 @@ export class AssetCategoriesService {
   async findOne(id: string): Promise<AssetCategory> {
     const category = await this.categoryRepo.findOneBy({ id });
     if (!category) {
-      throw new NotFoundException(`Asset category ${id} not found`);
+      throw new AppError('ASSET_CATEGORY_NOT_FOUND');
     }
     return category;
   }
@@ -67,9 +64,10 @@ export class AssetCategoriesService {
       .getCount();
 
     if (inUse > 0) {
-      throw new BadRequestException(
-        `Cannot delete asset category "${category.name}" because it is assigned to ${inUse} asset(s). Deactivate it instead.`,
-      );
+      throw new AppError('ASSET_CATEGORY_IN_USE', {
+        name: category.name,
+        count: inUse,
+      });
     }
 
     await this.categoryRepo.remove(category);
@@ -78,9 +76,7 @@ export class AssetCategoriesService {
   private async assertNameIsFree(name: string): Promise<void> {
     const existing = await this.categoryRepo.findOneBy({ name });
     if (existing) {
-      throw new BadRequestException(
-        `An asset category with name "${name}" already exists`,
-      );
+      throw new AppError('ASSET_CATEGORY_NAME_EXISTS', { name });
     }
   }
 }

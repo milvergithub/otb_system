@@ -1,13 +1,12 @@
 import {
   IsDateString,
-  IsEnum,
   IsNumber,
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
 } from 'class-validator';
-import { PaymentMethod } from '../../billing/entities/payment-history.entity';
 
 export class CreateSharePaymentDto {
   @IsNumber()
@@ -15,8 +14,9 @@ export class CreateSharePaymentDto {
   amount: number;
 
   @IsOptional()
-  @IsEnum(PaymentMethod)
-  paymentMethod?: PaymentMethod;
+  @IsString()
+  @MaxLength(50)
+  paymentMethod?: string;
 
   @IsOptional()
   @IsString()

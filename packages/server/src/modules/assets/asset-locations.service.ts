@@ -1,12 +1,9 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Asset } from './entities/asset.entity';
 import { AssetLocation } from './entities/asset-location.entity';
+import { AppError } from '../../common/errors/app-error';
 import {
   CreateAssetLocationDto,
   UpdateAssetLocationDto,
@@ -28,7 +25,7 @@ export class AssetLocationsService {
   async findOne(id: string): Promise<AssetLocation> {
     const location = await this.locationRepo.findOneBy({ id });
     if (!location) {
-      throw new NotFoundException(`Asset location ${id} not found`);
+      throw new AppError('ASSET_LOCATION_NOT_FOUND');
     }
     return location;
   }
@@ -67,9 +64,10 @@ export class AssetLocationsService {
       .getCount();
 
     if (inUse > 0) {
-      throw new BadRequestException(
-        `Cannot delete asset location "${location.name}" because ${inUse} asset(s) are stored there. Deactivate it instead.`,
-      );
+      throw new AppError('ASSET_LOCATION_IN_USE', {
+        name: location.name,
+        count: inUse,
+      });
     }
 
     await this.locationRepo.remove(location);
@@ -78,9 +76,7 @@ export class AssetLocationsService {
   private async assertNameIsFree(name: string): Promise<void> {
     const existing = await this.locationRepo.findOneBy({ name });
     if (existing) {
-      throw new BadRequestException(
-        `An asset location with name "${name}" already exists`,
-      );
+      throw new AppError('ASSET_LOCATION_NAME_EXISTS', { name });
     }
   }
 }

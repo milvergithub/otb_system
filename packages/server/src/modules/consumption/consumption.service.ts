@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -16,6 +10,7 @@ import { Meter } from '../meters/entities/meter.entity';
 import { CreateConsumptionDto } from './dto/consumption.dto';
 import { Consumption } from './entities/consumption.entity';
 import { StorageService } from './storage.service';
+import { AppError } from '../../common/errors/app-error';
 
 @Injectable()
 export class ConsumptionService {
@@ -44,7 +39,10 @@ export class ConsumptionService {
       .createQueryBuilder('consumption')
       .leftJoinAndSelect('consumption.meter', 'meter')
       .leftJoinAndSelect('meter.member', 'member')
-      .leftJoinAndSelect('consumption.payments', 'payment');
+      .leftJoinAndSelect('consumption.payments', 'payment')
+      // Historical consumptions keep the member name even if it was logically
+      // deleted afterwards.
+      .withDeleted();
 
     if (filters.month) {
       query.andWhere('consumption.month = :month', { month: filters.month });
@@ -103,9 +101,10 @@ export class ConsumptionService {
     const consumption = await this.consumptionsRepository.findOne({
       where: { id },
       relations: ['meter', 'meter.member'],
+      withDeleted: true,
     });
     if (!consumption) {
-      throw new NotFoundException('Consumption record not found');
+      throw new AppError('CONSUMPTION_NOT_FOUND');
     }
     return consumption;
   }
@@ -115,7 +114,7 @@ export class ConsumptionService {
       where: { id: dto.meterId },
     });
     if (!meter) {
-      throw new BadRequestException('Meter not found');
+      throw new AppError('METER_NOT_FOUND');
     }
 
     // Handle image upload using StorageService
@@ -132,9 +131,7 @@ export class ConsumptionService {
       },
     });
     if (existing) {
-      throw new BadRequestException(
-        'A consumption record already exists for this meter and period',
-      );
+      throw new AppError('CONSUMPTION_EXISTS');
     }
 
     const lastReading = await this.consumptionsRepository.findOne({
@@ -145,9 +142,7 @@ export class ConsumptionService {
     const current = dto.currentReading;
 
     if (current < previous) {
-      throw new BadRequestException(
-        'Current reading cannot be lower than the previous reading',
-      );
+      throw new AppError('CURRENT_READING_LOWER');
     }
 
     const consumption = this.consumptionsRepository.create({
@@ -168,13 +163,11 @@ export class ConsumptionService {
       relations: ['payments'],
     });
     if (!consumption) {
-      throw new NotFoundException('Consumption record not found');
+      throw new AppError('CONSUMPTION_NOT_FOUND');
     }
 
     if (consumption.payments?.length) {
-      throw new BadRequestException(
-        'Cannot delete a consumption record that has a generated bill',
-      );
+      throw new AppError('CONSUMPTION_HAS_BILL');
     }
 
     if (consumption.image_key) {

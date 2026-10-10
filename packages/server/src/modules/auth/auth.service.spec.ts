@@ -1,14 +1,11 @@
 import 'reflect-metadata';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import * as bcrypt from 'bcrypt';
 import { AuthService, JwtPayload } from './auth.service';
-import {
-  ChangePasswordDto,
-  CURRENT_PASSWORD_INVALID,
-  PASSWORD_REUSED,
-} from './dto/change-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { AppError } from '../../common/errors/app-error';
 
 const CURRENT_PASSWORD = 'S3cret-Pass!';
 const NEXT_PASSWORD = 'An0ther-Pass!';
@@ -67,7 +64,7 @@ describe('AuthService.changePassword', () => {
 
     await expect(
       service.changePassword('user-1', dtoOf({ currentPassword: 'Nope123!' })),
-    ).rejects.toThrow(CURRENT_PASSWORD_INVALID);
+    ).rejects.toThrow(new AppError('CURRENT_PASSWORD_INCORRECT'));
   });
 
   it('rejects reusing the current password', async () => {
@@ -78,14 +75,14 @@ describe('AuthService.changePassword', () => {
         'user-1',
         dtoOf({ newPassword: CURRENT_PASSWORD }),
       ),
-    ).rejects.toThrow(PASSWORD_REUSED);
+    ).rejects.toThrow(new AppError('PASSWORD_REUSED'));
   });
 
   it('rejects an account that no longer exists', async () => {
     const { service } = makeService(null);
 
     await expect(service.changePassword('gone', dtoOf())).rejects.toThrow(
-      NotFoundException,
+      new AppError('USER_NOT_FOUND'),
     );
   });
 
