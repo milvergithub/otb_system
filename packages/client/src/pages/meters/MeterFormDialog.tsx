@@ -38,6 +38,7 @@ const meterFormSchema = (t: TFunction) =>
     type_id: requiredString(t),
     latitude: z.string().optional(),
     longitude: z.string().optional(),
+    initial_reading: z.string().optional(),
     share_amount: z.string().optional(),
     share_method: z.string().optional(),
     share_reference: z.string().optional(),
@@ -53,6 +54,7 @@ const DEFAULT_METER_FORM: MeterFormValues = {
   type_id: "",
   latitude: "",
   longitude: "",
+  initial_reading: "",
   share_amount: "",
   share_method: "",
   share_reference: "",
@@ -126,7 +128,8 @@ export default function MeterFormDialog({
             type_id: editing.type_id,
             latitude: editing.latitude ?? "",
             longitude: editing.longitude ?? "",
-  share_amount: "0",
+            initial_reading: editing.initial_reading ?? "",
+            share_amount: "0",
             share_method: "",
             share_reference: "",
             share_notes: "",
@@ -148,6 +151,7 @@ export default function MeterFormDialog({
         typeId: values.type_id,
         latitude: values.latitude ? parseFloat(values.latitude) : undefined,
         longitude: values.longitude ? parseFloat(values.longitude) : undefined,
+        initialReading: values.initial_reading ? parseFloat(values.initial_reading) : undefined,
         shareAmount: Number.isFinite(shareAmount) && shareAmount > 0 ? shareAmount : undefined,
         sharePaymentMethod: values.share_method || undefined,
         shareReference: values.share_reference || undefined,
@@ -264,6 +268,20 @@ export default function MeterFormDialog({
               </a>
             </p>
           ) : null}
+          <div className="space-y-2">
+            <Label htmlFor="initial-reading">{t("meters.initialReading")}</Label>
+            <Input
+              id="initial-reading"
+              type="number"
+              min="0"
+              step="0.01"
+              {...meterForm.register("initial_reading")}
+              placeholder="0"
+            />
+            <p className="text-xs text-muted-foreground">
+              {t("meters.initialReadingHint")}
+            </p>
+          </div>
           {!editing ? (
             <div className="rounded-md border p-4">
               <p className="mb-3 text-sm font-medium">

@@ -11,6 +11,16 @@ export const DEFAULT_PERMISSIONS = [
   { resource: 'members', action: 'update', description: 'Update members' },
   { resource: 'members', action: 'delete', description: 'Delete members' },
   {
+    resource: 'members',
+    action: 'export',
+    description: 'Export members to CSV',
+  },
+  {
+    resource: 'members',
+    action: 'import',
+    description: 'Import members from CSV',
+  },
+  {
     resource: 'memberTypes',
     action: 'read',
     description: 'View member types',

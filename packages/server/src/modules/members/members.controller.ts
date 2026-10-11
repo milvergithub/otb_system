@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   Patch,
   Post,
@@ -13,7 +14,11 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthUser } from '../auth/interfaces/auth-user.interface';
 import { AppError } from '../../common/errors/app-error';
 import { PaginationDto } from '../../common/dto/pagination.dto';
-import { CreateMemberDto, UpdateMemberDto } from './dto/member.dto';
+import {
+  CreateMemberDto,
+  ImportMembersDto,
+  UpdateMemberDto,
+} from './dto/member.dto';
 import { MembersService } from './members.service';
 import type { MemberListStatus } from './members.service';
 
@@ -83,5 +88,19 @@ export class MembersController {
   @Roles('members.delete')
   restore(@Param('id') id: string) {
     return this.membersService.restore(id);
+  }
+
+  @Get('export-csv')
+  @Roles('members.export')
+  @Header('Content-Type', 'text/csv')
+  @Header('Content-Disposition', 'attachment; filename="members.csv"')
+  exportCsv() {
+    return this.membersService.exportCsv();
+  }
+
+  @Post('import-csv')
+  @Roles('members.import')
+  importCsv(@Body() dto: ImportMembersDto) {
+    return this.membersService.importCsv(dto.csvContent);
   }
 }

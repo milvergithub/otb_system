@@ -52,6 +52,8 @@ const en = {
     MEMBER_TYPE_NAME_REQUIRED: 'The name is required',
     MEMBER_TYPE_NAME_EXISTS: 'A member type with this name already exists',
     MEMBER_TYPE_INACTIVE: 'An inactive member type cannot be assigned',
+    IMPORT_CSV_EMPTY: 'The CSV file is empty',
+    IMPORT_CSV_INVALID: 'The CSV file has an invalid format',
 
     // ---------------------------------------------------------- meters
     METER_NOT_FOUND: 'Meter not found',

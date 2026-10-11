@@ -37,6 +37,11 @@ export class CreateMeterDto {
   typeId?: string;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  initialReading?: number;
+
+  @IsOptional()
   @IsEnum(MeterStatus)
   status?: MeterStatus;
 

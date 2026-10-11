@@ -138,7 +138,11 @@ export class ConsumptionService {
       where: { meter_id: dto.meterId },
       order: { year: 'DESC', month: 'DESC' },
     });
-    const previous = lastReading ? parseFloat(lastReading.current_reading) : 0;
+    const previous = lastReading
+      ? parseFloat(lastReading.current_reading)
+      : meter.initial_reading != null
+        ? parseFloat(meter.initial_reading)
+        : 0;
     const current = dto.currentReading;
 
     if (current < previous) {

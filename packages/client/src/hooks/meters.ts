@@ -101,6 +101,7 @@ export function useAddMeter() {
       shareReference?: string
       shareNotes?: string
       shareEvidenceBase64?: string
+      initialReading?: number
     }) => api.post(ApiPath.Meters.BASE, payload).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.meters.all })
@@ -112,7 +113,7 @@ export function useAddMeter() {
 export function useEditMeter() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, ...payload }: { id: string; code: string; memberId: string; address: string; type?: string; latitude?: number; longitude?: number }) =>
+    mutationFn: ({ id, ...payload }: { id: string; code: string; memberId: string; address: string; type?: string; latitude?: number; longitude?: number; initialReading?: number }) =>
       api.patch(ApiPath.Meters.ONE(id), payload).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.meters.all })

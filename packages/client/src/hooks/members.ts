@@ -124,3 +124,21 @@ export function useRestoreMember() {
     },
   })
 }
+
+export function useImportMembersCsv() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (csvContent: string) =>
+      api
+        .post<{ created: number; errors: Array<{ row: number; message: string }> }>(
+          "/members/import-csv",
+          { csvContent },
+        )
+        .then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.members.all })
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard })
+      queryClient.invalidateQueries({ queryKey: queryKeys.memberTypes.all })
+    },
+  })
+}

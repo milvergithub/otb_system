@@ -173,6 +173,7 @@ export class MetersService {
           latitude: dto.latitude?.toString(),
           longitude: dto.longitude?.toString(),
           type_id: dto.typeId,
+          initial_reading: dto.initialReading?.toString(),
           status: dto.status || MeterStatus.ACTIVE,
         }),
       );
@@ -301,6 +302,10 @@ export class MetersService {
           ? dto.longitude.toString()
           : meter.longitude,
       type_id: dto.typeId ?? meter.type_id,
+      initial_reading:
+        dto.initialReading !== undefined
+          ? dto.initialReading.toString()
+          : meter.initial_reading,
       status: dto.status ?? meter.status,
     });
     return this.metersRepository.save(meter);

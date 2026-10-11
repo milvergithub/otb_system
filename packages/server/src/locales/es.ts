@@ -52,6 +52,8 @@ const es = {
     MEMBER_TYPE_NAME_REQUIRED: 'El nombre es obligatorio',
     MEMBER_TYPE_NAME_EXISTS: 'Ya existe un tipo de socio con ese nombre',
     MEMBER_TYPE_INACTIVE: 'No se puede asignar un tipo de socio inactivo',
+    IMPORT_CSV_EMPTY: 'El archivo CSV está vacío',
+    IMPORT_CSV_INVALID: 'El archivo CSV tiene un formato inválido',
 
     // ---------------------------------------------------------- meters
     METER_NOT_FOUND: 'Medidor no encontrado',

@@ -155,6 +155,7 @@ export interface Meter {
   longitude?: string | null
   type_id: string
   type?: MeterTypeItem
+  initial_reading?: string | null
   status: MeterStatus
   installed_at: string
   created_at: string

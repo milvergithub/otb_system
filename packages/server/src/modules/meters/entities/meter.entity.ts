@@ -49,6 +49,9 @@ export class Meter {
   @JoinColumn({ name: 'type_id' })
   type: MeterTypeEntity;
 
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  initial_reading: string;
+
   @Column({ type: 'varchar', length: 20, default: MeterStatus.ACTIVE })
   status: MeterStatus;
 

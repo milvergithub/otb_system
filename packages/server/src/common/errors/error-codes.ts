@@ -53,6 +53,8 @@ export const ERROR_STATUS = {
   MEMBER_TYPE_NAME_REQUIRED: HttpStatus.BAD_REQUEST,
   MEMBER_TYPE_NAME_EXISTS: HttpStatus.CONFLICT,
   MEMBER_TYPE_INACTIVE: HttpStatus.BAD_REQUEST,
+  IMPORT_CSV_EMPTY: HttpStatus.BAD_REQUEST,
+  IMPORT_CSV_INVALID: HttpStatus.BAD_REQUEST,
 
   // -------------------------------------------------------------- meters
   METER_NOT_FOUND: HttpStatus.NOT_FOUND,

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { setImmediate } from 'node:timers';
 import { ILike, IsNull, Not, Repository } from 'typeorm';
+import { parse } from 'csv-parse/sync';
 import {
   PaginatedResult,
   PaginationDto,
@@ -219,6 +220,137 @@ export class MembersService {
       throw new AppError('MEMBER_NOT_FOUND');
     }
     return restored;
+  }
+
+  async exportCsv(): Promise<string> {
+    const members = await this.membersRepository.find({
+      relations: ['member_type'],
+      where: { deleted_at: IsNull() },
+      order: { first_name: 'ASC', last_name: 'ASC' },
+    });
+
+    const header = [
+      'ci',
+      'first_name',
+      'last_name',
+      'phone',
+      'phone_country',
+      'address',
+      'member_type',
+    ].join(',');
+
+    const rows = members.map((m) =>
+      [
+        `"${m.ci}"`,
+        `"${m.first_name}"`,
+        `"${m.last_name}"`,
+        `"${m.phone ?? ''}"`,
+        `"${m.phone_country ?? 'BO'}"`,
+        `"${m.address ?? ''}"`,
+        `"${m.member_type?.code ?? ''}"`,
+      ].join(','),
+    );
+
+    return [header, ...rows].join('\n');
+  }
+
+  async importCsv(csvContent: string): Promise<{
+    created: number;
+    errors: Array<{ row: number; message: string }>;
+  }> {
+    if (!csvContent.trim()) {
+      throw new AppError('IMPORT_CSV_EMPTY');
+    }
+
+    let records: string[][];
+    try {
+      records = parse(csvContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+      });
+    } catch {
+      throw new AppError('IMPORT_CSV_INVALID');
+    }
+
+    if (records.length === 0) {
+      throw new AppError('IMPORT_CSV_EMPTY');
+    }
+
+    const errors: Array<{ row: number; message: string }> = [];
+    let created = 0;
+
+    const memberTypes = await this.memberTypeRepository.find();
+    const memberTypeMap = new Map(
+      memberTypes.filter((mt) => mt.is_active).map((mt) => [mt.code, mt.id]),
+    );
+
+    for (let i = 0; i < records.length; i++) {
+      const row = records[i];
+      const rowNum = i + 2;
+
+      try {
+        const ci = row[0]?.trim();
+        const firstName = row[1]?.trim();
+        const lastName = row[2]?.trim();
+        const phone = row[3]?.trim() || undefined;
+        const phoneCountry = row[4]?.trim() || 'BO';
+        const address = row[5]?.trim() || undefined;
+        const memberTypeCode = row[6]?.trim();
+
+        if (!ci) {
+          errors.push({ row: rowNum, message: 'CI is required' });
+          continue;
+        }
+        if (!firstName) {
+          errors.push({ row: rowNum, message: 'First name is required' });
+          continue;
+        }
+        if (!lastName) {
+          errors.push({ row: rowNum, message: 'Last name is required' });
+          continue;
+        }
+
+        const existing = await this.membersRepository.findOne({
+          where: { ci },
+          withDeleted: true,
+        });
+        if (existing) {
+          errors.push({ row: rowNum, message: `CI "${ci}" already exists` });
+          continue;
+        }
+
+        let memberTypeId: string | null = null;
+        if (memberTypeCode) {
+          memberTypeId = memberTypeMap.get(memberTypeCode) ?? null;
+          if (!memberTypeId) {
+            errors.push({
+              row: rowNum,
+              message: `Member type "${memberTypeCode}" not found`,
+            });
+            continue;
+          }
+        }
+
+        await this.membersRepository.save(
+          this.membersRepository.create({
+            ci,
+            first_name: firstName,
+            last_name: lastName,
+            phone,
+            phone_country: phoneCountry,
+            address,
+            member_type_id: memberTypeId,
+          }),
+        );
+        created++;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        errors.push({ row: rowNum, message });
+      }
+    }
+
+    return { created, errors };
   }
 
   /**
