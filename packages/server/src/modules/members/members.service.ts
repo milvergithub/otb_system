@@ -298,16 +298,6 @@ export class MembersService {
         const address = row[5]?.trim() || undefined;
         const memberTypeCode = row[6]?.trim();
 
-        console.log({
-          ci,
-          firstName,
-          lastName,
-          phone,
-          phoneCountry,
-          address,
-          memberTypeCode,
-        });
-
         if (!ci) {
           errors.push({ row: rowNum, message: 'CI is required' });
           continue;
