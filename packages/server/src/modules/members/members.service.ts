@@ -265,7 +265,7 @@ export class MembersService {
     let records: string[][];
     try {
       records = parse(csvContent, {
-        columns: true,
+        from_line: 2,
         skip_empty_lines: true,
         trim: true,
       });
@@ -297,6 +297,16 @@ export class MembersService {
         const phoneCountry = row[4]?.trim() || 'BO';
         const address = row[5]?.trim() || undefined;
         const memberTypeCode = row[6]?.trim();
+
+        console.log({
+          ci,
+          firstName,
+          lastName,
+          phone,
+          phoneCountry,
+          address,
+          memberTypeCode,
+        });
 
         if (!ci) {
           errors.push({ row: rowNum, message: 'CI is required' });
