@@ -410,21 +410,5 @@ export class SeederService implements OnModuleInit {
       await this.rolesRepository.save(adminRole);
       this.logger.log('Admin role permissions synced');
     }
-
-    const readPermissions = allPermissions.filter((p) => p.action === 'read');
-    const userRole = await this.rolesRepository.findOne({
-      where: { name: 'user' },
-    });
-    if (!userRole) {
-      await this.rolesRepository.save(
-        this.rolesRepository.create({
-          name: 'user',
-          description: 'Read-only access',
-          is_system: false,
-          permissions: readPermissions,
-        }),
-      );
-      this.logger.log('User role seeded');
-    }
   }
 }

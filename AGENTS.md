@@ -7,8 +7,8 @@
 4. API: http://localhost:3001/api — Docs: http://localhost:3001/api/docs
 
 ## Quick Start (Docker, local DB)
-1. Ensure PostgreSQL is running (port 5433 → 5432)
-2. `cd packages/server && npm run docker:up` (builds + runs migrations automatically)
+1. Ensure PostgreSQL is running on host (default port 5433 per `.env`)
+2. `cd packages/server && npm run docker:up` (builds API image, runs migrations on start via `run-migrations.js`)
 3. API: http://localhost:3001/api
 
 ## Repository Structure
@@ -124,11 +124,8 @@ Required (see `packages/server/.env.example` and `packages/client/.env.example` 
 - Client also has `tsconfig.app.json` (includes `vite.config.ts`) and `tsconfig.node.json`
 
 ## Database
-- Docker Compose service `db` (Postgres 16-alpine)
-- Container name: `otb-postgres`
-- Volume: `otb_pgdata`
-- Healthcheck uses `pg_isready`
-- TypeORM entities auto-loaded; `synchronize: true` in dev only
+- PostgreSQL runs on host (not containerized); server's `docker-compose.yml` only defines the API service
+- TypeORM entities auto-loaded; `synchronize: true` in dev only (`NODE_ENV !== production`)
 - `meter_types.code`: short unique identifier (migration `1755000000020-add-code-to-meter-types.ts`), trimmed/uppercased by `MeterTypesService`, backfilled from `name` with a numeric suffix on collisions; enforced by `UQ_meter_types_code`. Mirrors `activity_types.code`
 
 ## API Client Patterns
@@ -164,16 +161,15 @@ Required (see `packages/server/.env.example` and `packages/client/.env.example` 
 - Config modules in `src/config/` provide typed configuration via `ConfigService`
 
 ## Development Workflow
-1. Ensure Docker is running for database
+1. Ensure PostgreSQL is running on host (default port 5433 per `.env`)
 2. Copy `packages/server/.env.example` values into `packages/server/.env` and review secrets
-3. Start database: `cd packages/server && docker compose up -d` (or run your own Postgres)
-4. Run `npm run dev` (starts both server and client with watch)
-5. Access client at http://localhost:5173; API at http://localhost:3001/api
-6. Use Swagger UI for API testing (login first to get Bearer token)
+3. Run `npm run dev` (starts both server and client with watch)
+4. Access client at http://localhost:5173; API at http://localhost:3001/api
+5. Use Swagger UI for API testing (login first to get Bearer token)
 
 ## Production Notes
 - Local production: `cd packages/server && docker compose up -d --build` (uses `.env`)
-- Server migrations run automatically on container start (via `run-migrations.ts`)
+- Server migrations run automatically on container start (via `run-migrations.js`)
 - Set `CORS_ORIGIN` to actual client URL (e.g. `http://<IP>:8081`) or `*` for any origin
-- To run migrations manually: `npm run migration:run:prod` (loads `.env` by default; use `ENV_FILE=.env.prod` for prod)
+- To run migrations manually: `npm run migration:run:prod` (loads `.env` by default)
 - Docker DB_HOST override: compose overrides `.env` with `host.docker.internal` (Docker Desktop) so the container connects to your host's PostgreSQL instead of itself. `DOCKER_DB_HOST` env var can override this
