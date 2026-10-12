@@ -35,6 +35,7 @@ function makeRepos() {
   };
   const memberTypeRepo = {
     findOneBy: jest.fn(),
+    find: jest.fn(),
   };
   const eventEmitter = { emit: jest.fn() };
   const service = new MembersService(
@@ -580,5 +581,88 @@ describe('MembersController deleted-members gate', () => {
 
     expect(service.restore).toHaveBeenCalledWith('member-1');
     expect(result.id).toBe('member-1');
+  });
+});
+
+describe('MembersService importCsv welcome emission', () => {
+  const HEADER =
+    'ci,first_name,last_name,phone,phone_country,address,member_type';
+
+  function csv(rows: string[]) {
+    return [HEADER, ...rows].join('\n');
+  }
+
+  function row(ci: string, phone = '', firstName = 'Juan', lastName = 'Perez') {
+    return `${ci},${firstName},${lastName},${phone},BO,,`;
+  }
+
+  async function runImport(
+    rows: string[],
+    {
+      sendWelcome,
+      findOne = null,
+    }: { sendWelcome?: boolean; findOne?: unknown } = {},
+  ) {
+    const { service, membersRepo, memberTypeRepo, eventEmitter } = makeRepos();
+    membersRepo.findOne.mockResolvedValue(findOne);
+    memberTypeRepo.find.mockResolvedValue([]);
+    await service.importCsv(
+      csv(rows),
+      sendWelcome === undefined ? false : sendWelcome,
+    );
+    return { membersRepo, eventEmitter };
+  }
+
+  it('emits member.created for each row with a phone when sendWelcome is true', async () => {
+    const { eventEmitter } = await runImport(
+      [row('1', '70000000'), row('2', '71111111')],
+      { sendWelcome: true },
+    );
+
+    expect(eventEmitter.emit).toHaveBeenCalledTimes(2);
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'member.created',
+      expect.objectContaining({ phone: '70000000' }),
+    );
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'member.created',
+      expect.objectContaining({
+        phone: '71111111',
+        fullName: 'Juan Perez',
+      }),
+    );
+  });
+
+  it('does not emit when sendWelcome is false or absent', async () => {
+    const { eventEmitter } = await runImport(
+      [row('1', '70000000'), row('2', '71111111')],
+      { sendWelcome: false },
+    );
+
+    expect(eventEmitter.emit).not.toHaveBeenCalled();
+  });
+
+  it(
+    'never emits for imports over ' + 20 + ' rows even when requested',
+    async () => {
+      const many = Array.from({ length: 21 }, (_, i) =>
+        row(String(i + 1), `7${i}`),
+      );
+      const { eventEmitter } = await runImport(many, { sendWelcome: true });
+
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not emit for rows without a phone', async () => {
+    const { eventEmitter } = await runImport([row('1'), row('2', '71111111')], {
+      sendWelcome: true,
+    });
+
+    expect(eventEmitter.emit).toHaveBeenCalledTimes(1);
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      'member.created',
+      expect.objectContaining({ phone: '71111111' }),
+    );
   });
 });

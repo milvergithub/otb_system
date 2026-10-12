@@ -224,7 +224,12 @@
     "importCsv": "Import CSV",
     "importing": "Importing...",
     "importSuccess": "{{count}} member(s) imported successfully",
-    "importPartial": "{{created}} member(s) imported, {{errors}} error(s)"
+    "importPartial": "{{created}} member(s) imported, {{errors}} error(s)",
+    "sendWelcome": "Send welcome via WhatsApp",
+    "sendWelcomeTooMany": "Welcome disabled for over {{max}} imported members",
+    "importTitle": "Import members",
+    "importDesc": "Select a CSV file to import members.",
+    "selectFile": "Select CSV file"
   },
   "memberTypes": {
     "subtitle": "Configurable classification for members",

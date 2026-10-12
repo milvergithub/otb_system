@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { OnEvent } from '@nestjs/event-emitter';
 import { lastValueFrom } from 'rxjs';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { OpenwaConfig } from '../../config/openwa.config';
 import { ReceiptService } from '../billing/receipt.service';
 import { ShareReceiptService } from '../shares/share-receipt.service';
@@ -192,25 +193,39 @@ export class WhatsAppService {
   }
 
   @OnEvent('member.created')
-  async handleMemberCreated(payload: {
+  handleMemberCreated(payload: {
     phone: string;
     phone_country?: string;
     fullName: string;
-  }): Promise<void> {
-    try {
+  }): void {
+    // Serialize welcome sends with a minimum interval between each one so a
+    // burst (e.g. a CSV import, manual rapid-fire creations) never floods the
+    // provider. Other channels (receipts, bills) are left unthrottled.
+    this.enqueueWelcome(async () => {
       await this.sendTemplate(
         payload.phone,
         { fullName: payload.fullName },
         await this.getWelcomeTemplateId(),
         payload.phone_country ?? 'BO',
       );
-    } catch (error) {
-      this.logger.warn(
-        `WhatsApp welcome send failed in background: ${
-          (error as Error).message ?? error
-        }`,
-      );
-    }
+    });
+  }
+
+  private welcomeQueue: Promise<void> = Promise.resolve();
+
+  private enqueueWelcome(task: () => Promise<void>): void {
+    this.welcomeQueue = this.welcomeQueue
+      .then(task)
+      .catch((error) =>
+        this.logger.warn(
+          `WhatsApp welcome send failed in background: ${
+            (error as Error).message ?? error
+          }`,
+        ),
+      )
+      .then(async () => {
+        await sleep(this.envConfig.sendIntervalMs);
+      });
   }
 
   @OnEvent('meter.created')

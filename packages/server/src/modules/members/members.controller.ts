@@ -101,6 +101,9 @@ export class MembersController {
   @Post('import-csv')
   @Roles('members.import')
   importCsv(@Body() dto: ImportMembersDto) {
-    return this.membersService.importCsv(dto.csvContent);
+    return this.membersService.importCsv(
+      dto.csvContent,
+      dto.sendWelcome ?? false,
+    );
   }
 }

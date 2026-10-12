@@ -128,11 +128,17 @@ export function useRestoreMember() {
 export function useImportMembersCsv() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (csvContent: string) =>
+    mutationFn: ({
+      csvContent,
+      sendWelcome,
+    }: {
+      csvContent: string
+      sendWelcome: boolean
+    }) =>
       api
         .post<{ created: number; errors: Array<{ row: number; message: string }> }>(
           "/members/import-csv",
-          { csvContent },
+          { csvContent, sendWelcome },
         )
         .then((r) => r.data),
     onSuccess: () => {

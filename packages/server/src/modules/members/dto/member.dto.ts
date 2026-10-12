@@ -1,10 +1,14 @@
 import { PartialType } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class ImportMembersDto {
   @IsString()
   @IsNotEmpty()
   csvContent: string;
+
+  @IsOptional()
+  @IsBoolean()
+  sendWelcome?: boolean;
 }
 
 export class CreateMemberDto {

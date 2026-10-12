@@ -25,6 +25,12 @@ const SORT_COLUMNS: Record<string, string> = {
 
 export type MemberListStatus = 'active' | 'deleted' | 'all';
 
+// Importing more than this many members never triggers the WhatsApp welcome,
+// regardless of what the client requests: a large batch would flood the
+// provider (and risk the sending number getting banned). Keep in sync with the
+// client's IMPORT_WELCOME_MAX_ROWS.
+const IMPORT_WELCOME_MAX_ROWS = 20;
+
 @Injectable()
 export class MembersService {
   constructor(
@@ -254,7 +260,10 @@ export class MembersService {
     return [header, ...rows].join('\n');
   }
 
-  async importCsv(csvContent: string): Promise<{
+  async importCsv(
+    csvContent: string,
+    sendWelcome = false,
+  ): Promise<{
     created: number;
     errors: Array<{ row: number; message: string }>;
   }> {
@@ -276,6 +285,10 @@ export class MembersService {
     if (records.length === 0) {
       throw new AppError('IMPORT_CSV_EMPTY');
     }
+
+    // Server-side cap: the flag is honoured only for small imports.
+    const welcomeEnabled =
+      sendWelcome && records.length <= IMPORT_WELCOME_MAX_ROWS;
 
     const errors: Array<{ row: number; message: string }> = [];
     let created = 0;
@@ -332,7 +345,7 @@ export class MembersService {
           }
         }
 
-        await this.membersRepository.save(
+        const saved = await this.membersRepository.save(
           this.membersRepository.create({
             ci,
             first_name: firstName,
@@ -344,6 +357,13 @@ export class MembersService {
           }),
         );
         created++;
+        if (welcomeEnabled && saved.phone) {
+          this.eventEmitter.emit('member.created', {
+            phone: saved.phone,
+            phone_country: saved.phone_country,
+            fullName: `${saved.first_name} ${saved.last_name}`,
+          });
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
         errors.push({ row: rowNum, message });

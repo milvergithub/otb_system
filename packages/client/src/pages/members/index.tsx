@@ -1,10 +1,10 @@
-import { useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { Pencil, Plus, RotateCcw, Search, Trash2, Users, Phone, CircleDollarSign, MapPinHouse, Download, Upload } from "lucide-react"
 import { formatDate, getWhatsAppUrl } from "@/lib/utils"
 import type { Member } from "@/lib/types"
-import { useSearchMembers, useImportMembersCsv } from "@/hooks/members"
+import { useSearchMembers } from "@/hooks/members"
 import { useActiveMemberTypes } from "@/hooks/memberTypes"
 import { useFines } from "@/hooks/activities"
 import { Button } from "@/components/ui/button"
@@ -18,10 +18,10 @@ import { RowActions } from "@/components/ui/row-actions"
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table"
 import { DataTablePagination } from "@/components/ui/data-table-pagination"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { toast } from "sonner"
 import MemberFormDialog from "./MemberFormDialog"
 import DeleteMemberDialog from "./DeleteMemberDialog"
 import RestoreMemberDialog from "./RestoreMemberDialog"
+import ImportMembersDialog from "./ImportMembersDialog"
 import Can from "@/components/Can"
 
 const NO_TYPE_FILTER = "__none__"
@@ -43,8 +43,7 @@ export default function MembersPage() {
   const [editing, setEditing] = useState<Member | null>(null)
   const [deleting, setDeleting] = useState<Member | null>(null)
   const [restoring, setRestoring] = useState<Member | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const importMutation = useImportMembersCsv()
+  const [importOpen, setImportOpen] = useState(false)
 
   const { sort, toggleSort } = useTableSort(
     { key: "first_name", order: "asc" },
@@ -139,34 +138,6 @@ export default function MembersPage() {
     URL.revokeObjectURL(url)
   }
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      const content = ev.target?.result as string
-      importMutation.mutate(content, {
-        onSuccess: (result) => {
-          if (result.errors.length === 0) {
-            toast.success(t("members.importSuccess", { count: result.created }))
-          } else {
-            toast.warning(
-              t("members.importPartial", {
-                created: result.created,
-                errors: result.errors.length,
-              }),
-            )
-          }
-        },
-        onError: (err) => {
-          toast.error(err instanceof Error ? err.message : "Error importing CSV")
-        },
-      })
-    }
-    reader.readAsText(file)
-    e.target.value = ""
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -184,23 +155,10 @@ export default function MembersPage() {
             </Button>
           </Can>
           <Can permission="members.import">
-            <>
-              <input
-                type="file"
-                accept=".csv"
-                className="hidden"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-              />
-              <Button
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={importMutation.isPending}
-              >
-                <Upload className="mr-2 size-4" />
-                {importMutation.isPending ? t("members.importing") : t("members.importCsv")}
-              </Button>
-            </>
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
+              <Upload className="mr-2 size-4" />
+              {t("members.importCsv")}
+            </Button>
           </Can>
           <Can permission="members.create">
             <Button onClick={openCreate}>
@@ -468,6 +426,10 @@ export default function MembersPage() {
         onOpenChange={(open) => {
           if (!open) setRestoring(null)
         }}
+      />
+      <ImportMembersDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
       />
     </div>
   )

@@ -9,6 +9,7 @@ export interface OpenwaConfig {
   meterRegisteredTemplateId: string;
   apiKey: string;
   timeoutMs: number;
+  sendIntervalMs: number;
 }
 
 export default registerAs('openwa', (): OpenwaConfig => ({
@@ -21,4 +22,5 @@ export default registerAs('openwa', (): OpenwaConfig => ({
     process.env.OPENWA_METER_REGISTERED_TEMPLATE_ID || '',
   apiKey: process.env.OPENWA_API_KEY || '',
   timeoutMs: parseInt(process.env.OPENWA_TIMEOUT_MS || '10000', 10),
+  sendIntervalMs: parseInt(process.env.OPENWA_SEND_INTERVAL_MS || '3000', 10),
 }));

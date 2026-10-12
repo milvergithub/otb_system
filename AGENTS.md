@@ -102,7 +102,7 @@ Required (see `packages/server/.env.example` and `packages/client/.env.example` 
 - JWT: `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `JWT_ACCESS_EXPIRES_IN` (15m), `JWT_REFRESH_EXPIRES_IN` (7d)
 - Audit: `AUDIT_LOG_RETENTION_DAYS` (0 = keep forever)
 - Logging: `LOG_LEVEL` (default info)
-- OpenWA (WhatsApp): `OPENWA_ENABLED`, `OPENWA_BASE_URL`, `OPENWA_SESSION_ID`, `OPENWA_API_KEY`, `OPENWA_CONSUMPTION_TEMPLATE_ID`, `OPENWA_WELCOME_TEMPLATE_ID`, `OPENWA_METER_REGISTERED_TEMPLATE_ID`, `OPENWA_TIMEOUT_MS`
+- OpenWA (WhatsApp): `OPENWA_ENABLED`, `OPENWA_BASE_URL`, `OPENWA_SESSION_ID`, `OPENWA_API_KEY`, `OPENWA_CONSUMPTION_TEMPLATE_ID`, `OPENWA_WELCOME_TEMPLATE_ID`, `OPENWA_METER_REGISTERED_TEMPLATE_ID`, `OPENWA_TIMEOUT_MS`, `OPENWA_SEND_INTERVAL_MS`
 - Image storage (S3-compatible, used by `StorageService`): `RUSTFS_ENDPOINT`, `RUSTFS_REGION`, `RUSTFS_ACCESS_KEY`, `RUSTFS_SECRET_KEY`, `RUSTFS_BUCKET`, `RUSTFS_PUBLIC_URL` — **not present in `.env.example`**; copy from `packages/server/.env`
 - Client: `VITE_API_URL` (in `packages/client/.env.example`)
 

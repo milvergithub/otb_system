@@ -223,8 +223,13 @@
     "exportCsv": "Exportar CSV",
     "importCsv": "Importar CSV",
     "importing": "Importando...",
-    "importSuccess": "{{count} socio(s) importado(s) correctamente",
-    "importPartial": "{{created} socio(s) importado(s), {{errors}} error(es)"
+    "importSuccess": "{{count}} socio(s) importado(s) correctamente",
+    "importPartial": "{{created}} socio(s) importado(s), {{errors}} error(es)",
+    "sendWelcome": "Enviar bienvenida por WhatsApp",
+    "sendWelcomeTooMany": "Bienvenida deshabilitada para más de {{max}} socios importados",
+    "importTitle": "Importar socios",
+    "importDesc": "Selecciona un archivo CSV para importar socios.",
+    "selectFile": "Seleccionar archivo CSV"
   },
   "memberTypes": {
     "subtitle": "Clasificación configurable para los socios",
