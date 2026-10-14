@@ -7,6 +7,7 @@ import type { Member } from "@/lib/types"
 import { useSearchMembers } from "@/hooks/members"
 import { useActiveMemberTypes } from "@/hooks/memberTypes"
 import { useFines } from "@/hooks/activities"
+import { useDebounce } from "@/hooks/use-debounce"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -35,8 +36,13 @@ export default function MembersPage() {
   }
 
   const [page, setPage] = useState(1)
-  const [search, setSearch] = useState("")
   const [searchInput, setSearchInput] = useState("")
+  const debouncedSearch = useDebounce(searchInput.trim(), 300)
+  const [search, setSearch] = useState(debouncedSearch)
+  if (search !== debouncedSearch) {
+    setSearch(debouncedSearch)
+    setPage(1)
+  }
   const [memberTypeFilter, setMemberTypeFilter] = useState("")
   const [status, setStatus] = useState<"active" | "deleted" | "all">("active")
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -193,12 +199,6 @@ export default function MembersPage() {
             placeholder={t("members.searchPlaceholder")}
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                setSearch(searchInput.trim())
-                setPage(1)
-              }
-            }}
           />
         </div>
         <ComboboxSelect

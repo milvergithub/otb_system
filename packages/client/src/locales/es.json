@@ -167,7 +167,7 @@
     "retry": "Reintentar"
   },
   "dashboard": {
-    "title": "Panel",
+    "title": "Dashboard",
     "overview": "Resumen desde {{startDate}} hasta {{endDate}}",
     "members": "Socios",
     "meters": "Medidores",

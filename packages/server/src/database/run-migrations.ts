@@ -97,6 +97,14 @@ const MIGRATIONS = [
     timestamp: 1755000000026,
     name: 'CreatePaymentMethods1755000000026',
   },
+  {
+    timestamp: 1755000000027,
+    name: 'AddInitialReadingToMeters1755000000027',
+  },
+  {
+    timestamp: 1755000000028,
+    name: 'EnableUnaccentExtension1755000000028',
+  },
 ];
 
 async function isFreshDatabase(ds: DataSource): Promise<boolean> {
@@ -112,9 +120,12 @@ async function isFreshDatabase(ds: DataSource): Promise<boolean> {
 async function runBaseline(ds: DataSource): Promise<void> {
   console.log('Fresh database detected — running baseline sync...');
 
-  // 1. Ensure uuid-ossp extension (used by migrations 0000000/0000001)
+  // 1. Ensure extensions used by migrations/entities (uuid-ossp for the early
+  //    migrations; unaccent for the members accent-insensitive search, which
+  //    is only created by migration 0028 and would otherwise be skipped here).
   await ds.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
-  console.log('  Extension uuid-ossp ensured.');
+  await ds.query('CREATE EXTENSION IF NOT EXISTS "unaccent"');
+  console.log('  Extensions uuid-ossp and unaccent ensured.');
 
   // 2. Create all tables from entities
   await ds.synchronize();

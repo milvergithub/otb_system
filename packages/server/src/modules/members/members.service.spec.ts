@@ -2,7 +2,7 @@ jest.mock('@nestjs/event-emitter', () => ({
   EventEmitter2: class EventEmitter2 {},
 }));
 
-import { FindOperator, IsNull, Not } from 'typeorm';
+import { Brackets } from 'typeorm';
 import { MembersService } from './members.service';
 import { ROLES_KEY } from '../../common/decorators/roles.decorator';
 import { MembersController } from './members.controller';
@@ -21,12 +21,36 @@ const INACTIVE_TYPE = {
   is_active: false,
 };
 
+function makeQueryBuilder() {
+  const qb: Record<string, jest.Mock> = {};
+  qb.leftJoinAndSelect = jest.fn(() => qb);
+  qb.withDeleted = jest.fn(() => qb);
+  qb.andWhere = jest.fn(() => qb);
+  qb.orWhere = jest.fn(() => qb);
+  qb.where = jest.fn(() => qb);
+  qb.orderBy = jest.fn(() => qb);
+  qb.addOrderBy = jest.fn(() => qb);
+  qb.skip = jest.fn(() => qb);
+  qb.take = jest.fn(() => qb);
+  qb.getManyAndCount = jest.fn(async () => [[], 0]);
+  return qb;
+}
+
+type MockQueryBuilder = ReturnType<typeof makeQueryBuilder>;
+
+function expandBracket(bracket: unknown): MockQueryBuilder {
+  const inner = makeQueryBuilder();
+  (bracket as Brackets).whereFactory(inner as never);
+  return inner;
+}
+
 function makeRepos() {
+  const qb = makeQueryBuilder();
   const membersRepo = {
     findOne: jest.fn(),
     findOneBy: jest.fn(),
-    findAndCount: jest.fn(),
     find: jest.fn(),
+    createQueryBuilder: jest.fn(() => qb),
     create: jest.fn((v) => ({ ...v })),
     save: jest.fn(async (v) => ({ id: v.id ?? 'member-new', ...v })),
     remove: jest.fn(async (v) => v),
@@ -43,7 +67,7 @@ function makeRepos() {
     memberTypeRepo as never,
     eventEmitter as never,
   );
-  return { service, membersRepo, memberTypeRepo, eventEmitter };
+  return { service, membersRepo, memberTypeRepo, eventEmitter, qb };
 }
 
 const BASE_MEMBER = {
@@ -187,8 +211,8 @@ describe('MembersService update with member type', () => {
 
 describe('MembersService filtering by member type', () => {
   it('filters by a specific member type', async () => {
-    const { service, membersRepo } = makeRepos();
-    membersRepo.findAndCount.mockResolvedValue([
+    const { service, qb } = makeRepos();
+    qb.getManyAndCount.mockResolvedValue([
       [{ ...BASE_MEMBER, member_type: ACTIVE_TYPE }],
       1,
     ]);
@@ -199,75 +223,61 @@ describe('MembersService filtering by member type', () => {
       'type-active',
     );
 
-    const arg = membersRepo.findAndCount.mock.calls[0][0] as {
-      where: Record<string, unknown>[];
-      withDeleted: boolean;
-    };
-    expect(arg.where[0].member_type_id).toBe('type-active');
-    expect(arg.withDeleted).toBe(false);
+    expect(qb.andWhere).toHaveBeenCalledWith(
+      'm.member_type_id = :memberTypeId',
+      { memberTypeId: 'type-active' },
+    );
+    expect(qb.withDeleted).not.toHaveBeenCalled();
     expect(result.items).toHaveLength(1);
   });
 
   it('filters unassigned members with the none marker', async () => {
-    const { service, membersRepo } = makeRepos();
-    membersRepo.findAndCount.mockResolvedValue([[BASE_MEMBER], 1]);
+    const { service, qb } = makeRepos();
+    qb.getManyAndCount.mockResolvedValue([[BASE_MEMBER], 1]);
 
     await service.findAll({ page: 1, limit: 10 } as never, undefined, 'none');
 
-    const arg = membersRepo.findAndCount.mock.calls[0][0] as {
-      where: Record<string, unknown>[];
-    };
-    expect(arg.where[0].member_type_id).toBeInstanceOf(Object);
+    expect(qb.andWhere).toHaveBeenCalledWith('m.member_type_id IS NULL');
   });
 
   it('lists members without a type when no filter is applied', async () => {
-    const { service, membersRepo } = makeRepos();
-    membersRepo.findAndCount.mockResolvedValue([[BASE_MEMBER], 1]);
+    const { service, qb } = makeRepos();
+    qb.getManyAndCount.mockResolvedValue([[BASE_MEMBER], 1]);
 
     const result = await service.findAll({ page: 1, limit: 10 } as never);
 
-    const arg = membersRepo.findAndCount.mock.calls[0][0] as {
-      where: Record<string, unknown>[];
-      withDeleted: boolean;
-    };
-    expect(arg.where[0].member_type_id).toBeUndefined();
-    expect(arg.withDeleted).toBe(false);
+    const typeFilters = qb.andWhere.mock.calls.filter((call) =>
+      String(call[0]).includes('member_type_id'),
+    );
+    expect(typeFilters).toHaveLength(0);
+    expect(qb.withDeleted).not.toHaveBeenCalled();
     expect(result.total).toBe(1);
     expect(result.items[0].member_type).toBeNull();
   });
 });
 
 describe('MembersService soft delete status', () => {
-  function whereOf(membersRepo: {
-    findAndCount: jest.Mock;
-  }): Record<string, unknown> {
-    return (
-      membersRepo.findAndCount.mock.calls[0][0] as {
-        where: Record<string, unknown>[];
-      }
-    ).where[0];
+  function deletedAtFilter(qb: MockQueryBuilder): unknown {
+    const call = qb.andWhere.mock.calls.find((c) =>
+      String(c[0]).includes('m.deleted_at'),
+    );
+    return call?.[0];
   }
 
   it('defaults to active members only', async () => {
-    const { service, membersRepo } = makeRepos();
-    membersRepo.findAndCount.mockResolvedValue([[BASE_MEMBER], 1]);
+    const { service, qb } = makeRepos();
+    qb.getManyAndCount.mockResolvedValue([[BASE_MEMBER], 1]);
 
     await service.findAll({ page: 1, limit: 10 } as never);
 
-    const arg = membersRepo.findAndCount.mock.calls[0][0] as {
-      withDeleted: boolean;
-    };
-    expect(arg.withDeleted).toBe(false);
-    expect(whereOf(membersRepo).deleted_at).toBeInstanceOf(FindOperator);
-    expect(
-      (whereOf(membersRepo).deleted_at as FindOperator<unknown>).type,
-    ).toBe('isNull');
+    expect(qb.withDeleted).not.toHaveBeenCalled();
+    expect(deletedAtFilter(qb)).toBe('m.deleted_at IS NULL');
   });
 
   it('lists softly deleted members when status is deleted', async () => {
-    const { service, membersRepo } = makeRepos();
+    const { service, qb } = makeRepos();
     const deleted = { ...BASE_MEMBER, deleted_at: new Date() };
-    membersRepo.findAndCount.mockResolvedValue([[deleted], 1]);
+    qb.getManyAndCount.mockResolvedValue([[deleted], 1]);
 
     const result = await service.findAll(
       { page: 1, limit: 10 } as never,
@@ -276,20 +286,14 @@ describe('MembersService soft delete status', () => {
       'deleted',
     );
 
-    const arg = membersRepo.findAndCount.mock.calls[0][0] as {
-      withDeleted: boolean;
-    };
-    expect(arg.withDeleted).toBe(true);
-    expect(whereOf(membersRepo).deleted_at).toBeInstanceOf(FindOperator);
-    expect(
-      (whereOf(membersRepo).deleted_at as FindOperator<unknown>).type,
-    ).toBe('not');
+    expect(qb.withDeleted).toHaveBeenCalled();
+    expect(deletedAtFilter(qb)).toBe('m.deleted_at IS NOT NULL');
     expect(result.items[0].deleted_at).toBe(deleted.deleted_at);
   });
 
   it('returns active and deleted members for status all', async () => {
-    const { service, membersRepo } = makeRepos();
-    membersRepo.findAndCount.mockResolvedValue([[BASE_MEMBER], 1]);
+    const { service, qb } = makeRepos();
+    qb.getManyAndCount.mockResolvedValue([[BASE_MEMBER], 1]);
 
     await service.findAll(
       { page: 1, limit: 10 } as never,
@@ -298,11 +302,94 @@ describe('MembersService soft delete status', () => {
       'all',
     );
 
-    const arg = membersRepo.findAndCount.mock.calls[0][0] as {
-      withDeleted: boolean;
-    };
-    expect(arg.withDeleted).toBe(true);
-    expect(whereOf(membersRepo).deleted_at).toBeUndefined();
+    expect(qb.withDeleted).toHaveBeenCalled();
+    expect(deletedAtFilter(qb)).toBeUndefined();
+  });
+});
+
+describe('MembersService search', () => {
+  function searchBrackets(qb: MockQueryBuilder): Brackets[] {
+    return qb.andWhere.mock.calls
+      .map((call) => call[0])
+      .filter((arg): arg is Brackets => arg instanceof Brackets);
+  }
+
+  function tokenColumns(bracket: unknown): string[] {
+    const inner = expandBracket(bracket);
+    return [...inner.where.mock.calls, ...inner.orWhere.mock.calls].map(
+      (call) => call[0] as string,
+    );
+  }
+
+  it('does not filter when the search is blank', async () => {
+    const { service, qb } = makeRepos();
+    qb.getManyAndCount.mockResolvedValue([[BASE_MEMBER], 1]);
+
+    await service.findAll({ page: 1, limit: 10 } as never, '   ');
+
+    expect(searchBrackets(qb)).toHaveLength(0);
+  });
+
+  it('matches a single token across name, last name and CI, accent-insensitively', async () => {
+    const { service, qb } = makeRepos();
+    qb.getManyAndCount.mockResolvedValue([[BASE_MEMBER], 1]);
+
+    await service.findAll({ page: 1, limit: 10 } as never, 'martinez');
+
+    const brackets = searchBrackets(qb);
+    expect(brackets).toHaveLength(1);
+
+    const tokenFilters = expandBracket(brackets[0]).andWhere.mock.calls;
+    expect(tokenFilters).toHaveLength(1);
+    expect(tokenFilters[0][1]).toEqual({ searchToken0: '%martinez%' });
+
+    expect(tokenColumns(tokenFilters[0][0])).toEqual([
+      'unaccent(m.first_name) ILIKE unaccent(:searchToken0)',
+      'unaccent(m.last_name) ILIKE unaccent(:searchToken0)',
+      'unaccent(m.ci) ILIKE unaccent(:searchToken0)',
+    ]);
+  });
+
+  it('ANDs every token so a full name matches across columns', async () => {
+    const { service, qb } = makeRepos();
+    qb.getManyAndCount.mockResolvedValue([[BASE_MEMBER], 1]);
+
+    await service.findAll(
+      { page: 1, limit: 10 } as never,
+      '  Juan   Martinez ',
+    );
+
+    const outer = expandBracket(searchBrackets(qb)[0]);
+    const tokenFilters = outer.andWhere.mock.calls;
+    expect(tokenFilters).toHaveLength(2);
+    expect(tokenFilters[0][1]).toEqual({ searchToken0: '%Juan%' });
+    expect(tokenFilters[1][1]).toEqual({ searchToken1: '%Martinez%' });
+
+    expect(tokenColumns(tokenFilters[0][0])[0]).toBe(
+      'unaccent(m.first_name) ILIKE unaccent(:searchToken0)',
+    );
+    expect(tokenColumns(tokenFilters[1][0])[0]).toBe(
+      'unaccent(m.first_name) ILIKE unaccent(:searchToken1)',
+    );
+  });
+
+  it('combines the search with the member type and status filters', async () => {
+    const { service, qb } = makeRepos();
+    qb.getManyAndCount.mockResolvedValue([[BASE_MEMBER], 1]);
+
+    await service.findAll(
+      { page: 1, limit: 10 } as never,
+      'jose',
+      'type-active',
+      'active',
+    );
+
+    expect(qb.andWhere).toHaveBeenCalledWith(
+      'm.member_type_id = :memberTypeId',
+      { memberTypeId: 'type-active' },
+    );
+    expect(qb.andWhere).toHaveBeenCalledWith('m.deleted_at IS NULL');
+    expect(searchBrackets(qb)).toHaveLength(1);
   });
 });
 

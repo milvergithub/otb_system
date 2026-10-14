@@ -27,12 +27,14 @@ export class BillingController {
     @Query('year') year?: string,
     @Query('status') status?: PaymentStatus,
     @Query('search') search?: string,
+    @Query('meterId') meterId?: string,
   ) {
     return this.billingService.findAll(pagination, {
       month: month ? parseInt(month, 10) : undefined,
       year: year ? parseInt(year, 10) : undefined,
       status,
       search,
+      meterId,
     });
   }
 

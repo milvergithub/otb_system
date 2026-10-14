@@ -6,6 +6,7 @@ import {
   PaginationDto,
 } from '../../common/dto/pagination.dto';
 import { buildOrder } from '../../common/utils/sort';
+import { applyTokenizedSearch } from '../../common/utils/search';
 import { Meter } from '../meters/entities/meter.entity';
 import { CreateConsumptionDto } from './dto/consumption.dto';
 import { Consumption } from './entities/consumption.entity';
@@ -55,12 +56,15 @@ export class ConsumptionService {
         meterId: filters.meterId,
       });
     }
-    if (filters.search) {
-      query.andWhere(
-        '(meter.code ILIKE :search OR member.first_name ILIKE :search OR member.last_name ILIKE :search)',
-        { search: `%${filters.search}%` },
-      );
-    }
+    // Multi-word, accent-insensitive search across the meter code and the
+    // member's name/CI (the table shows the member name). Tokens are ANDed so
+    // "juan martinez" matches across first_name and last_name.
+    applyTokenizedSearch(query, filters.search, [
+      'meter.code',
+      'member.first_name',
+      'member.last_name',
+      'member.ci',
+    ]);
 
     const sortColumns = buildOrder(sortBy, sortOrder, SORT_COLUMNS);
     if (sortColumns.length > 0) {

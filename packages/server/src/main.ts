@@ -5,6 +5,7 @@ import { apiReference } from '@scalar/nestjs-api-reference';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import helmet from 'helmet';
 import * as express from 'express';
+import { DataSource } from 'typeorm';
 import { AppModule } from './app.module';
 import { AppConfig } from './config/app.config';
 import { LocalizedValidationPipe } from './common/errors/localized-validation.pipe';
@@ -13,6 +14,20 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
   const logger = app.get(WINSTON_MODULE_NEST_PROVIDER);
   app.useLogger(logger);
+
+  // Dev uses `synchronize` instead of migrations, so the `unaccent` extension
+  // (created by migration 0028) may not exist yet; the members search needs it.
+  // Idempotent and non-fatal: a DB user without privileges still boots.
+  try {
+    await app
+      .get(DataSource)
+      .query(`CREATE EXTENSION IF NOT EXISTS "unaccent"`);
+  } catch (err) {
+    logger.warn(
+      `Could not ensure the unaccent extension: ${(err as Error).message}`,
+      'Bootstrap',
+    );
+  }
 
   const configService = app.get(ConfigService);
   const config = configService.get<AppConfig>('app')!;

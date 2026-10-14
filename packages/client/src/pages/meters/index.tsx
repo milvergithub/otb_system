@@ -18,6 +18,7 @@ import { useAuth } from "@/lib/auth"
 import { useSearchMeters, useMeterMap } from "@/hooks/meters"
 import { useMeterTypes } from "@/hooks/meterTypes"
 import { useZones } from "@/hooks/zones"
+import { useDebounce } from "@/hooks/use-debounce"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -42,8 +43,13 @@ export default function MetersPage() {
   const { hasPermission } = useAuth()
 
   const [page, setPage] = useState(1)
-  const [search, setSearch] = useState("")
   const [searchInput, setSearchInput] = useState("")
+  const debouncedSearch = useDebounce(searchInput.trim(), 300)
+  const [search, setSearch] = useState(debouncedSearch)
+  if (search !== debouncedSearch) {
+    setSearch(debouncedSearch)
+    setPage(1)
+  }
   const [statusFilter, setStatusFilter] = useState<string>("")
   const [typeFilter, setTypeFilter] = useState<string>("")
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -127,12 +133,6 @@ export default function MetersPage() {
                 placeholder="Buscar por código, socio o CI..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    setSearch(searchInput.trim())
-                    setPage(1)
-                  }
-                }}
               />
             </div>
             <ComboboxSelect

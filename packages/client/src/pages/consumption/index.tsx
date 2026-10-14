@@ -6,6 +6,7 @@ import type { Consumption } from "@/lib/types"
 import { useAuth } from "@/lib/auth"
 import { useSearchConsumptions } from "@/hooks/consumptions"
 import { useMetersSelect } from "@/hooks/meters"
+import { useDebounce } from "@/hooks/use-debounce"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -32,8 +33,13 @@ export default function ConsumptionPage() {
   const [month, setMonth] = useState<string>("")
   const [year, setYear] = useState<string>("")
   const [meterId, setMeterId] = useState<string>("")
-  const [search, setSearch] = useState("")
   const [searchInput, setSearchInput] = useState("")
+  const debouncedSearch = useDebounce(searchInput.trim(), 300)
+  const [search, setSearch] = useState(debouncedSearch)
+  if (search !== debouncedSearch) {
+    setSearch(debouncedSearch)
+    setPage(1)
+  }
   const [dialogOpen, setDialogOpen] = useState(false)
   const [generating, setGenerating] = useState<Consumption | null>(null)
   const [deleting, setDeleting] = useState<Consumption | null>(null)
@@ -81,12 +87,6 @@ export default function ConsumptionPage() {
             placeholder={t("consumption.searchPlaceholder")}
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                setSearch(searchInput.trim())
-                setPage(1)
-              }
-            }}
           />
         </div>
         <ComboboxSelect

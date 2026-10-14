@@ -6,7 +6,7 @@ import type { Payment, PaymentStatus } from "@/lib/types"
 import { useAuth } from "@/lib/auth"
 import { useSearchBills } from "@/hooks/billing"
 import { useMetersSelect } from "@/hooks/meters"
-import { Button } from "@/components/ui/button"
+import { useDebounce } from "@/hooks/use-debounce"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -26,8 +26,13 @@ export default function BillingPage() {
   const { t } = useTranslation()
   const months = monthNames()
   const [page, setPage] = useState(1)
-  const [search, setSearch] = useState("")
   const [searchInput, setSearchInput] = useState("")
+  const debouncedSearch = useDebounce(searchInput.trim(), 300)
+  const [search, setSearch] = useState(debouncedSearch)
+  if (search !== debouncedSearch) {
+    setSearch(debouncedSearch)
+    setPage(1)
+  }
   const [month, setMonth] = useState<string>("")
   const [year, setYear] = useState<string>("")
   const [status, setStatus] = useState<string>("")
@@ -70,12 +75,6 @@ export default function BillingPage() {
             placeholder={t("billing.searchPlaceholder")}
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                setSearch(searchInput.trim())
-                setPage(1)
-              }
-            }}
           />
         </div>
         <ComboboxSelect
@@ -162,7 +161,10 @@ export default function BillingPage() {
                             permission: "billing.download",
                             onClick: () => handleDownloadReceipt(p)
                         },
-                        ...(remaining(p) > 0
+                        ...((remaining(p) > 0 ||
+        (parseFloat(p.total_amount) === 0 &&
+          parseFloat(p.amount_paid) === 0 &&
+          p.status !== 'paid'))
                             ? [
                                 { label: t("billing.pay"),
                                     icon: <Wallet className="size-4" />,

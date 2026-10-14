@@ -7,6 +7,7 @@ import {
   PaginationDto,
 } from '../../common/dto/pagination.dto';
 import { buildOrder } from '../../common/utils/sort';
+import { applyTokenizedSearch } from '../../common/utils/search';
 import { buildInvoiceCode } from '../../common/utils/invoice-code';
 import { Consumption } from '../consumption/entities/consumption.entity';
 import { StorageService } from '../consumption/storage.service';
@@ -108,6 +109,7 @@ export class BillingService {
       year?: number;
       status?: PaymentStatus;
       search?: string;
+      meterId?: string;
     } = {},
   ): Promise<PaginatedResult<Payment>> {
     const { page, limit, sortBy, sortOrder } = pagination;
@@ -132,12 +134,18 @@ export class BillingService {
     if (filters.status) {
       query.andWhere('payment.status = :status', { status: filters.status });
     }
-    if (filters.search) {
-      query.andWhere(
-        '(member.first_name ILIKE :search OR member.last_name ILIKE :search OR meter.code ILIKE :search)',
-        { search: `%${filters.search}%` },
-      );
+    if (filters.meterId) {
+      query.andWhere('consumption.meter_id = :meterId', {
+        meterId: filters.meterId,
+      });
     }
+    // Multi-word, accent-insensitive search across the meter code and the
+    // member's name, so "juan martinez" and "jose" both find their matches.
+    applyTokenizedSearch(query, filters.search, [
+      'member.first_name',
+      'member.last_name',
+      'meter.code',
+    ]);
 
     const sortColumns = buildOrder(sortBy, sortOrder, SORT_COLUMNS);
     if (sortColumns.length > 0) {

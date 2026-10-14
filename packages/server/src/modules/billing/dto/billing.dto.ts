@@ -13,7 +13,7 @@ import { PaymentStatus } from '../entities/payment.entity';
 
 export class PayBillDto {
   @IsNumber()
-  @Min(0.01)
+  @Min(0)
   amount: number;
 
   @IsOptional()

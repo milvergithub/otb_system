@@ -285,7 +285,7 @@ function ControlSection({
                       </span>
                       <Badge
                         variant="secondary"
-                        className="w-fit gap-0 text-[10px] font-semibold px-1.5 py-0"
+                        className="w-fit gap-0 text-xs font-semibold px-1.5 py-0"
                       >
                         {row.ci}
                       </Badge>
@@ -582,7 +582,7 @@ export default function AttendancePage() {
                                 </span>
                                 <Badge
                                   variant="secondary"
-                                  className="w-fit gap-0 text-[10px] font-semibold px-1.5 py-0"
+                                  className="w-fit gap-0 text-xs font-semibold px-1.5 py-0"
                                 >
                                   {row.ci}
                                 </Badge>

@@ -2,13 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { setImmediate } from 'node:timers';
-import { ILike, IsNull, Not, Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { parse } from 'csv-parse/sync';
 import {
   PaginatedResult,
   PaginationDto,
 } from '../../common/dto/pagination.dto';
 import { buildOrder } from '../../common/utils/sort';
+import { applyTokenizedSearch } from '../../common/utils/search';
 import { Member } from './entities/member.entity';
 import { MemberType } from './entities/member-type.entity';
 import { CreateMemberDto, UpdateMemberDto } from './dto/member.dto';
@@ -59,44 +60,48 @@ export class MembersService {
   ): Promise<PaginatedResult<Member>> {
     const { page, limit, sortBy, sortOrder } = pagination;
 
-    const isUnassigned = memberTypeId === 'none' || memberTypeId === 'null';
-    const base = isUnassigned
-      ? { member_type_id: IsNull() }
-      : memberTypeId
-        ? { member_type_id: memberTypeId }
-        : {};
-
-    const deletedCondition =
-      status === 'deleted'
-        ? { deleted_at: Not(IsNull()) }
-        : status === 'all'
-          ? {}
-          : { deleted_at: IsNull() };
+    const qb = this.membersRepository
+      .createQueryBuilder('m')
+      .leftJoinAndSelect('m.meters', 'meter')
+      .leftJoinAndSelect('m.member_type', 'memberType');
 
     // The explicit deleted_at filter keeps this independent of TypeORM's
     // default behavior; withDeleted must be enabled because the deleted
     // branches intentionally query rows that the default excludes.
-    const where = search
-      ? [
-          { ...base, ...deletedCondition, first_name: ILike(`%${search}%`) },
-          { ...base, ...deletedCondition, last_name: ILike(`%${search}%`) },
-          { ...base, ...deletedCondition, ci: ILike(`%${search}%`) },
-        ]
-      : [{ ...base, ...deletedCondition }];
+    if (status === 'deleted') {
+      qb.withDeleted().andWhere('m.deleted_at IS NOT NULL');
+    } else if (status === 'all') {
+      qb.withDeleted();
+    } else {
+      qb.andWhere('m.deleted_at IS NULL');
+    }
 
-    const order = buildOrder(sortBy, sortOrder, SORT_COLUMNS).reduce(
-      (acc, { column, dir }) => ({ ...acc, [column]: dir }),
-      {} as Record<string, 'ASC' | 'DESC'>,
-    );
+    if (memberTypeId === 'none' || memberTypeId === 'null') {
+      qb.andWhere('m.member_type_id IS NULL');
+    } else if (memberTypeId) {
+      qb.andWhere('m.member_type_id = :memberTypeId', { memberTypeId });
+    }
 
-    const [items, total] = await this.membersRepository.findAndCount({
-      relations: ['meters', 'member_type'],
-      withDeleted: status !== 'active',
-      where,
-      order: Object.keys(order).length ? order : { first_name: 'ASC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    // Multi-word, accent-insensitive search across first_name/last_name/ci.
+    applyTokenizedSearch(qb, search, ['m.first_name', 'm.last_name', 'm.ci']);
+
+    const sortColumns = buildOrder(sortBy, sortOrder, SORT_COLUMNS);
+    if (sortColumns.length > 0) {
+      sortColumns.forEach(({ column, dir }, index) => {
+        if (index === 0) {
+          qb.orderBy(`m.${column}`, dir);
+        } else {
+          qb.addOrderBy(`m.${column}`, dir);
+        }
+      });
+    } else {
+      qb.orderBy('m.first_name', 'ASC');
+    }
+
+    const [items, total] = await qb
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
 
     return {
       items,

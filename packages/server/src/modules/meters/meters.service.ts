@@ -8,6 +8,7 @@ import {
   PaginationDto,
 } from '../../common/dto/pagination.dto';
 import { buildOrder } from '../../common/utils/sort';
+import { applyTokenizedSearch } from '../../common/utils/search';
 import { Member } from '../members/entities/member.entity';
 import { SharePayment } from '../shares/entities/share-payment.entity';
 import { SharePaymentsService } from '../shares/share-payments.service';
@@ -71,12 +72,14 @@ export class MetersService {
     if (filters.type) {
       query.andWhere('meter.type_id = :typeId', { typeId: filters.type });
     }
-    if (filters.search) {
-      query.andWhere(
-        '(meter.code ILIKE :search OR member.first_name ILIKE :search OR member.last_name ILIKE :search OR member.ci ILIKE :search)',
-        { search: `%${filters.search}%` },
-      );
-    }
+    // Multi-word, accent-insensitive search across code and the member's
+    // name/CI, so "juan martinez" and "jose" both find their matches.
+    applyTokenizedSearch(query, filters.search, [
+      'meter.code',
+      'member.first_name',
+      'member.last_name',
+      'member.ci',
+    ]);
 
     const sortColumns = buildOrder(sortBy, sortOrder, SORT_COLUMNS);
     if (sortColumns.length > 0) {
