@@ -4,6 +4,7 @@ import {
   ExternalLink,
   HandCoins,
   List,
+  LocateFixed,
   Map,
   MapPin,
   Pencil,
@@ -12,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react"
 import { MapContainer, Marker, Popup, GeoJSON, TileLayer, LayersControl } from "react-leaflet"
+import { toast } from "sonner"
 import type { Meter } from "@/lib/types"
 import { formatCurrency, formatDate, getWhatsAppUrl, googleMapsUrl } from "@/lib/utils"
 import { useAuth } from "@/lib/auth"
@@ -32,6 +34,7 @@ import { DataTablePagination } from "@/components/ui/data-table-pagination"
 import Can from "@/components/Can"
 import { STATUS_LABEL, SHARE_STATUS_LABEL, DEFAULT_CENTER, markerIcon } from "./constants"
 import { FitBounds, shareStatusOf, hasCoords, useMemberName, zoneBoundsPoints } from "./helpers"
+import UserLocation from "./UserLocation"
 import MeterFormDialog from "./MeterFormDialog"
 import SharePaymentsDialog from "./SharePaymentsDialog"
 import MeterDetailSheet from "./MeterDetailSheet"
@@ -57,6 +60,7 @@ export default function MetersPage() {
   const [deleting, setDeleting] = useState<Meter | null>(null)
   const [shareMeter, setShareMeter] = useState<Meter | null>(null)
   const [viewing, setViewing] = useState<Meter | null>(null)
+  const [locating, setLocating] = useState(false)
 
   const { sort, toggleSort } = useTableSort(
     { key: "created_at", order: "desc" },
@@ -428,7 +432,32 @@ export default function MetersPage() {
                         </Marker>
                       ),
                   )}
+                  <UserLocation
+                    active={locating}
+                    onError={() => {
+                      setLocating(false)
+                      toast.error(t("meters.locationDenied"))
+                    }}
+                  />
                 </MapContainer>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant={locating ? "default" : "outline"}
+                  className="absolute bottom-4 right-4 z-[1000] shadow"
+                  title={t("meters.useMyLocation")}
+                  aria-label={t("meters.useMyLocation")}
+                  aria-pressed={locating}
+                  onClick={() => {
+                    if (!navigator.geolocation) {
+                      toast.error(t("meters.locationDenied"))
+                      return
+                    }
+                    setLocating((value) => !value)
+                  }}
+                >
+                  <LocateFixed className={locating ? "animate-pulse" : undefined} />
+                </Button>
                 {mapMeters &&
                 !mapMeters.some((m) => m.latitude && m.longitude) ? (
                   <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
