@@ -86,6 +86,8 @@ const en = {
     // -------------------------------------------------------- discount
     DISCOUNT_NOT_FOUND: 'Discount not found',
     DISCOUNT_NAME_EXISTS: 'Discount name already exists',
+    SURCHARGE_NOT_FOUND: 'Surcharge not found',
+    SURCHARGE_NAME_EXISTS: 'Surcharge name already exists',
 
     // --------------------------------------------------------- tariffs
     TARIFF_NOT_FOUND: 'Tariff not found',

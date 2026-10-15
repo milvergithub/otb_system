@@ -49,6 +49,9 @@ export const ApiPath = {
     DISCOUNTS: "/billing/discounts",
     DISCOUNT_ONE: (id: string) => `/billing/discounts/${id}` as const,
     DISCOUNTS_ACTIVE: "/billing/discounts/active",
+    SURCHARGES: "/billing/surcharges",
+    SURCHARGE_ONE: (id: string) => `/billing/surcharges/${id}` as const,
+    SURCHARGES_ACTIVE: "/billing/surcharges/active",
     GENERATE: (id: string) => `/billing/${id}/generate` as const,
   },
   Tariffs: {

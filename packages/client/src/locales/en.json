@@ -298,6 +298,20 @@
     "noMeters": "No meters found",
     "empty": "No meters found",
     "noMetersWithLocation": "No meters with location yet",
+    "route": {
+      "title": "Route",
+      "start": "Start route",
+      "end": "End route",
+      "loading": "Calculating route…",
+      "error": "Could not calculate the route",
+      "noMeters": "No meters with location",
+      "gettingLocation": "Getting your location…",
+      "summary": "{{count}} stops · {{distance}}",
+      "visited": "Visited",
+      "next": "Next",
+      "previous": "Previous",
+      "completed": "Route completed"
+    },
     "noun": "meters",
     "statuses": {
       "decommissioned": "Decommissioned"
@@ -395,6 +409,13 @@
     "generateTitle": "Generate bill",
     "generateDesc": "Generate a bill for meter {{code}} for {{period}}?",
     "applyDiscounts": "Apply discounts (optional)",
+    "originalAmount": "Estimated bill amount",
+    "overdueNotice": "{{count}} prior overdue bill(s) with a pending balance",
+    "surchargeTotal": "Late fee total",
+    "surchargeCalculated": "confirmed on generation",
+    "previewEstimateNote": "Preview only; the server validates the final amount.",
+    "noDefaultSurcharge": "Overdue bills exist but no default surcharge is configured.",
+    "surchargeBelowThreshold": "The late fee applies from {{min}} overdue bills with balance ({{count}} so far)",
     "generating": "Generating...",
     "generate": "Generate",
     "daysOverdue": "days overdue",
@@ -446,7 +467,9 @@
     "meter": "Meter",
     "discounts": "Discounts",
     "totalDiscounted": "Total: -{{amount}}",
-    "paymentHistory": "Payment history"
+    "paymentHistory": "Payment history",
+    "lateFee": "Late fee",
+    "totalSurcharged": "Late fee total: +{{amount}}"
   },
   "tariffs": {
     "title": "Tariffs",
@@ -639,7 +662,18 @@
     "waterShareResponsible": {
       "label": "Water action responsible",
       "description": "Default responsible user for water action (share) payments."
-    }
+    },
+    "lateFee": {
+      "enabled": {
+        "label": "Late fee enabled",
+        "description": "Enable late fees for overdue members"
+      },
+      "minMonths": {
+        "label": "Minimum overdue months",
+        "description": "Months overdue before applying a surcharge"
+      }
+    },
+    "surcharges": "Surcharges"
   },
   "shares": {
     "title": "Water Shares",
@@ -718,9 +752,9 @@
       "create": "Create",
       "update": "Update",
       "delete": "Delete",
-    "export": "Export",
-    "import": "Import",
-    "dashboard": "Dashboard",
+      "export": "Export",
+      "import": "Import",
+      "dashboard": "Dashboard",
       "revenue": "Revenue",
       "overdue": "Overdue",
       "all": "View all",
@@ -1426,5 +1460,47 @@
       "finances": "Finances",
       "documents": "Documents"
     }
+  },
+  "surcharges": {
+    "title": "Surcharges",
+    "subtitle": "Manage billing surcharges",
+    "newDiscount": "New surcharge",
+    "name": "Name",
+    "typeLabel": "Type",
+    "value": "Value",
+    "description": "Description",
+    "status": "Status",
+    "created": "Created",
+    "empty": "No surcharges found",
+    "noDiscounts": "No surcharges found",
+    "accessDenied": "Access denied",
+    "updated": "Surcharge updated",
+    "createdToast": "Surcharge created",
+    "deleted": "Surcharge deleted",
+    "editTitle": "Edit surcharge",
+    "newTitle": "New surcharge",
+    "editDescription": "Update the surcharge information below.",
+    "editDesc": "Update the surcharge information below.",
+    "newDescription": "Create a new surcharge that can be applied to bills.",
+    "newDesc": "Create a new surcharge that can be applied to bills.",
+    "type": {
+      "fixed": "Fixed",
+      "percentage": "Percentage"
+    },
+    "amount": "Amount (BOB)",
+    "percentage": "Percentage (%)",
+    "fixedAmountBob": "Fixed amount (BOB)",
+    "percentagePct": "Percentage (%)",
+    "amountBob": "Amount (BOB)",
+    "descriptionOptional": "Description (optional)",
+    "descriptionPlaceholder": "Brief description of this surcharge",
+    "namePlaceholder": "e.g. Late payment fee",
+    "active": "Active",
+    "deleteTitle": "Delete surcharge",
+    "deleteDescription": "Are you sure you want to delete the surcharge {{name}}? This action cannot be undone. Existing bills with this surcharge will retain the amount.",
+    "deleteDesc": "Are you sure you want to delete the surcharge {{name}}? This action cannot be undone. Existing bills with this surcharge will retain the amount.",
+    "newSurcharge": "New surcharge",
+    "defaultLabel": "Default",
+    "defaultDescription": "Applied automatically to each new bill while there are overdue bills with a pending balance"
   }
 }

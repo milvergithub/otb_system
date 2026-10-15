@@ -18,6 +18,27 @@ export interface Role {
 }
 
 export type DiscountType = "fixed" | "percentage"
+export type SurchargeType = "fixed" | "percentage"
+
+export interface Surcharge {
+  id: string
+  name: string
+  type: SurchargeType
+  value: string
+  description?: string | null
+  is_active: boolean
+  is_default: boolean
+  created_at: string
+}
+
+export interface PaymentSurcharge {
+  id: string
+  payment_id: string
+  surcharge_id: string
+  amount: string
+  created_at: string
+  surcharge?: Surcharge
+}
 
 export interface Discount {
   id: string
@@ -240,10 +261,12 @@ export interface Payment {
   due_date: string
   paid_at?: string | null
   discount_amount: string
+  late_fee_amount: string
   created_at: string
   updated_at: string
   history?: PaymentHistory[]
   paymentDiscounts?: PaymentDiscount[]
+  paymentSurcharges?: PaymentSurcharge[]
 }
 
 export type NotificationType = "expiration" | "pending" | "overdue" | "payment"

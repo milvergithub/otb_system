@@ -4,6 +4,9 @@ jest.mock('@nestjs/event-emitter', () => ({
 
 import { Brackets } from 'typeorm';
 import { BillingService } from './billing.service';
+import { SurchargeService } from './surcharge.service';
+import { Surcharge, SurchargeType } from './entities/surcharge.entity';
+import { Discount, DiscountType } from './entities/discount.entity';
 
 function makeQueryBuilder() {
   const qb: Record<string, jest.Mock> = {};
@@ -29,19 +32,21 @@ function makeService() {
   };
   const service = new BillingService(
     paymentsRepository as never,
-    {} as never,
-    {} as never,
-    {} as never,
-    {} as never,
-    {} as never,
-    {} as never,
-    {} as never,
-    {} as never,
-    {} as never,
-    {} as never,
-    {} as never,
-    {} as never,
-    {} as never,
+    {} as never, // history
+    {} as never, // paymentDiscounts
+    {} as never, // paymentSurcharges
+    {} as never, // consumptions
+    {} as never, // tariffs
+    {} as never, // baseTariff
+    {} as never, // settings
+    {} as never, // discountService
+    {} as never, // surchargeService
+    {} as never, // eventEmitter
+    {} as never, // storage
+    {} as never, // finances
+    {} as never, // responsibility
+    {} as never, // paymentMethods
+    {} as never, // dataSource
   );
   return { service, paymentsRepository, qb };
 }
@@ -120,5 +125,506 @@ describe('BillingService search', () => {
       { meterId: 'meter-1' },
     );
     expect(searchBrackets(qb)).toHaveLength(1);
+  });
+});
+
+function makeSurchargeFixture(
+  id: string,
+  type: SurchargeType,
+  value: string,
+): Surcharge {
+  return {
+    id,
+    name: `surcharge-${id}`,
+    type,
+    value,
+    description: undefined,
+    is_active: true,
+    is_default: true,
+    created_at: new Date(),
+    updated_at: new Date(),
+  } as Surcharge;
+}
+
+let billSeq = 0;
+function makeBillFixture(
+  totalAmount: string,
+  amountPaid: string,
+  dueDate = '2026-01-15',
+) {
+  billSeq += 1;
+  return {
+    id: `bill-${billSeq}`,
+    total_amount: totalAmount,
+    amount_paid: amountPaid,
+    status: 'overdue',
+    due_date: dueDate,
+  };
+}
+
+function makeConsumptionFixture(
+  id: string,
+  month: number,
+  meterId = 'meter-1',
+  code = 'VL-592020',
+) {
+  return {
+    id,
+    meter_id: meterId,
+    cubic_meters: '6',
+    year: 2026,
+    month,
+    meter: {
+      code,
+      type_id: 'type-1',
+      member: { id: 'member-1', first_name: 'Juan', last_name: 'Perez' },
+    },
+  };
+}
+
+type GenerateBillOptions = {
+  lateFeeEnabled?: boolean;
+  minMonths?: number;
+  overdueBills?: Record<string, unknown>[];
+  defaults?: Surcharge[];
+  discounts?: Discount[];
+  consumptions?: Record<string, unknown>[];
+};
+
+function makeGenerateBillService(opts: GenerateBillOptions = {}) {
+  const {
+    lateFeeEnabled = true,
+    minMonths = 3,
+    overdueBills = [],
+    defaults = [],
+    discounts = [],
+    consumptions = [makeConsumptionFixture('consumption-1', 9)],
+  } = opts;
+
+  const overdueQb: Record<string, jest.Mock> = {};
+  overdueQb.leftJoin = jest.fn(() => overdueQb);
+  overdueQb.where = jest.fn(() => overdueQb);
+  overdueQb.andWhere = jest.fn(() => overdueQb);
+  overdueQb.getMany = jest.fn(async () => overdueBills);
+
+  const paymentsStore = new Map<string, Record<string, unknown>>();
+  let paymentSeq = 0;
+  const paymentsRepository = {
+    findOne: jest.fn(async (findOpts: { where?: Record<string, unknown> }) => {
+      const where = findOpts?.where ?? {};
+      if (where.consumption_id) {
+        return paymentsStore.get(String(where.consumption_id)) ?? null;
+      }
+      if (where.id) {
+        return (
+          [...paymentsStore.values()].find((p) => p.id === where.id) ?? null
+        );
+      }
+      return null;
+    }),
+    create: jest.fn((data: Record<string, unknown>) => ({ ...data })),
+    save: jest.fn(async (data: Record<string, unknown>) => {
+      if (!data.id) {
+        paymentSeq += 1;
+        data.id = `payment-${paymentSeq}`;
+      }
+      if (data.consumption_id) {
+        paymentsStore.set(String(data.consumption_id), data);
+      }
+      return data;
+    }),
+    createQueryBuilder: jest.fn(() => overdueQb),
+  };
+
+  const consumptionsById = new Map<string, Record<string, unknown>>(
+    consumptions.map(
+      (c) => [String(c.id), c] as [string, Record<string, unknown>],
+    ),
+  );
+  const consumptionsRepository = {
+    findOne: jest.fn(
+      async (findOpts: { where?: Record<string, unknown> }) =>
+        consumptionsById.get(String(findOpts?.where?.id)) ?? null,
+    ),
+  };
+
+  const savedSurcharges: Record<string, unknown>[] = [];
+  const paymentSurchargesRepository = {
+    create: jest.fn((data: Record<string, unknown>) => ({ ...data })),
+    save: jest.fn(async (data: Record<string, unknown>) => {
+      savedSurcharges.push(data);
+      return data;
+    }),
+  };
+
+  const savedDiscounts: Record<string, unknown>[] = [];
+  const paymentDiscountsRepository = {
+    create: jest.fn((data: Record<string, unknown>) => ({ ...data })),
+    save: jest.fn(async (data: Record<string, unknown>) => {
+      savedDiscounts.push(data);
+      return data;
+    }),
+  };
+
+  const settingsService = {
+    getPaymentDueDay: jest.fn(async () => 15),
+    getLateFeeEnabled: jest.fn(async () => lateFeeEnabled),
+    getLateFeeMinMonths: jest.fn(async () => minMonths),
+  };
+
+  const realSurchargeService = new SurchargeService({} as never);
+  const surchargeService = {
+    findDefaults: jest.fn(async () => defaults),
+    calculateSurchargeAmount:
+      realSurchargeService.calculateSurchargeAmount.bind(realSurchargeService),
+  };
+
+  const discountsById = new Map(discounts.map((d) => [d.id, d]));
+  const discountService = {
+    findOne: jest.fn(async (id: string) => {
+      const discount = discountsById.get(id);
+      if (!discount) throw new Error('DISCOUNT_NOT_FOUND');
+      return discount;
+    }),
+    calculateDiscountAmount: (totalAmount: number, discount: Discount) => {
+      const value = parseFloat(discount.value);
+      if (discount.type === DiscountType.FIXED) {
+        return Math.min(value, totalAmount);
+      }
+      return totalAmount * (value / 100);
+    },
+  };
+
+  const service = new BillingService(
+    paymentsRepository as never,
+    {} as never, // history
+    paymentDiscountsRepository as never,
+    paymentSurchargesRepository as never,
+    consumptionsRepository as never,
+    {
+      getValidForDate: jest.fn(async () => ({ price_per_cubic_meter: '5' })),
+    } as never, // tariffs
+    { getValidForDate: jest.fn(async () => ({ amount: '10' })) } as never, // baseTariff
+    settingsService as never,
+    discountService as never,
+    surchargeService as never,
+    { emit: jest.fn() } as never, // eventEmitter
+    {} as never, // storage
+    {} as never, // finances
+    {} as never, // responsibility
+    {} as never, // paymentMethods
+    {} as never, // dataSource
+  );
+
+  return {
+    service,
+    surchargeService,
+    overdueQb,
+    savedSurcharges,
+    savedDiscounts,
+    paymentsStore,
+    consumptionsById,
+  };
+}
+
+function makeDiscountFixture(
+  id: string,
+  type: DiscountType,
+  value: string,
+): Discount {
+  return {
+    id,
+    name: `discount-${id}`,
+    type,
+    value,
+    description: '',
+    is_active: true,
+    created_at: new Date(),
+    updated_at: new Date(),
+  } as Discount;
+}
+
+describe('BillingService.generateBill late fees', () => {
+  it('re-evaluates overdue bills on each generation (Abril)', async () => {
+    const { service, savedSurcharges } = makeGenerateBillService({
+      minMonths: 3,
+      overdueBills: [
+        makeBillFixture('30', '0'),
+        makeBillFixture('25', '0'),
+        makeBillFixture('15', '0'),
+      ],
+      defaults: [makeSurchargeFixture('s1', SurchargeType.FIXED, '10')],
+      consumptions: [makeConsumptionFixture('consumption-1', 4)],
+    });
+
+    const payment = await service.generateBill('consumption-1');
+
+    // original = max(base 10, 6 m3 * 5) = 30
+    expect(payment.late_fee_amount).toBe('10.00');
+    expect(payment.total_amount).toBe('40.00');
+    expect(savedSurcharges).toHaveLength(1);
+    expect(savedSurcharges[0]).toMatchObject({
+      payment_id: payment.id,
+      surcharge_id: 's1',
+      amount: '10.00',
+    });
+  });
+
+  it('applies a fresh surcharge again on the next month (Mayo)', async () => {
+    const stillOverdue = [
+      makeBillFixture('30', '0'),
+      makeBillFixture('25', '0'),
+      makeBillFixture('15', '0'),
+    ];
+    const { service, savedSurcharges, paymentsStore } = makeGenerateBillService(
+      {
+        minMonths: 3,
+        overdueBills: stillOverdue,
+        defaults: [makeSurchargeFixture('s1', SurchargeType.FIXED, '10')],
+        consumptions: [
+          makeConsumptionFixture('consumption-1', 4),
+          makeConsumptionFixture('consumption-2', 5),
+        ],
+      },
+    );
+
+    const abril = await service.generateBill('consumption-1');
+    const mayo = await service.generateBill('consumption-2');
+
+    expect(abril.id).not.toBe(mayo.id);
+    expect(abril.late_fee_amount).toBe('10.00');
+    expect(mayo.late_fee_amount).toBe('10.00');
+    expect(savedSurcharges).toHaveLength(2);
+    expect(savedSurcharges.map((s) => s.payment_id)).toEqual([
+      abril.id,
+      mayo.id,
+    ]);
+    expect(paymentsStore.size).toBe(2);
+  });
+
+  it('does not apply a surcharge once prior bills have no pending balance', async () => {
+    const { service, savedSurcharges, surchargeService } =
+      makeGenerateBillService({
+        minMonths: 3,
+        // all three prior bills are now fully paid
+        overdueBills: [
+          makeBillFixture('30', '30'),
+          makeBillFixture('25', '25'),
+          makeBillFixture('15', '15'),
+        ],
+        defaults: [makeSurchargeFixture('s1', SurchargeType.FIXED, '10')],
+        consumptions: [makeConsumptionFixture('consumption-1', 5)],
+      });
+
+    const payment = await service.generateBill('consumption-1');
+
+    expect(surchargeService.findDefaults).not.toHaveBeenCalled();
+    expect(payment.late_fee_amount).toBe('0.00');
+    expect(payment.total_amount).toBe('30.00');
+    expect(savedSurcharges).toHaveLength(0);
+  });
+
+  it('applies one surcharge for the new bill, not one per overdue bill', async () => {
+    const { service, savedSurcharges } = makeGenerateBillService({
+      minMonths: 3,
+      overdueBills: [
+        makeBillFixture('30', '10'),
+        makeBillFixture('25', '0'),
+        makeBillFixture('15', '5'),
+      ],
+      defaults: [makeSurchargeFixture('s1', SurchargeType.FIXED, '10')],
+      consumptions: [makeConsumptionFixture('consumption-1', 4)],
+    });
+
+    const payment = await service.generateBill('consumption-1');
+
+    expect(savedSurcharges).toHaveLength(1);
+    expect(payment.late_fee_amount).toBe('10.00');
+  });
+
+  it('does not duplicate the surcharge when the request is retried', async () => {
+    const { service, savedSurcharges } = makeGenerateBillService({
+      minMonths: 3,
+      overdueBills: [
+        makeBillFixture('30', '0'),
+        makeBillFixture('25', '0'),
+        makeBillFixture('15', '0'),
+      ],
+      defaults: [makeSurchargeFixture('s1', SurchargeType.FIXED, '10')],
+      consumptions: [makeConsumptionFixture('consumption-1', 4)],
+    });
+
+    const payment = await service.generateBill('consumption-1');
+    await expect(service.generateBill('consumption-1')).rejects.toMatchObject({
+      code: 'BILL_ALREADY_EXISTS',
+    });
+
+    expect(savedSurcharges).toHaveLength(1);
+    const stored = savedSurcharges[0];
+    expect(stored.payment_id).toBe(payment.id);
+    expect(payment.late_fee_amount).toBe('10.00');
+  });
+
+  it('keeps discounts and surcharges independent (total = original - discount + surcharge)', async () => {
+    const { service, savedDiscounts, savedSurcharges } =
+      makeGenerateBillService({
+        minMonths: 3,
+        overdueBills: [
+          makeBillFixture('30', '0'),
+          makeBillFixture('25', '0'),
+          makeBillFixture('15', '0'),
+        ],
+        defaults: [makeSurchargeFixture('s1', SurchargeType.FIXED, '10')],
+        discounts: [makeDiscountFixture('d1', DiscountType.FIXED, '5')],
+        consumptions: [makeConsumptionFixture('consumption-1', 4)],
+      });
+
+    const payment = await service.generateBill('consumption-1', ['d1']);
+
+    // original 30 stays untouched as the basis of the bill
+    expect(payment.discount_amount).toBe('5.00');
+    expect(payment.late_fee_amount).toBe('10.00');
+    expect(payment.total_amount).toBe('35.00');
+    expect(savedDiscounts).toHaveLength(1);
+    expect(savedDiscounts[0].amount).toBe('5.00');
+    expect(savedSurcharges).toHaveLength(1);
+    expect(savedSurcharges[0].amount).toBe('10.00');
+  });
+
+  it('scopes overdue detection to the meter and excludes the new bill itself', async () => {
+    const { service, overdueQb } = makeGenerateBillService({
+      minMonths: 3,
+      overdueBills: [
+        makeBillFixture('30', '0'),
+        makeBillFixture('25', '0'),
+        makeBillFixture('15', '0'),
+      ],
+      defaults: [makeSurchargeFixture('s1', SurchargeType.FIXED, '10')],
+      consumptions: [makeConsumptionFixture('consumption-1', 4)],
+    });
+
+    const payment = await service.generateBill('consumption-1');
+
+    expect(overdueQb.where).toHaveBeenCalledWith(
+      'consumption.meter_id = :meterId',
+      { meterId: 'meter-1' },
+    );
+    expect(overdueQb.andWhere).toHaveBeenCalledWith(
+      'payment.id != :excludeId',
+      { excludeId: payment.id },
+    );
+    expect(overdueQb.andWhere).not.toHaveBeenCalledWith(
+      expect.stringContaining('member_id'),
+      expect.anything(),
+    );
+  });
+
+  it('sums every default surcharge into the new bill', async () => {
+    const { service, savedSurcharges, surchargeService } =
+      makeGenerateBillService({
+        minMonths: 1,
+        overdueBills: [makeBillFixture('30', '0')],
+        defaults: [
+          makeSurchargeFixture('s-fixed-10', SurchargeType.FIXED, '10'),
+          makeSurchargeFixture('s-fixed-5', SurchargeType.FIXED, '5'),
+          makeSurchargeFixture('s-pct-2', SurchargeType.PERCENTAGE, '2'),
+        ],
+      });
+
+    const payment = await service.generateBill('consumption-1');
+
+    // originalAmount = max(base 10, 6 m3 * 5) = 30
+    // late fee = 10 + 5 + 2% of 30 = 15.60
+    expect(payment.late_fee_amount).toBe('15.60');
+    expect(payment.total_amount).toBe('45.60');
+    expect(payment.discount_amount).toBe('0.00');
+    expect(savedSurcharges).toHaveLength(3);
+    expect(savedSurcharges.map((s) => s.amount)).toEqual([
+      '10.00',
+      '5.00',
+      '0.60',
+    ]);
+    expect(savedSurcharges.map((s) => s.surcharge_id)).toEqual([
+      's-fixed-10',
+      's-fixed-5',
+      's-pct-2',
+    ]);
+    expect(surchargeService.findDefaults).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies a percentage surcharge over the bill amount', async () => {
+    const { service } = makeGenerateBillService({
+      minMonths: 1,
+      overdueBills: [makeBillFixture('30', '0')],
+      defaults: [
+        makeSurchargeFixture('s-pct-2', SurchargeType.PERCENTAGE, '2'),
+      ],
+    });
+
+    const payment = await service.generateBill('consumption-1');
+
+    expect(payment.late_fee_amount).toBe('0.60');
+    expect(payment.total_amount).toBe('30.60');
+  });
+
+  it('adds no surcharge when there are no default surcharges', async () => {
+    const { service, savedSurcharges } = makeGenerateBillService({
+      minMonths: 1,
+      overdueBills: [makeBillFixture('30', '0')],
+      defaults: [],
+    });
+
+    const payment = await service.generateBill('consumption-1');
+
+    expect(payment.late_fee_amount).toBe('0.00');
+    expect(payment.total_amount).toBe('30.00');
+    expect(savedSurcharges).toHaveLength(0);
+  });
+
+  it('never consults default surcharges when late fees are disabled', async () => {
+    const { service, surchargeService } = makeGenerateBillService({
+      lateFeeEnabled: false,
+      minMonths: 1,
+      overdueBills: [makeBillFixture('30', '0')],
+      defaults: [makeSurchargeFixture('s1', SurchargeType.FIXED, '10')],
+    });
+
+    const payment = await service.generateBill('consumption-1');
+
+    expect(surchargeService.findDefaults).not.toHaveBeenCalled();
+    expect(payment.late_fee_amount).toBe('0.00');
+    expect(payment.total_amount).toBe('30.00');
+  });
+
+  it('skips default surcharges while overdue bills are below minMonths', async () => {
+    const { service, surchargeService } = makeGenerateBillService({
+      minMonths: 3,
+      overdueBills: [makeBillFixture('30', '0'), makeBillFixture('25', '0')],
+      defaults: [makeSurchargeFixture('s1', SurchargeType.FIXED, '10')],
+    });
+
+    const payment = await service.generateBill('consumption-1');
+
+    expect(surchargeService.findDefaults).not.toHaveBeenCalled();
+    expect(payment.late_fee_amount).toBe('0.00');
+    expect(payment.total_amount).toBe('30.00');
+  });
+
+  it('applies defaults once overdue bills reach minMonths', async () => {
+    const { service, surchargeService } = makeGenerateBillService({
+      minMonths: 3,
+      overdueBills: [
+        makeBillFixture('30', '0'),
+        makeBillFixture('25', '0'),
+        makeBillFixture('15', '0'),
+      ],
+      defaults: [makeSurchargeFixture('s1', SurchargeType.FIXED, '10')],
+    });
+
+    const payment = await service.generateBill('consumption-1');
+
+    expect(surchargeService.findDefaults).toHaveBeenCalledTimes(1);
+    expect(payment.late_fee_amount).toBe('10.00');
+    expect(payment.total_amount).toBe('40.00');
   });
 });

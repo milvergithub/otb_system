@@ -4,13 +4,14 @@ import { ApiPath } from "@/lib/apiPath"
 import { queryKeys } from "@/lib/utils/query"
 import type { BaseTariff, Tariff } from "@/lib/types"
 
-export function useSearchTariffs(includeInactive = true) {
+export function useSearchTariffs(includeInactive = true, enabled = true) {
   return useQuery<Tariff[]>({
     queryKey: queryKeys.tariffs.list(includeInactive),
     queryFn: () =>
       api
         .get(ApiPath.Tariffs.BASE, { params: { includeInactive: String(includeInactive) } })
         .then((r) => r.data),
+    enabled,
   })
 }
 
@@ -63,10 +64,11 @@ export function useDeleteTariff() {
   })
 }
 
-export function useSearchBaseTariffs() {
+export function useSearchBaseTariffs(enabled = true) {
   return useQuery<BaseTariff[]>({
     queryKey: queryKeys.baseTariffs.list,
     queryFn: () => api.get(ApiPath.Tariffs.BASE_TARIFFS).then((r) => r.data),
+    enabled,
   })
 }
 

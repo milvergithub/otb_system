@@ -16,6 +16,9 @@ import { SettingsService } from '../settings/settings.service';
 import { BaseTariffService } from '../tariffs/base-tariff.service';
 import { TariffsService } from '../tariffs/tariffs.service';
 import { DiscountService } from './discount.service';
+import { Surcharge, SurchargeType } from './entities/surcharge.entity';
+import { PaymentSurcharge } from './entities/payment-surcharge.entity';
+import { SurchargeService } from './surcharge.service';
 import { PaymentHistory } from './entities/payment-history.entity';
 import { PaymentDiscount } from './entities/payment-discount.entity';
 import { Payment, PaymentStatus } from './entities/payment.entity';
@@ -47,12 +50,15 @@ export class BillingService {
     private readonly historyRepository: Repository<PaymentHistory>,
     @InjectRepository(PaymentDiscount)
     private readonly paymentDiscountsRepository: Repository<PaymentDiscount>,
+    @InjectRepository(PaymentSurcharge)
+    private readonly paymentSurchargesRepository: Repository<PaymentSurcharge>,
     @InjectRepository(Consumption)
     private readonly consumptionsRepository: Repository<Consumption>,
     private readonly tariffsService: TariffsService,
     private readonly baseTariffService: BaseTariffService,
     private readonly settingsService: SettingsService,
     private readonly discountService: DiscountService,
+    private readonly surchargeService: SurchargeService,
     private readonly eventEmitter: EventEmitter2,
     private readonly storageService: StorageService,
     private readonly financesService: FinancesService,
@@ -121,6 +127,8 @@ export class BillingService {
       .leftJoinAndSelect('payment.history', 'history')
       .leftJoinAndSelect('payment.paymentDiscounts', 'paymentDiscounts')
       .leftJoinAndSelect('paymentDiscounts.discount', 'pd_discount')
+      .leftJoinAndSelect('payment.paymentSurcharges', 'paymentSurcharges')
+      .leftJoinAndSelect('paymentSurcharges.surcharge', 'ps_surcharge')
       // Historical payments keep the member name even if it was logically
       // deleted afterwards.
       .withDeleted();
@@ -185,6 +193,8 @@ export class BillingService {
         'history',
         'paymentDiscounts',
         'paymentDiscounts.discount',
+        'paymentSurcharges',
+        'paymentSurcharges.surcharge',
       ],
       // The pay flow resolves the member from this relation; keep it visible for
       // deleted members so the central finance validation can still block new
@@ -198,8 +208,90 @@ export class BillingService {
   }
 
   /**
-   * Generates a bill from a consumption record with optional multiple discounts.
+   * Resolves which late-fee surcharges apply for a newly generated bill.
+   * Evaluated fresh on every generation: eligibility depends ONLY on the
+   * existence of at least `lateFeeMinMonths` prior bills (of THIS meter)
+   * currently overdue and with a pending balance.
    */
+  public async resolveLateFee(
+    consumption: Consumption,
+    originalAmount: number,
+    excludePaymentId?: string,
+  ): Promise<{
+    surcharges: Surcharge[];
+    amounts: number[];
+    total: number;
+    overdueCount: number;
+    eligible: boolean;
+    enabled: boolean;
+  }> {
+    const lateFeeEnabled = await this.settingsService.getLateFeeEnabled();
+    if (!lateFeeEnabled) {
+      return {
+        surcharges: [],
+        amounts: [],
+        total: 0,
+        overdueCount: 0,
+        eligible: false,
+        enabled: false,
+      };
+    }
+
+    const meterId = consumption.meter_id;
+    let overdueBills: Payment[] = [];
+    if (meterId) {
+      const qb = this.paymentsRepository
+        .createQueryBuilder('payment')
+        .leftJoin('payment.consumption', 'consumption')
+        .where('consumption.meter_id = :meterId', { meterId })
+        .andWhere("payment.status IN ('pending', 'partial', 'overdue')")
+        .andWhere('payment.due_date < :today', {
+          today: new Date().toISOString().slice(0, 10),
+        });
+      if (excludePaymentId) {
+        qb.andWhere('payment.id != :excludeId', {
+          excludeId: excludePaymentId,
+        });
+      }
+      const payments = await qb.getMany();
+      overdueBills = payments.filter((b) => {
+        const bal = parseFloat(b.total_amount) - parseFloat(b.amount_paid);
+        return bal > 0.001;
+      });
+    }
+
+    const minMonths = await this.settingsService.getLateFeeMinMonths();
+    const overdueCount = overdueBills.length;
+    const eligible = overdueCount >= minMonths;
+
+    if (!eligible) {
+      return {
+        surcharges: [],
+        amounts: [],
+        total: 0,
+        overdueCount,
+        eligible: false,
+        enabled: true,
+      };
+    }
+
+    const defaults = await this.surchargeService.findDefaults();
+    const amounts = defaults.map((s) =>
+      this.surchargeService.calculateSurchargeAmount(originalAmount, s),
+    );
+    const selected = defaults.filter((_, i) => amounts[i] > 0);
+    const signed = amounts.filter((n) => n > 0);
+    const total = signed.reduce((a, b) => a + b, 0);
+    return {
+      surcharges: selected,
+      amounts: signed,
+      total,
+      overdueCount,
+      eligible: true,
+      enabled: true,
+    };
+  }
+
   async generateBill(
     consumptionId: string,
     discountIds?: string[],
@@ -242,38 +334,60 @@ export class BillingService {
       status: PaymentStatus.PENDING,
       due_date: dueDate.toISOString().slice(0, 10),
       discount_amount: '0',
+      late_fee_amount: '0',
       invoice_code: invoiceCode,
     });
     const savedPayment = await this.paymentsRepository.save(payment);
 
+    let totalDiscount = 0;
     if (discountIds?.length) {
       const discountEntries = await this.applyMultipleDiscounts(
         savedPayment.id,
         originalAmount,
         discountIds,
       );
-      const totalDiscount = discountEntries.reduce(
+      totalDiscount = discountEntries.reduce(
         (sum, d) => sum + parseFloat(d.amount),
         0,
       );
-      savedPayment.total_amount = Math.max(
-        0,
-        originalAmount - totalDiscount,
-      ).toFixed(2);
-      savedPayment.discount_amount = totalDiscount.toFixed(2);
-      await this.paymentsRepository.save(savedPayment);
-    } else {
-      savedPayment.total_amount = originalAmount.toFixed(2);
-      await this.paymentsRepository.save(savedPayment);
+    }
+    let lateFeeTotal = 0;
+    const lateFee = await this.resolveLateFee(
+      consumption,
+      originalAmount,
+      savedPayment.id,
+    );
+    if (lateFee.enabled && lateFee.eligible) {
+      for (let i = 0; i < lateFee.surcharges.length; i++) {
+        const surcharge = lateFee.surcharges[i];
+        const amount = lateFee.amounts[i];
+        if (amount <= 0) continue;
+        const entry = this.paymentSurchargesRepository.create({
+          payment_id: savedPayment.id,
+          surcharge_id: surcharge.id,
+          amount: amount.toFixed(2),
+        });
+        await this.paymentSurchargesRepository.save(entry);
+        lateFeeTotal += amount;
+      }
     }
 
-    const member = consumption.meter.member;
-    if (member?.phone) {
+    const netAmount = Math.max(
+      0,
+      originalAmount - totalDiscount + lateFeeTotal,
+    );
+    savedPayment.total_amount = netAmount.toFixed(2);
+    savedPayment.discount_amount = totalDiscount.toFixed(2);
+    savedPayment.late_fee_amount = lateFeeTotal.toFixed(2);
+    await this.paymentsRepository.save(savedPayment);
+
+    const memberForEmit = consumption.meter.member;
+    if (memberForEmit?.phone) {
       this.eventEmitter.emit('bill.generated', {
-        phone: member.phone,
-        phone_country: member.phone_country,
+        phone: memberForEmit.phone,
+        phone_country: memberForEmit.phone_country,
         vars: {
-          member: `${member.first_name} ${member.last_name}`,
+          member: `${memberForEmit.first_name} ${memberForEmit.last_name}`,
           consume: cubicMeters,
           totalAmount: savedPayment.total_amount,
           contactPhone: '73767999',

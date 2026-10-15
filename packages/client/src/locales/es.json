@@ -298,6 +298,20 @@
     "noMeters": "No se encontraron medidores",
     "empty": "No se encontraron medidores",
     "noMetersWithLocation": "Aún no hay medidores con ubicación",
+    "route": {
+      "title": "Recorrido",
+      "start": "Iniciar recorrido",
+      "end": "Finalizar recorrido",
+      "loading": "Calculando ruta…",
+      "error": "No se pudo calcular la ruta",
+      "noMeters": "No hay medidores con ubicación",
+      "gettingLocation": "Obteniendo tu ubicación…",
+      "summary": "{{count}} paradas · {{distance}}",
+      "visited": "Visitado",
+      "next": "Siguiente",
+      "previous": "Anterior",
+      "completed": "Recorrido completado"
+    },
     "noun": "medidores",
     "statuses": {
       "decommissioned": "Dado de baja"
@@ -395,6 +409,13 @@
     "generateTitle": "Generar factura",
     "generateDesc": "¿Generar una factura para el medidor {{code}} del período {{period}}?",
     "applyDiscounts": "Aplicar descuentos (opcional)",
+    "originalAmount": "Monto estimado de la factura",
+    "overdueNotice": "{{count}} factura(s) anterior(es) vencida(s) con saldo pendiente",
+    "surchargeTotal": "Total del recargo por mora",
+    "surchargeCalculated": "se confirma al generar",
+    "previewEstimateNote": "Solo vista previa; el servidor valida el importe final.",
+    "noDefaultSurcharge": "Existen facturas vencidas pero no hay recargos por defecto configurados.",
+    "surchargeBelowThreshold": "El recargo aplica desde {{min}} facturas vencidas con saldo ({{count}} hasta ahora)",
     "generating": "Generando...",
     "generate": "Generar",
     "daysOverdue": "días de mora",
@@ -446,7 +467,9 @@
     "meter": "Medidor",
     "discounts": "Descuentos",
     "totalDiscounted": "Total: -{{amount}}",
-    "paymentHistory": "Historial de pagos"
+    "paymentHistory": "Historial de pagos",
+    "lateFee": "Recargo",
+    "totalSurcharged": "Total del recargo: +{{amount}}"
   },
   "tariffs": {
     "title": "Tarifas",
@@ -639,7 +662,18 @@
     "waterShareResponsible": {
       "label": "Responsable de acción de agua",
       "description": "Usuario responsable por defecto de los pagos de cuotas de acción de agua."
-    }
+    },
+    "lateFee": {
+      "enabled": {
+        "label": "Recargo por mora activado",
+        "description": "Activar recargos por mora para socios con boletas vencidas"
+      },
+      "minMonths": {
+        "label": "Meses morosos mínimos",
+        "description": "Cantidad de boletas vencidas para activar recargo"
+      }
+    },
+    "surcharges": "Recargos"
   },
   "shares": {
     "title": "Acciones de Agua",
@@ -718,9 +752,9 @@
       "create": "Crear",
       "update": "Actualizar",
       "delete": "Eliminar",
-    "export": "Exportar",
-    "import": "Importar",
-    "dashboard": "Dashboard",
+      "export": "Exportar",
+      "import": "Importar",
+      "dashboard": "Dashboard",
       "revenue": "Ingresos",
       "overdue": "Morosos",
       "all": "Ver todo",
@@ -1426,5 +1460,47 @@
       "finances": "Finanzas",
       "documents": "Documentos"
     }
+  },
+  "surcharges": {
+    "title": "Recargos",
+    "subtitle": "Gestionar recargos de facturación",
+    "newDiscount": "Nuevo recargo",
+    "name": "Nombre",
+    "typeLabel": "Tipo",
+    "value": "Valor",
+    "description": "Descripción",
+    "status": "Estado",
+    "created": "Creado",
+    "empty": "No se encontraron recargos",
+    "noDiscounts": "No se encontraron recargos",
+    "accessDenied": "Acceso denegado",
+    "updated": "Recargo actualizado",
+    "createdToast": "Recargo creado",
+    "deleted": "Recargo eliminado",
+    "editTitle": "Editar recargo",
+    "newTitle": "Nuevo recargo",
+    "editDescription": "Actualiza la información del recargo a continuación.",
+    "editDesc": "Actualiza la información del recargo a continuación.",
+    "newDescription": "Crea un nuevo recargo que se puede aplicar a las facturas.",
+    "newDesc": "Crea un nuevo recargo que se puede aplicar a las facturas.",
+    "type": {
+      "fixed": "Fijo",
+      "percentage": "Porcentaje"
+    },
+    "amount": "Monto (BOB)",
+    "percentage": "Porcentaje (%)",
+    "fixedAmountBob": "Monto fijo (BOB)",
+    "percentagePct": "Porcentaje (%)",
+    "amountBob": "Monto (BOB)",
+    "descriptionOptional": "Descripción (opcional)",
+    "descriptionPlaceholder": "Breve descripción de este recargo",
+    "namePlaceholder": "p. ej., Recargo por mora",
+    "active": "Activo",
+    "deleteTitle": "Eliminar recargo",
+    "deleteDescription": "¿Seguro que deseas eliminar el recargo {{name}}? Esta acción no se puede deshacer. Las facturas existentes con este recargo conservarán el monto.",
+    "deleteDesc": "¿Seguro que deseas eliminar el recargo {{name}}? Esta acción no se puede deshacer. Las facturas existentes con este recargo conservarán el monto.",
+    "newSurcharge": "Nuevo recargo",
+    "defaultLabel": "Por defecto",
+    "defaultDescription": "Se aplica automáticamente a cada factura nueva mientras existan facturas vencidas con saldo pendiente"
   }
 }

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import {
   ExternalLink,
@@ -9,6 +9,7 @@ import {
   MapPin,
   Pencil,
   Plus,
+  Route,
   Search,
   Trash2,
 } from "lucide-react"
@@ -35,6 +36,11 @@ import Can from "@/components/Can"
 import { STATUS_LABEL, SHARE_STATUS_LABEL, DEFAULT_CENTER, markerIcon } from "./constants"
 import { FitBounds, shareStatusOf, hasCoords, useMemberName, zoneBoundsPoints } from "./helpers"
 import UserLocation from "./UserLocation"
+import RouteLayer from "./RouteLayer"
+import MetersRoutePanel from "./MetersRoutePanel"
+import { useGeolocation, type GeoPosition } from "@/hooks/use-geolocation"
+import { routeThrough, type RouteLeg } from "@/lib/osrm"
+import { nearestNeighborOrder, type LatLng } from "@/lib/utils/geo"
 import MeterFormDialog from "./MeterFormDialog"
 import SharePaymentsDialog from "./SharePaymentsDialog"
 import MeterDetailSheet from "./MeterDetailSheet"
@@ -62,6 +68,15 @@ export default function MetersPage() {
   const [viewing, setViewing] = useState<Meter | null>(null)
   const [locating, setLocating] = useState(false)
 
+  const [routeActive, setRouteActive] = useState(false)
+  const [routeStops, setRouteStops] = useState<Meter[]>([])
+  const [routeLegs, setRouteLegs] = useState<RouteLeg[]>([])
+  const [routePath, setRoutePath] = useState<LatLng[]>([])
+  const [routeIndex, setRouteIndex] = useState(0)
+  const [visited, setVisited] = useState<Set<string>>(new Set())
+  const [routeLoading, setRouteLoading] = useState(false)
+  const awaitingRouteRef = useRef(false)
+
   const { sort, toggleSort } = useTableSort(
     { key: "created_at", order: "desc" },
     () => setPage(1),
@@ -83,6 +98,118 @@ export default function MetersPage() {
   const { data: zones } = useZones()
 
   const memberName = useMemberName()
+
+  const fitPoints = useMemo<[number, number][]>(
+    () => [
+      ...(mapMeters || [])
+        .filter((m) => m.latitude && m.longitude)
+        .map((m) => [parseFloat(m.latitude!), parseFloat(m.longitude!)] as [number, number]),
+      ...zoneBoundsPoints(zones || []),
+    ],
+    [mapMeters, zones],
+  )
+
+  const visibleMapMeters = routeActive ? [] : mapMeters
+
+  const computeRoute = useCallback(
+    async (origin: GeoPosition) => {
+      const meters = (mapMeters ?? []).filter((m) => m.latitude && m.longitude)
+      if (meters.length === 0) {
+        toast.info(t("meters.route.noMeters"))
+        setRouteActive(false)
+        setRouteLoading(false)
+        return
+      }
+      setRouteActive(true)
+      setRouteLoading(true)
+      setVisited(new Set())
+      setRouteIndex(0)
+      try {
+        const originPoint: LatLng = { lat: origin.lat, lng: origin.lng }
+        const points = meters.map(
+          (m): LatLng => ({ lat: parseFloat(m.latitude!), lng: parseFloat(m.longitude!) }),
+        )
+        const order = nearestNeighborOrder(originPoint, points)
+        const coordinates: LatLng[] = [originPoint, ...order.map((i) => points[i])]
+        const result = await routeThrough(coordinates)
+        setRouteStops(order.map((i) => meters[i]))
+        setRouteLegs(result.legs)
+        setRoutePath(result.path)
+      } catch {
+        toast.error(t("meters.route.error"))
+        setRouteActive(false)
+      } finally {
+        setRouteLoading(false)
+      }
+    },
+    [mapMeters, t],
+  )
+
+  const { position, supported, start: startGeo, stop: stopGeo } = useGeolocation({
+    onError: () => {
+      toast.error(t("meters.locationDenied"))
+      setLocating(false)
+      setRouteActive(false)
+    },
+    onPosition: (pos) => {
+      if (awaitingRouteRef.current) {
+        awaitingRouteRef.current = false
+        void computeRoute(pos)
+      }
+    },
+  })
+
+  const startRoute = () => {
+    if (!supported) {
+      toast.error(t("meters.locationDenied"))
+      return
+    }
+    if (position) {
+      void computeRoute(position)
+      return
+    }
+    toast.info(t("meters.route.gettingLocation"))
+    awaitingRouteRef.current = true
+    setRouteActive(true)
+    setRouteLoading(true)
+  }
+
+  const closeRoute = () => {
+    awaitingRouteRef.current = false
+    setRouteActive(false)
+    setRouteLoading(false)
+    setRouteStops([])
+    setRouteLegs([])
+    setRoutePath([])
+    setVisited(new Set())
+    setRouteIndex(0)
+  }
+
+  const toggleVisited = (id: string) => {
+    setVisited((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleNext = () => {
+    if (routeStops.length === 0) return
+    for (let step = 1; step <= routeStops.length; step++) {
+      const index = (routeIndex + step) % routeStops.length
+      if (!visited.has(routeStops[index].id)) {
+        setRouteIndex(index)
+        return
+      }
+    }
+    toast.success(t("meters.route.completed"))
+  }
+
+  useEffect(() => {
+    if (locating || routeActive) startGeo()
+    else stopGeo()
+  }, [locating, routeActive, startGeo, stopGeo])
 
   function openCreate() {
     setEditing(null)
@@ -294,20 +421,7 @@ export default function MetersPage() {
                             />
                         </LayersControl.BaseLayer>
                     </LayersControl>
-                  <FitBounds
-                    points={[
-                      ...(mapMeters || [])
-                        .filter((m) => m.latitude && m.longitude)
-                        .map(
-                          (m) =>
-                            [
-                              parseFloat(m.latitude!),
-                              parseFloat(m.longitude!),
-                            ] as [number, number],
-                        ),
-                      ...zoneBoundsPoints(zones || []),
-                    ]}
-                  />
+                  <FitBounds points={fitPoints} />
                   {(zones || []).map((zone) => (
                     <GeoJSON
                       key={zone.id}
@@ -323,7 +437,7 @@ export default function MetersPage() {
                       }}
                     />
                   ))}
-                  {mapMeters?.map(
+                  {visibleMapMeters?.map(
                     (meter) =>
                       meter.latitude &&
                       meter.longitude && (
@@ -432,32 +546,49 @@ export default function MetersPage() {
                         </Marker>
                       ),
                   )}
-                  <UserLocation
-                    active={locating}
-                    onError={() => {
-                      setLocating(false)
-                      toast.error(t("meters.locationDenied"))
-                    }}
-                  />
+                  <UserLocation active={locating || routeActive} position={position} />
+                  {routeActive && (
+                    <RouteLayer
+                      stops={routeStops}
+                      path={routePath}
+                      activeIndex={routeIndex}
+                      visited={visited}
+                      onSelect={setRouteIndex}
+                    />
+                  )}
                 </MapContainer>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant={locating ? "default" : "outline"}
-                  className="absolute bottom-4 right-4 z-[1000] shadow"
-                  title={t("meters.useMyLocation")}
-                  aria-label={t("meters.useMyLocation")}
-                  aria-pressed={locating}
-                  onClick={() => {
-                    if (!navigator.geolocation) {
-                      toast.error(t("meters.locationDenied"))
-                      return
-                    }
-                    setLocating((value) => !value)
-                  }}
-                >
-                  <LocateFixed className={locating ? "animate-pulse" : undefined} />
-                </Button>
+                <div className="absolute bottom-4 right-4 z-[1000] flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant={routeActive ? "default" : "outline"}
+                    className="shadow"
+                    title={t("meters.route.start")}
+                    aria-label={t("meters.route.start")}
+                    aria-pressed={routeActive}
+                    onClick={routeActive ? closeRoute : startRoute}
+                  >
+                    <Route />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant={locating ? "default" : "outline"}
+                    className="shadow"
+                    title={t("meters.useMyLocation")}
+                    aria-label={t("meters.useMyLocation")}
+                    aria-pressed={locating}
+                    onClick={() => {
+                      if (!navigator.geolocation) {
+                        toast.error(t("meters.locationDenied"))
+                        return
+                      }
+                      setLocating((value) => !value)
+                    }}
+                  >
+                    <LocateFixed className={locating ? "animate-pulse" : undefined} />
+                  </Button>
+                </div>
                 {mapMeters &&
                 !mapMeters.some((m) => m.latitude && m.longitude) ? (
                   <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -466,6 +597,20 @@ export default function MetersPage() {
                     </p>
                   </div>
                 ) : null}
+                {routeActive && (
+                  <MetersRoutePanel
+                    stops={routeStops}
+                    legs={routeLegs}
+                    activeIndex={routeIndex}
+                    visited={visited}
+                    loading={routeLoading}
+                    totalDistance={routeLegs.reduce((sum, leg) => sum + leg.distance, 0)}
+                    onSelect={setRouteIndex}
+                    onToggleVisited={toggleVisited}
+                    onNext={handleNext}
+                    onClose={closeRoute}
+                  />
+                )}
               </div>
             </CardContent>
           </Card>

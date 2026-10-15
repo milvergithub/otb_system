@@ -87,6 +87,8 @@ const es = {
     // -------------------------------------------------------- discount
     DISCOUNT_NOT_FOUND: 'Descuento no encontrado',
     DISCOUNT_NAME_EXISTS: 'Ya existe un descuento con este nombre',
+    SURCHARGE_NOT_FOUND: 'Recargo no encontrado',
+    SURCHARGE_NAME_EXISTS: 'Ya existe un recargo con este nombre',
 
     // --------------------------------------------------------- tariffs
     TARIFF_NOT_FOUND: 'Tarifa no encontrada',

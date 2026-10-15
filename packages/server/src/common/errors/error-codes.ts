@@ -83,6 +83,8 @@ export const ERROR_STATUS = {
   // ------------------------------------------------------------ discount
   DISCOUNT_NOT_FOUND: HttpStatus.NOT_FOUND,
   DISCOUNT_NAME_EXISTS: HttpStatus.CONFLICT,
+  SURCHARGE_NOT_FOUND: HttpStatus.NOT_FOUND,
+  SURCHARGE_NAME_EXISTS: HttpStatus.CONFLICT,
 
   // ------------------------------------------------------------- tariffs
   TARIFF_NOT_FOUND: HttpStatus.NOT_FOUND,

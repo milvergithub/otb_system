@@ -12,6 +12,10 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   // changing these settings never rewrites historical finance records.
   water_bill_responsible_user_id: '',
   water_share_responsible_user_id: '',
+  // Late fee (mora) configuration — disabled by default.
+  // Which surcharges apply is decided by the surcharge's own `is_default` flag.
+  late_fee_enabled: 'false',
+  late_fee_min_months: '3',
   openwa_api_key: process.env.OPENWA_API_KEY || '',
   openwa_consumption_template_id:
     process.env.OPENWA_CONSUMPTION_TEMPLATE_ID || '',
@@ -34,6 +38,16 @@ export class SettingsService {
 
   async getPaymentDueDay(): Promise<number> {
     return parseInt(await this.getValue('payment_due_day'), 10);
+  }
+
+  async getLateFeeEnabled(): Promise<boolean> {
+    return (await this.getValue('late_fee_enabled')) === 'true';
+  }
+
+  async getLateFeeMinMonths(): Promise<number> {
+    const raw = await this.getValue('late_fee_min_months');
+    const parsed = parseInt(raw, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 3;
   }
 
   async getCurrency(): Promise<string> {

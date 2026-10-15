@@ -1,55 +1,29 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect } from "react"
 import { Circle, CircleMarker, useMap } from "react-leaflet"
+import type { GeoPosition } from "@/hooks/use-geolocation"
 
 interface UserLocationProps {
   active: boolean
-  onError: () => void
+  position: GeoPosition | null
 }
 
-interface UserPosition {
-  lat: number
-  lng: number
-  accuracy: number
-}
-
-export default function UserLocation({ active, onError }: UserLocationProps) {
+export default function UserLocation({ active, position }: UserLocationProps) {
   const map = useMap()
-  const [pos, setPos] = useState<UserPosition | null>(null)
-  const onErrorRef = useRef(onError)
 
   useEffect(() => {
-    onErrorRef.current = onError
-  })
+    if (!active || !position) return
+    map.flyTo([position.lat, position.lng], Math.max(map.getZoom(), 16), {
+      duration: 0.5,
+    })
+  }, [active, position, map])
 
-  useEffect(() => {
-    if (!active) return
-    const id = navigator.geolocation.watchPosition(
-      (position) => {
-        const next: UserPosition = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-        }
-        setPos(next)
-        map.flyTo([next.lat, next.lng], Math.max(map.getZoom(), 16), {
-          duration: 0.5,
-        })
-      },
-      () => onErrorRef.current(),
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 },
-    )
-    return () => {
-      navigator.geolocation.clearWatch(id)
-    }
-  }, [active, map])
-
-  if (!active || !pos) return null
+  if (!active || !position) return null
 
   return (
     <>
       <Circle
-        center={[pos.lat, pos.lng]}
-        radius={pos.accuracy}
+        center={[position.lat, position.lng]}
+        radius={position.accuracy}
         pathOptions={{
           color: "#2563eb",
           fillColor: "#2563eb",
@@ -58,7 +32,7 @@ export default function UserLocation({ active, onError }: UserLocationProps) {
         }}
       />
       <CircleMarker
-        center={[pos.lat, pos.lng]}
+        center={[position.lat, position.lng]}
         radius={7}
         pathOptions={{
           color: "#ffffff",

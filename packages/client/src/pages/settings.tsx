@@ -19,6 +19,7 @@ import AssetLocationsPanel from "./assets/AssetLocationsPanel"
 import FinanceCategoriesPanel from "./finances/FinanceCategoriesPanel"
 import SharesPage from "./shares"
 import DiscountsPage from "./discounts"
+import SurchargesPage from "./surcharges"
 import TariffsPage from "./tariffs"
 import WhatsAppSettingsPanel from "./settings/WhatsAppSettingsPanel"
 import MemberTypesPanel from "./settings/members/MemberTypesPanel"
@@ -28,8 +29,16 @@ import { toast } from "sonner"
 
 const SETTING_LABELS: Record<string, { label: string; description: string }> = {
   payment_due_day: {
-    label: "settings.paymentDueDay.label",
-    description: "settings.paymentDueDay.description",
+    label: "settings.payment_due_day.label",
+    description: "settings.payment_due_day.description",
+  },
+  late_fee_enabled: {
+    label: "settings.lateFee.enabled.label",
+    description: "settings.lateFee.enabled.description",
+  },
+  late_fee_min_months: {
+    label: "settings.lateFee.minMonths.label",
+    description: "settings.lateFee.minMonths.description",
   },
   organization_name: {
     label: "settings.organizationName.label",
@@ -41,7 +50,7 @@ const SETTING_LABELS: Record<string, { label: string; description: string }> = {
   },
 }
 
-const NUMBER_KEYS = ["payment_due_day"]
+const NUMBER_KEYS = ["payment_due_day", "late_fee_min_months"]
 const USER_SETTING_KEYS = [
   "water_bill_responsible_user_id",
   "water_share_responsible_user_id",
@@ -152,6 +161,12 @@ export default function SettingsPage() {
               <TabsTrigger value="discounts" className="gap-2">
                 <Percent className="size-4" />
                 {t("settings.discounts")}
+              </TabsTrigger>
+            </Can>
+            <Can permission="surcharges.read">
+              <TabsTrigger value="surcharges" className="gap-2">
+                <Percent className="size-4" />
+                {t("settings.surcharges")}
               </TabsTrigger>
             </Can>
             <Can permission="tariffs.read">
@@ -329,6 +344,13 @@ export default function SettingsPage() {
           <TabsContent value="discounts" className="min-w-0">
             <div className="mt-4">
               <DiscountsPage />
+            </div>
+          </TabsContent>
+        </Can>
+        <Can permission="surcharges.read">
+          <TabsContent value="surcharges" className="min-w-0">
+            <div className="mt-4">
+              <SurchargesPage />
             </div>
           </TabsContent>
         </Can>

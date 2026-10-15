@@ -90,10 +90,34 @@ export default function PaymentDetailsDialog({
                       })}
                     </div>
                   </div>
-                </div>
-              ) : null}
+              </div>
+            ) : null}
+            {payment.paymentSurcharges &&
+            payment.paymentSurcharges.length > 0 &&
+            parseFloat(payment.late_fee_amount) > 0 ? (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">{t("billing.total")}</span>
+                <span className="text-muted-foreground">
+                  {t("billing.lateFee")}
+                </span>
+                <div className="text-right">
+                  {payment.paymentSurcharges.map((ps) => (
+                    <div key={ps.id} className="text-destructive text-sm">
+                      +{formatCurrency(ps.amount)} (
+                      {ps.surcharge?.type === "fixed"
+                        ? ps.surcharge?.name
+                        : `${ps.surcharge?.value}% — ${ps.surcharge?.name}`})
+                    </div>
+                  ))}
+                  <div className="text-destructive font-semibold text-sm mt-1">
+                    {t("billing.totalSurcharged", {
+                      amount: formatCurrency(payment.late_fee_amount),
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">{t("billing.total")}</span>
                 <span className="font-semibold">
                   {formatCurrency(payment.total_amount)}
                 </span>

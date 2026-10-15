@@ -11,6 +11,7 @@ import {
 import { Consumption } from '../../consumption/entities/consumption.entity';
 import { PaymentDiscount } from './payment-discount.entity';
 import { PaymentHistory } from './payment-history.entity';
+import { PaymentSurcharge } from './payment-surcharge.entity';
 
 export enum PaymentStatus {
   PENDING = 'pending',
@@ -53,6 +54,9 @@ export class Payment {
   @Column({ type: 'decimal', precision: 10, scale: 2, default: '0' })
   discount_amount: string;
 
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: '0' })
+  late_fee_amount: string;
+
   @Column({ type: 'varchar', length: 100, nullable: true })
   invoice_code: string;
 
@@ -67,4 +71,7 @@ export class Payment {
 
   @OneToMany(() => PaymentDiscount, (pd) => pd.payment)
   paymentDiscounts: PaymentDiscount[];
+
+  @OneToMany(() => PaymentSurcharge, (ps) => ps.payment)
+  paymentSurcharges: PaymentSurcharge[];
 }

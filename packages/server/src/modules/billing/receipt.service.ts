@@ -21,6 +21,7 @@ export interface PaymentReceiptData {
   period: string;
   totalPaid: string;
   totalAmount: string;
+  lateFeeAmount: string;
   history: { date: string; amount: string; method: string }[];
 }
 
@@ -71,6 +72,7 @@ export class ReceiptService {
       period: `${this.monthName(consumption.month)} ${consumption.year}`,
       totalPaid: `${parseFloat(String(payment.amount_paid)).toFixed(2)} Bs`,
       totalAmount: `${parseFloat(String(payment.total_amount)).toFixed(2)} Bs`,
+      lateFeeAmount: `${parseFloat(String(payment.late_fee_amount ?? '0')).toFixed(2)} Bs`,
       history: (payment.history ?? [])
         .sort(
           (a, b) =>
@@ -193,6 +195,15 @@ export class ReceiptService {
     );
 
     // TOTALES
+    this.drawLabeledValue(
+      page,
+      font,
+      'Recargo mora:',
+      data.lateFeeAmount,
+      395,
+      510,
+      fontSize,
+    );
     this.drawLabeledValue(
       page,
       font,

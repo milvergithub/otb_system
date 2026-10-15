@@ -8,13 +8,16 @@ import type {
   DiscountType,
   Paginated,
   Payment,
+  Surcharge,
+  SurchargeType,
   PaymentStatus,
 } from "@/lib/types"
 
-export function useActiveDiscounts() {
+export function useActiveDiscounts(enabled = true) {
   return useQuery<Discount[]>({
     queryKey: queryKeys.billing.discountsActive,
     queryFn: () => api.get(ApiPath.Billing.DISCOUNTS_ACTIVE).then((r) => r.data),
+    enabled,
   })
 }
 
@@ -68,6 +71,20 @@ export function useGetBill(id: string | undefined, enabled = true) {
   })
 }
 
+/** Recent bills of a single meter, used by the generate-bill preview. */
+export function useMeterBills(meterId: string | undefined, enabled = true) {
+  return useQuery<Paginated<Payment>>({
+    queryKey: queryKeys.billing.meterBills(meterId ?? ""),
+    queryFn: () =>
+      api
+        .get(ApiPath.Billing.BASE, {
+          params: { page: 1, limit: 100, meterId },
+        })
+        .then((r) => r.data),
+    enabled: enabled && !!meterId,
+  })
+}
+
 export interface PayBillRequest {
   amount: number
   paymentMethod?: string
@@ -94,13 +111,7 @@ export function usePayBill() {
 export function useGenerateBill() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({
-      consumptionId,
-      discountIds,
-    }: {
-      consumptionId: string
-      discountIds?: string[]
-    }) =>
+    mutationFn: ({ consumptionId, discountIds }: { consumptionId: string; discountIds?: string[] }) =>
       api
         .post(ApiPath.Billing.GENERATE(consumptionId), {
           discountIds: discountIds && discountIds.length > 0 ? discountIds : undefined,
@@ -179,5 +190,61 @@ export function useDeleteDiscount() {
     mutationFn: (id: string) =>
       api.delete(ApiPath.Billing.DISCOUNT_ONE(id)).then((r) => r.data),
     onSuccess: () => invalidateDiscounts(queryClient),
+  })
+}
+
+export function useSurcharges() {
+  return useQuery<Surcharge[]>({
+    queryKey: queryKeys.billing.surcharges,
+    queryFn: () => api.get(ApiPath.Billing.SURCHARGES).then((r) => r.data),
+  })
+}
+
+export function useActiveSurcharges(enabled = true) {
+  return useQuery<Surcharge[]>({
+    queryKey: queryKeys.billing.surchargesActive,
+    queryFn: () => api.get(ApiPath.Billing.SURCHARGES_ACTIVE).then((r) => r.data),
+    enabled,
+  })
+}
+
+export interface SurchargeRequest {
+  name: string
+  type: SurchargeType
+  value: number
+  description?: string
+  is_active?: boolean
+  is_default?: boolean
+}
+
+function invalidateSurcharges(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: queryKeys.billing.surcharges })
+  queryClient.invalidateQueries({ queryKey: queryKeys.billing.surchargesActive })
+}
+
+export function useAddSurcharge() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: SurchargeRequest) =>
+      api.post(ApiPath.Billing.SURCHARGES, payload).then((r) => r.data),
+    onSuccess: () => invalidateSurcharges(queryClient),
+  })
+}
+
+export function useEditSurcharge() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...payload }: { id: string } & Partial<SurchargeRequest>) =>
+      api.patch(ApiPath.Billing.SURCHARGE_ONE(id), payload).then((r) => r.data),
+    onSuccess: () => invalidateSurcharges(queryClient),
+  })
+}
+
+export function useDeleteSurcharge() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.delete(ApiPath.Billing.SURCHARGE_ONE(id)).then((r) => r.data),
+    onSuccess: () => invalidateSurcharges(queryClient),
   })
 }

@@ -116,8 +116,11 @@ export class NotificationsService {
     }
   }
 
-  // Runs daily to update overdue statuses and generate notifications
-  @Cron(CronExpression.EVERY_DAY_AT_8AM, { timeZone: 'America/La_Paz' })
+  // Runs daily (schedule configurable via OVERDUE_CRON / OVERDUE_CRON_TZ) to
+  // update overdue statuses and generate notifications
+  @Cron(process.env.OVERDUE_CRON || '*/1 * * * *', {
+    timeZone: process.env.OVERDUE_CRON_TZ || 'America/La_Paz',
+  })
   async handleDailyBillingTasks(): Promise<void> {
     await this.billingService.updateOverdueStatuses();
     await this.notifyOverdue();

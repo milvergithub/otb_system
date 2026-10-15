@@ -142,7 +142,29 @@ export default function BillingPage() {
                     <span className="text-muted-foreground">—</span>
                   ),
               },
-              { key: "total_amount", label: t("billing.total"), sortable: true, align: "right", render: (p) => <span className="tabular-nums">{formatCurrency(p.total_amount)}</span> },
+              {
+        key: "late_fee",
+        label: t("billing.lateFee"),
+        render: (p) =>
+          parseFloat(p.late_fee_amount) > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {p.paymentSurcharges && p.paymentSurcharges.length > 0
+                ? p.paymentSurcharges.map((ps) => (
+                    <Badge key={ps.id} variant="destructive" className="text-xs">
+                      {`${formatCurrency(ps.amount)}`}
+                    </Badge>
+                  ))
+                : (
+                  <Badge variant="destructive" className="text-xs">
+                    {formatCurrency(p.late_fee_amount)}
+                  </Badge>
+                )}
+            </div>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      { key: "total_amount", label: t("billing.total"), sortable: true, align: "right", render: (p) => <span className="tabular-nums">{formatCurrency(p.total_amount)}</span> },
               { key: "amount_paid", label: t("billing.paid"), sortable: true, align: "right", render: (p) => <span className="tabular-nums">{formatCurrency(p.amount_paid)}</span> },
               { key: "status", label: t("billing.status"), sortable: true, render: (p) => <Badge variant={STATUS_VARIANT[p.status]}>{t(STATUS_LABEL[p.status])}</Badge> },
               { key: "due_date", label: t("billing.dueDate"), sortable: true, render: (p) => <span className="text-muted-foreground">{p.due_date}</span> },

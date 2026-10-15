@@ -153,8 +153,11 @@ export const queryKeys = {
       sortOrder: string,
     ) => ["billing", page, month, year, status, search, meterId, sortBy, sortOrder] as const,
     detail: (id: string) => ["billing", "detail", id] as const,
+    meterBills: (meterId: string) => ["billing", "meter-bills", meterId] as const,
     discounts: ["billing", "discounts"] as const,
     discountsActive: ["billing", "discounts", "active"] as const,
+    surcharges: ["billing", "surcharges"] as const,
+    surchargesActive: ["billing", "surcharges", "active"] as const,
   },
   notifications: {
     all: ["notifications"] as const,

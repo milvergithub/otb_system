@@ -358,6 +358,18 @@ export const DEFAULT_PERMISSIONS = [
     action: 'delete',
     description: 'Delete payment methods',
   },
+  { resource: 'surcharges', action: 'read', description: 'View surcharges' },
+  {
+    resource: 'surcharges',
+    action: 'create',
+    description: 'Create surcharges',
+  },
+  { resource: 'surcharges', action: 'update', description: 'Edit surcharges' },
+  {
+    resource: 'surcharges',
+    action: 'delete',
+    description: 'Delete surcharges',
+  },
 ];
 
 @Injectable()
