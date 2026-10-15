@@ -34,6 +34,18 @@ export class PayBillDto {
   @IsString({ each: true })
   discountIds?: string[];
 
+  /**
+   * Explicit late-fee surcharge selection (ids chosen by the user).
+   * Generate: omitted field = legacy behaviour (all default active surcharges
+   * when eligible); empty array = none.
+   * Pay: applied only to bills that were generated WITHOUT surcharges; bills
+   * that already carry persisted surcharges are never rewritten.
+   */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  surchargeIds?: string[];
+
   @IsOptional()
   @IsString()
   evidenceBase64?: string;
@@ -54,6 +66,16 @@ export class GenerateBillDto {
   @IsArray()
   @IsString({ each: true })
   discountIds?: string[];
+
+  /**
+   * Explicit late-fee surcharge selection (ids chosen by the user). Omitting
+   * the field keeps the legacy behaviour: every default active surcharge is
+   * applied when the bill is eligible. An empty array applies none.
+   */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  surchargeIds?: string[];
 }
 
 export class BillingQueryDto {

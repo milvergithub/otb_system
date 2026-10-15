@@ -88,6 +88,9 @@ const en = {
     DISCOUNT_NAME_EXISTS: 'Discount name already exists',
     SURCHARGE_NOT_FOUND: 'Surcharge not found',
     SURCHARGE_NAME_EXISTS: 'Surcharge name already exists',
+    SURCHARGE_INACTIVE: 'Surcharge {{name}} is inactive and cannot be applied',
+    LATE_FEE_NOT_ELIGIBLE:
+      'Late fees do not apply to this bill under the current configuration',
 
     // --------------------------------------------------------- tariffs
     TARIFF_NOT_FOUND: 'Tariff not found',

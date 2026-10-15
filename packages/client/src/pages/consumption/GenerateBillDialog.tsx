@@ -1,9 +1,14 @@
-import { useEffect, useMemo, type FormEvent } from "react"
+import { useEffect, useMemo, useRef, type FormEvent } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { getApiErrorMessage } from "@/lib/api"
 import { formatCurrency, monthNames } from "@/lib/utils"
-import { estimateBillAmount, resolveLateFeePreview } from "@/lib/utils/lateFee"
+import {
+  defaultSurchargeSelection,
+  estimateBillAmount,
+  resolveLateFeePreview,
+} from "@/lib/utils/lateFee"
+import { calculateDiscountAmount } from "@/lib/utils/discounts"
 import type { Consumption } from "@/lib/types"
 import {
   useActiveDiscounts,
@@ -15,6 +20,7 @@ import { useSettings } from "@/hooks/settings"
 import { useSearchBaseTariffs, useSearchTariffs } from "@/hooks/tariffs"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import SurchargeSelectList from "@/components/SurchargeSelectList"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,10 +35,12 @@ import { toast } from "sonner"
 
 type GenerateFormValues = {
   discount_ids: string[]
+  surcharge_ids: string[]
 }
 
 const DEFAULT_GENERATE_FORM: GenerateFormValues = {
   discount_ids: [],
+  surcharge_ids: [],
 }
 
 interface GenerateBillDialogProps {
@@ -53,6 +61,10 @@ export default function GenerateBillDialog({
   const watchGenerateDiscountIds = useWatch({
     control: generateForm.control,
     name: "discount_ids",
+  })
+  const watchSurchargeIds = useWatch({
+    control: generateForm.control,
+    name: "surcharge_ids",
   })
 
   const isOpen = !!generating
@@ -86,12 +98,70 @@ export default function GenerateBillDialog({
       minMonths,
       surcharges,
       baseAmount,
+      selectedSurchargeIds: watchSurchargeIds ?? [],
     })
-  }, [generating, meterBills, settings, minMonths, surcharges, baseAmount])
+  }, [
+    generating,
+    meterBills,
+    settings,
+    minMonths,
+    surcharges,
+    baseAmount,
+    watchSurchargeIds,
+  ])
 
   useEffect(() => {
     if (generating) generateForm.reset(DEFAULT_GENERATE_FORM)
   }, [generating, generateForm])
+
+  // Preselect the default active surcharges once the data needed to compute
+  // eligibility is loaded. The ref makes it run once per consumption, so it
+  // never overrides the user's toggles or the discount reset above.
+  const surchargeInitRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!generating) {
+      surchargeInitRef.current = null
+      return
+    }
+    if (surchargeInitRef.current === generating.id) return
+    if (settings === undefined || surcharges === undefined) return
+    if (generating.meter_id && meterBills === undefined) return
+    surchargeInitRef.current = generating.id
+    generateForm.setValue(
+      "surcharge_ids",
+      defaultSurchargeSelection({
+        bills: meterBills?.items ?? [],
+        meterId: generating.meter_id,
+        enabled: settings.late_fee_enabled === "true",
+        minMonths,
+        surcharges,
+        baseAmount,
+      }),
+      { shouldDirty: false },
+    )
+  }, [
+    generating,
+    settings,
+    surcharges,
+    meterBills,
+    minMonths,
+    baseAmount,
+    generateForm,
+  ])
+
+  const discountPreview = useMemo(() => {
+    if (baseAmount == null || !discounts) return 0
+    return watchGenerateDiscountIds.reduce((sum, id) => {
+      const discount = discounts.find((d) => d.id === id)
+      return discount ? sum + calculateDiscountAmount(baseAmount, discount) : sum
+    }, 0)
+  }, [baseAmount, discounts, watchGenerateDiscountIds])
+
+  const surchargePreview = lateFee?.eligible ? lateFee.total : 0
+  const estimatedTotal =
+    baseAmount != null
+      ? Math.max(0, baseAmount - discountPreview + surchargePreview)
+      : null
 
   function toggleGenerateDiscount(discountId: string) {
     generateForm.setValue(
@@ -102,6 +172,16 @@ export default function GenerateBillDialog({
     )
   }
 
+  function toggleGenerateSurcharge(surchargeId: string) {
+    const current = watchSurchargeIds ?? []
+    generateForm.setValue(
+      "surcharge_ids",
+      current.includes(surchargeId)
+        ? current.filter((id) => id !== surchargeId)
+        : [...current, surchargeId],
+    )
+  }
+
   function handleGenerate(e: FormEvent) {
     e.preventDefault()
     generateForm.handleSubmit((values) => {
@@ -109,6 +189,7 @@ export default function GenerateBillDialog({
         {
           consumptionId: generating!.id,
           discountIds: values.discount_ids,
+          surchargeIds: lateFee?.eligible ? values.surcharge_ids : undefined,
         },
         {
           onSuccess: () => {
@@ -141,14 +222,6 @@ export default function GenerateBillDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <form onSubmit={handleGenerate} noValidate className="space-y-3">
-          {baseAmount != null ? (
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">
-                {t("consumption.originalAmount")}
-              </span>
-              <span className="font-medium">{formatCurrency(baseAmount)}</span>
-            </div>
-          ) : null}
           {showLateFeeBox ? (
             <div className="space-y-2">
               <Label>{t("billing.lateFee")}</Label>
@@ -160,41 +233,20 @@ export default function GenerateBillDialog({
                 </p>
                 {lateFee.eligible ? (
                   <>
-                    {lateFee.items.length ? (
-                      lateFee.items.map(({ surcharge, amount }) => (
-                        <div
-                          key={surcharge.id}
-                          className="flex items-center justify-between gap-3 text-sm"
-                        >
-                          <span>
-                            {surcharge.name} —{" "}
-                            {surcharge.type === "fixed"
-                              ? formatCurrency(surcharge.value)
-                              : `${surcharge.value}%`}
-                          </span>
-                          <span className="font-medium text-destructive">
-                            {amount != null
-                              ? `+${formatCurrency(amount)}`
-                              : t("consumption.surchargeCalculated")}
-                          </span>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-sm text-muted-foreground">
-                        {t("consumption.noDefaultSurcharge")}
-                      </p>
-                    )}
-                    {lateFee.items.length ? (
-                      <>
-                        <div className="flex items-center justify-between gap-3 border-t pt-2 text-sm font-semibold text-destructive">
-                          <span>{t("consumption.surchargeTotal")}</span>
-                          <span>{`+${formatCurrency(lateFee.total)}`}</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {t("consumption.previewEstimateNote")}
-                        </p>
-                      </>
-                    ) : null}
+                    <SurchargeSelectList
+                      surcharges={surcharges ?? []}
+                      selectedIds={watchSurchargeIds ?? []}
+                      onToggle={toggleGenerateSurcharge}
+                      baseAmount={baseAmount}
+                      unknownAmountLabel={t("consumption.surchargeCalculated")}
+                    />
+                    <div className="flex items-center justify-between gap-3 border-t pt-2 text-sm font-semibold text-destructive">
+                      <span>{t("consumption.surchargeTotal")}</span>
+                      <span>{`+${formatCurrency(lateFee.total)}`}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {t("consumption.previewEstimateNote")}
+                    </p>
                   </>
                 ) : (
                   <p className="text-sm text-muted-foreground">
@@ -233,6 +285,40 @@ export default function GenerateBillDialog({
               </p>
             )}
           </div>
+          {baseAmount != null ? (
+            <div className="space-y-1 border-t pt-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  {t("consumption.originalAmount")}
+                </span>
+                <span className="font-medium">{formatCurrency(baseAmount)}</span>
+              </div>
+              {discountPreview > 0 ? (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    {t("billing.discounts")}
+                  </span>
+                  <span className="font-medium text-green-600">
+                    -{formatCurrency(discountPreview)}
+                  </span>
+                </div>
+              ) : null}
+              {surchargePreview > 0 ? (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    {t("billing.lateFee")}
+                  </span>
+                  <span className="font-medium text-destructive">
+                    +{formatCurrency(surchargePreview)}
+                  </span>
+                </div>
+              ) : null}
+              <div className="flex justify-between text-sm font-semibold">
+                <span>{t("billing.total")}</span>
+                <span>{formatCurrency(estimatedTotal ?? 0)}</span>
+              </div>
+            </div>
+          ) : null}
           <AlertDialogFooter>
             <AlertDialogCancel type="button">
               {t("common.cancel")}

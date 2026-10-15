@@ -469,7 +469,8 @@
     "totalDiscounted": "Total: -{{amount}}",
     "paymentHistory": "Historial de pagos",
     "lateFee": "Recargo",
-    "totalSurcharged": "Total del recargo: +{{amount}}"
+    "totalSurcharged": "Total del recargo: +{{amount}}",
+    "noSurcharges": "No hay recargos configurados"
   },
   "tariffs": {
     "title": "Tarifas",

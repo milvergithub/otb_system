@@ -13,6 +13,8 @@ import { Payment } from '../modules/billing/entities/payment.entity';
 import { PaymentHistory } from '../modules/billing/entities/payment-history.entity';
 import { PaymentDiscount } from '../modules/billing/entities/payment-discount.entity';
 import { Discount } from '../modules/billing/entities/discount.entity';
+import { Surcharge } from '../modules/billing/entities/surcharge.entity';
+import { PaymentSurcharge } from '../modules/billing/entities/payment-surcharge.entity';
 import { Notification } from '../modules/notifications/entities/notification.entity';
 import { Role } from '../modules/roles/entities/role.entity';
 import { Permission } from '../modules/roles/entities/permission.entity';
@@ -68,6 +70,8 @@ export const AppDataSource = new DataSource({
     PaymentHistory,
     PaymentDiscount,
     Discount,
+    Surcharge,
+    PaymentSurcharge,
     Notification,
     Role,
     Permission,

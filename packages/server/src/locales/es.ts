@@ -89,6 +89,10 @@ const es = {
     DISCOUNT_NAME_EXISTS: 'Ya existe un descuento con este nombre',
     SURCHARGE_NOT_FOUND: 'Recargo no encontrado',
     SURCHARGE_NAME_EXISTS: 'Ya existe un recargo con este nombre',
+    SURCHARGE_INACTIVE:
+      'El recargo {{name}} está inactivo y no puede aplicarse',
+    LATE_FEE_NOT_ELIGIBLE:
+      'Los recargos por mora no aplican a esta factura según la configuración actual',
 
     // --------------------------------------------------------- tariffs
     TARIFF_NOT_FOUND: 'Tarifa no encontrada',

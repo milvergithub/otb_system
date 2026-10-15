@@ -66,20 +66,21 @@ export function estimateBillAmount(
   return Math.max(parseFloat(base.amount), consumptionTotal)
 }
 
-function surchargeAmount(surcharge: Surcharge, baseAmount: number | null | undefined): number | undefined {
+/**
+ * Estimated amount for one surcharge over a base. Fixed surcharges are the
+ * value itself; percentages need the base — undefined when it is unknown.
+ */
+export function surchargeAmount(
+  surcharge: Surcharge,
+  baseAmount: number | null | undefined,
+): number | undefined {
   const value = parseFloat(surcharge.value)
   if (surcharge.type === "fixed") return Math.max(0, value)
   if (baseAmount == null) return undefined
   return Math.max(0, baseAmount * (value / 100))
 }
 
-/**
- * Preview-only evaluation of the late fee for a bill that is about to be
- * generated: eligible when late fees are enabled and the meter has at least
- * `minMonths` prior bills overdue with pending balance. All surcharges marked
- * as default apply once, each at most one time per bill.
- */
-export function resolveLateFeePreview(options: {
+export interface LateFeePreviewOptions {
   bills: Payment[]
   meterId: string
   enabled: boolean
@@ -87,7 +88,23 @@ export function resolveLateFeePreview(options: {
   surcharges: Surcharge[] | undefined
   baseAmount?: number | null
   today?: string
-}): LateFeePreview {
+  /**
+   * Explicit user selection. Undefined = legacy behaviour (all default active
+   * surcharges preselected). An empty array deselects everything.
+   */
+  selectedSurchargeIds?: string[]
+}
+
+/**
+ * Preview-only evaluation of the late fee for a bill that is about to be
+ * generated: eligible when late fees are enabled and the meter has at least
+ * `minMonths` prior bills overdue with pending balance. Surcharges come from
+ * the explicit selection when given, otherwise from the `is_default` flags.
+ * The backend recomputes the authoritative figures on confirm.
+ */
+export function resolveLateFeePreview(
+  options: LateFeePreviewOptions,
+): LateFeePreview {
   const { bills, meterId, enabled, surcharges, baseAmount } = options
   const today = options.today ?? toDay(new Date())
   const minMonths =
@@ -104,13 +121,29 @@ export function resolveLateFeePreview(options: {
     return { enabled, eligible: false, overdueCount, items: [], total: 0 }
   }
 
-  const items = (surcharges ?? [])
-    .filter((s) => s.is_active && s.is_default)
-    .map((surcharge) => ({
-      surcharge,
-      amount: surchargeAmount(surcharge, baseAmount),
-    }))
+  const { selectedSurchargeIds } = options
+  const candidates = (surcharges ?? []).filter((s) =>
+    s.is_active &&
+    (selectedSurchargeIds === undefined
+      ? s.is_default
+      : selectedSurchargeIds.includes(s.id)),
+  )
+  const items = candidates.map((surcharge) => ({
+    surcharge,
+    amount: surchargeAmount(surcharge, baseAmount),
+  }))
   const total = items.reduce((sum, item) => sum + (item.amount ?? 0), 0)
 
   return { enabled, eligible: true, overdueCount, items, total }
+}
+
+/**
+ * Initial checkbox selection: the default active surcharges when the bill is
+ * eligible, none otherwise.
+ */
+export function defaultSurchargeSelection(
+  options: Omit<LateFeePreviewOptions, "selectedSurchargeIds">,
+): string[] {
+  const preview = resolveLateFeePreview(options)
+  return preview.eligible ? preview.items.map((item) => item.surcharge.id) : []
 }

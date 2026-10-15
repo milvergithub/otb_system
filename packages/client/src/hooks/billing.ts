@@ -91,6 +91,7 @@ export interface PayBillRequest {
   reference?: string
   notes?: string
   discountIds?: string[]
+  surchargeIds?: string[]
   evidenceBase64?: string
   collectorUserId?: string
 }
@@ -111,10 +112,21 @@ export function usePayBill() {
 export function useGenerateBill() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ consumptionId, discountIds }: { consumptionId: string; discountIds?: string[] }) =>
+    mutationFn: ({
+      consumptionId,
+      discountIds,
+      surchargeIds,
+    }: {
+      consumptionId: string
+      discountIds?: string[]
+      surchargeIds?: string[]
+    }) =>
       api
         .post(ApiPath.Billing.GENERATE(consumptionId), {
           discountIds: discountIds && discountIds.length > 0 ? discountIds : undefined,
+          // `undefined` is dropped by JSON.stringify (legacy defaults);
+          // an empty array is preserved and deselects everything.
+          surchargeIds,
         })
         .then((r) => r.data),
     onSuccess: () => {

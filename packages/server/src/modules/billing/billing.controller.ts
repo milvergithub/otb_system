@@ -74,7 +74,11 @@ export class BillingController {
     @Param('consumptionId') consumptionId: string,
     @Body() dto: GenerateBillDto,
   ) {
-    return this.billingService.generateBill(consumptionId, dto.discountIds);
+    return this.billingService.generateBill(
+      consumptionId,
+      dto.discountIds,
+      dto.surchargeIds,
+    );
   }
 
   @Post(':id/pay')

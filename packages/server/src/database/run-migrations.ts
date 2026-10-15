@@ -105,6 +105,14 @@ const MIGRATIONS = [
     timestamp: 1755000000028,
     name: 'EnableUnaccentExtension1755000000028',
   },
+  {
+    timestamp: 1755000000029,
+    name: 'AddSurchargesAndLateFees1755000000029',
+  },
+  {
+    timestamp: 1755000000030,
+    name: 'AddSurchargeIsDefault1755000000030',
+  },
 ];
 
 async function isFreshDatabase(ds: DataSource): Promise<boolean> {

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Surcharge, SurchargeType } from './entities/surcharge.entity';
 import { CreateSurchargeDto, UpdateSurchargeDto } from './dto/surcharge.dto';
 import { AppError } from '../../common/errors/app-error';
@@ -27,6 +27,32 @@ export class SurchargeService {
     return this.repository.find({
       where: { is_default: true, is_active: true },
       order: { name: 'ASC' },
+    });
+  }
+
+  /**
+   * Loads surcharges by explicit user selection, validating that every id
+   * exists and is active. Order follows the request so previews and persisted
+   * rows match what the user saw.
+   */
+  async findSelected(ids: string[]): Promise<Surcharge[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+    const unique = [...new Set(ids)];
+    const rows = await this.repository.find({
+      where: { id: In(unique) },
+    });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return unique.map((id) => {
+      const surcharge = byId.get(id);
+      if (!surcharge) {
+        throw new AppError('SURCHARGE_NOT_FOUND');
+      }
+      if (!surcharge.is_active) {
+        throw new AppError('SURCHARGE_INACTIVE', { name: surcharge.name });
+      }
+      return surcharge;
     });
   }
 

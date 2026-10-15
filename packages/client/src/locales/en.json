@@ -469,7 +469,8 @@
     "totalDiscounted": "Total: -{{amount}}",
     "paymentHistory": "Payment history",
     "lateFee": "Late fee",
-    "totalSurcharged": "Late fee total: +{{amount}}"
+    "totalSurcharged": "Late fee total: +{{amount}}",
+    "noSurcharges": "No surcharges configured"
   },
   "tariffs": {
     "title": "Tariffs",

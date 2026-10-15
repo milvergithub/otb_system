@@ -85,6 +85,8 @@ export const ERROR_STATUS = {
   DISCOUNT_NAME_EXISTS: HttpStatus.CONFLICT,
   SURCHARGE_NOT_FOUND: HttpStatus.NOT_FOUND,
   SURCHARGE_NAME_EXISTS: HttpStatus.CONFLICT,
+  SURCHARGE_INACTIVE: HttpStatus.BAD_REQUEST,
+  LATE_FEE_NOT_ELIGIBLE: HttpStatus.BAD_REQUEST,
 
   // ------------------------------------------------------------- tariffs
   TARIFF_NOT_FOUND: HttpStatus.NOT_FOUND,

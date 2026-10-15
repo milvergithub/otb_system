@@ -7,14 +7,26 @@ import type { TFunction } from "i18next"
 import { requiredString } from "@/lib/validation"
 import { getApiErrorMessage } from "@/lib/api"
 import { formatCurrency, monthNames } from "@/lib/utils"
+import {
+  defaultSurchargeSelection,
+  resolveLateFeePreview,
+  surchargeAmount,
+} from "@/lib/utils/lateFee"
 import type { Payment } from "@/lib/types"
-import { useActiveDiscounts, usePayBill } from "@/hooks/billing"
+import {
+  useActiveDiscounts,
+  useActiveSurcharges,
+  useMeterBills,
+  usePayBill,
+} from "@/hooks/billing"
+import { useSettings } from "@/hooks/settings"
 import { useSearchUsers } from "@/hooks/users"
 import { useAuth } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import SurchargeSelectList from "@/components/SurchargeSelectList"
 import { ComboboxSelect } from "@/components/ui/combobox"
 import {
   Dialog,
@@ -36,6 +48,7 @@ const payFormSchema = (t: TFunction) =>
     method: requiredString(t),
     reference: z.string().optional(),
     discount_ids: z.array(z.string()).optional(),
+    surcharge_ids: z.array(z.string()).optional(),
     collectorUserId: z.string().optional(),
   })
 
@@ -46,6 +59,7 @@ const DEFAULT_PAY_FORM: PayFormValues = {
   method: "",
   reference: "",
   discount_ids: [],
+  surcharge_ids: [],
   collectorUserId: "",
 }
 
@@ -71,8 +85,19 @@ export default function PayBillDialog({
     control: form.control,
     name: "discount_ids",
   })
+  const watchSurchargeIds = useWatch({
+    control: form.control,
+    name: "surcharge_ids",
+  })
 
   const { data: discounts } = useActiveDiscounts()
+  const { data: surcharges } = useActiveSurcharges(!!payment)
+  const { data: settings } = useSettings()
+  const minMonths = parseInt(settings?.late_fee_min_months ?? "", 10) || 3
+  const { data: meterBills } = useMeterBills(
+    payment?.consumption?.meter_id,
+    !!payment,
+  )
   const payMutation = usePayBill()
   const { hasPermission } = useAuth()
   const canPickCollector = hasPermission("users.read")
@@ -91,28 +116,80 @@ export default function PayBillDialog({
     return parseFloat(payment.total_amount) + parseFloat(payment.discount_amount)
   }, [payment])
 
-  const recalcAmount = useCallback((discountIds: string[] | undefined): number => {
-    const amountPaid = payment ? parseFloat(payment.amount_paid ?? "0") : 0
-    if (!discountIds || discountIds.length === 0) return Math.max(0, originalAmount - amountPaid)
-    if (!discounts) return Math.max(0, originalAmount - amountPaid)
-    let totalDiscount = 0
-    for (const id of discountIds) {
-      const d = discounts.find((x) => x.id === id)
-      if (!d) {
-        const stored = payment?.paymentDiscounts?.find((pd) => pd.discount_id === id)
-        if (stored) totalDiscount += parseFloat(stored.amount)
-        continue
-      }
-      if (d.type === "fixed") {
-        totalDiscount += parseFloat(d.value)
-      } else {
-        totalDiscount += originalAmount * (parseFloat(d.value) / 100)
-      }
-    }
-    return Math.max(0, originalAmount - totalDiscount - amountPaid)
-  }, [originalAmount, discounts, payment])
+  // Surcharges snapshotted at generation time are read-only: the bill can no
+  // longer gain fees. A bill without them may still receive the selection
+  // while the meter qualifies, mirroring the backend's eligibility check
+  // (this payment is excluded from the overdue count, as `excludeId` does).
+  const hasPersistedSurcharges = (payment?.paymentSurcharges?.length ?? 0) > 0
+  const lateFee = useMemo(() => {
+    if (!payment) return null
+    return resolveLateFeePreview({
+      bills: (meterBills?.items ?? []).filter(
+        (bill) => bill.id !== payment.id,
+      ),
+      meterId: payment.consumption?.meter_id ?? "",
+      enabled: settings?.late_fee_enabled === "true",
+      minMonths,
+      surcharges,
+      baseAmount: originalAmount,
+      selectedSurchargeIds: watchSurchargeIds ?? [],
+    })
+  }, [
+    payment,
+    meterBills,
+    settings,
+    minMonths,
+    surcharges,
+    originalAmount,
+    watchSurchargeIds,
+  ])
+  const surchargeEditable =
+    !!payment && !hasPersistedSurcharges && !!lateFee?.eligible
 
-  const discountedAmount = useMemo(() => recalcAmount(watchDiscountIds), [watchDiscountIds, recalcAmount])
+  const recalcAmount = useCallback(
+    (discountIds: string[] | undefined, surchargeIds?: string[]): number => {
+      const amountPaid = payment ? parseFloat(payment.amount_paid ?? "0") : 0
+      let totalDiscount = 0
+      if (discountIds && discountIds.length > 0 && discounts) {
+        for (const id of discountIds) {
+          const d = discounts.find((x) => x.id === id)
+          if (!d) {
+            const stored = payment?.paymentDiscounts?.find(
+              (pd) => pd.discount_id === id,
+            )
+            if (stored) totalDiscount += parseFloat(stored.amount)
+            continue
+          }
+          if (d.type === "fixed") {
+            totalDiscount += parseFloat(d.value)
+          } else {
+            totalDiscount += originalAmount * (parseFloat(d.value) / 100)
+          }
+        }
+      }
+      let surchargeTotal = 0
+      if (surchargeIds && surchargeIds.length > 0 && surcharges) {
+        for (const id of surchargeIds) {
+          const s = surcharges.find((x) => x.id === id)
+          if (s) surchargeTotal += surchargeAmount(s, originalAmount) ?? 0
+        }
+      }
+      return Math.max(
+        0,
+        originalAmount - totalDiscount + surchargeTotal - amountPaid,
+      )
+    },
+    [originalAmount, discounts, surcharges, payment],
+  )
+
+  const discountedAmount = useMemo(
+    () =>
+      recalcAmount(
+        watchDiscountIds,
+        surchargeEditable ? watchSurchargeIds : undefined,
+      ),
+    [watchDiscountIds, surchargeEditable, watchSurchargeIds, recalcAmount],
+  )
 
   useEffect(() => {
     if (!payment) return
@@ -121,9 +198,51 @@ export default function PayBillDialog({
       method: "cash",
       reference: "",
       discount_ids: payment.paymentDiscounts?.map((pd) => pd.discount_id) ?? [],
+      surcharge_ids: [],
       collectorUserId: "",
     })
   }, [payment, form])
+
+  // Preselect the default active surcharges once the eligibility data is
+  // loaded; the ref keeps it once per payment so it never overrides toggles.
+  const surchargeInitRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!payment) {
+      surchargeInitRef.current = null
+      return
+    }
+    if (surchargeInitRef.current === payment.id) return
+    if (hasPersistedSurcharges) {
+      surchargeInitRef.current = payment.id
+      return
+    }
+    if (settings === undefined || surcharges === undefined) return
+    if (payment.consumption?.meter_id && meterBills === undefined) return
+    surchargeInitRef.current = payment.id
+    form.setValue(
+      "surcharge_ids",
+      defaultSurchargeSelection({
+        bills: (meterBills?.items ?? []).filter(
+          (bill) => bill.id !== payment.id,
+        ),
+        meterId: payment.consumption?.meter_id ?? "",
+        enabled: settings.late_fee_enabled === "true",
+        minMonths,
+        surcharges,
+        baseAmount: originalAmount,
+      }),
+      { shouldDirty: false },
+    )
+  }, [
+    payment,
+    hasPersistedSurcharges,
+    settings,
+    surcharges,
+    meterBills,
+    minMonths,
+    originalAmount,
+    form,
+  ])
 
   useEffect(() => {
     if (!payment) return
@@ -160,6 +279,16 @@ export default function PayBillDialog({
     )
   }
 
+  function toggleSurcharge(surchargeId: string) {
+    const current = watchSurchargeIds ?? []
+    form.setValue(
+      "surcharge_ids",
+      current.includes(surchargeId)
+        ? current.filter((id) => id !== surchargeId)
+        : [...current, surchargeId],
+    )
+  }
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     form.handleSubmit((values) => {
@@ -170,6 +299,7 @@ export default function PayBillDialog({
           paymentMethod: values.method,
           reference: values.reference || undefined,
           discountIds: values.discount_ids ?? [],
+          surchargeIds: surchargeEditable ? (values.surcharge_ids ?? []) : undefined,
           evidenceBase64: croppedBase64 ?? undefined,
           collectorUserId: values.collectorUserId || undefined,
         },
@@ -275,12 +405,58 @@ export default function PayBillDialog({
                     </span>
                   </label>
                 ))
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  {t("common.noDiscounts")}
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {t("common.noDiscounts")}
+              </p>
+            )}
+          </div>
+          {surchargeEditable ? (
+            <div className="space-y-2">
+              <Label>{t("billing.lateFee")}</Label>
+              <SurchargeSelectList
+                surcharges={surcharges ?? []}
+                selectedIds={watchSurchargeIds ?? []}
+                onToggle={toggleSurcharge}
+                baseAmount={originalAmount}
+                unknownAmountLabel={t("consumption.surchargeCalculated")}
+              />
+              {(lateFee?.total ?? 0) > 0 ? (
+                <p className="text-sm text-destructive">
+                  {t("billing.totalSurcharged", {
+                    amount: formatCurrency(lateFee!.total),
+                  })}
                 </p>
-              )}
+              ) : null}
             </div>
+          ) : hasPersistedSurcharges &&
+            payment?.paymentSurcharges?.length ? (
+            <div className="space-y-2">
+              <Label>{t("billing.lateFee")}</Label>
+              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-1">
+                {payment.paymentSurcharges.map((ps) => (
+                  <div
+                    key={ps.id}
+                    className="flex items-center justify-between gap-3 text-sm"
+                  >
+                    <span>
+                      {ps.surcharge?.name ?? ps.surcharge_id} —{" "}
+                      {ps.surcharge?.type === "fixed"
+                        ? formatCurrency(ps.surcharge.value)
+                        : `${ps.surcharge?.value}%`}
+                    </span>
+                    <span className="font-medium text-destructive">
+                      +{formatCurrency(ps.amount)}
+                    </span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between gap-3 border-t pt-2 text-sm font-semibold text-destructive">
+                  <span>{t("consumption.surchargeTotal")}</span>
+                  <span>{`+${formatCurrency(payment.late_fee_amount)}`}</span>
+                </div>
+              </div>
+            </div>
+          ) : null}
           </div>
           <div className="space-y-2">
             <Label>{t("billing.evidence")}</Label>

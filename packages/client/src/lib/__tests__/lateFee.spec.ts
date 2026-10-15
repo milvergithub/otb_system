@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import type { Payment, Surcharge, Tariff, BaseTariff } from "@/lib/types"
 import {
+  defaultSurchargeSelection,
   estimateBillAmount,
   isOverdueWithBalance,
   resolveLateFeePreview,
@@ -178,6 +179,120 @@ describe("resolveLateFeePreview", () => {
     expect(result.items).toHaveLength(1)
     expect(result.items[0].amount).toBeUndefined()
     expect(result.total).toBe(0)
+  })
+})
+
+describe("resolveLateFeePreview manual selection", () => {
+  it("applies only the selected active surcharges, ignoring the default flags", () => {
+    const result = preview({
+      bills: [JAN, FEB, MAR],
+      surcharges: [
+        makeSurcharge({ id: "a", value: "10", is_default: true }),
+        makeSurcharge({ id: "b", value: "5", is_default: false }),
+        makeSurcharge({ id: "c", value: "7", is_default: true }),
+      ],
+      selectedSurchargeIds: ["b"],
+    })
+
+    expect(result.eligible).toBe(true)
+    expect(result.items.map((i) => i.surcharge.id)).toEqual(["b"])
+    expect(result.total).toBe(5)
+  })
+
+  it("an empty selection is eligible but applies no surcharge", () => {
+    const result = preview({
+      bills: [JAN, FEB, MAR],
+      selectedSurchargeIds: [],
+    })
+
+    expect(result.eligible).toBe(true)
+    expect(result.items).toHaveLength(0)
+    expect(result.total).toBe(0)
+  })
+
+  it("ignores inactive surcharges even when selected", () => {
+    const result = preview({
+      bills: [JAN, FEB, MAR],
+      surcharges: [
+        makeSurcharge({ id: "off", is_active: false }),
+        makeSurcharge({ id: "on" }),
+      ],
+      selectedSurchargeIds: ["off", "on"],
+    })
+
+    expect(result.items.map((i) => i.surcharge.id)).toEqual(["on"])
+  })
+
+  it("sums fixed and percentage amounts from the selection", () => {
+    const result = preview({
+      bills: [JAN, FEB, MAR],
+      surcharges: [
+        makeSurcharge({ id: "fixed", type: "fixed", value: "10" }),
+        makeSurcharge({ id: "pct", type: "percentage", value: "2" }),
+      ],
+      selectedSurchargeIds: ["fixed", "pct"],
+      baseAmount: 30,
+    })
+
+    expect(result.total).toBeCloseTo(10.6)
+  })
+
+  it("an unknown selected id simply has no effect in the preview", () => {
+    const result = preview({
+      bills: [JAN, FEB, MAR],
+      surcharges: [makeSurcharge({ id: "a" })],
+      selectedSurchargeIds: ["ghost"],
+    })
+
+    expect(result.items).toHaveLength(0)
+    expect(result.total).toBe(0)
+  })
+})
+
+describe("defaultSurchargeSelection", () => {
+  it("returns the default active surcharge ids when the bill is eligible", () => {
+    expect(
+      defaultSurchargeSelection({
+        bills: [JAN, FEB, MAR],
+        meterId: METER,
+        enabled: true,
+        minMonths: 3,
+        surcharges: [
+          makeSurcharge({ id: "default" }),
+          makeSurcharge({ id: "opt-in", is_default: false }),
+        ],
+        baseAmount: 30,
+        today: TODAY,
+      }),
+    ).toEqual(["default"])
+  })
+
+  it("returns nothing when below the overdue threshold", () => {
+    expect(
+      defaultSurchargeSelection({
+        bills: [JAN],
+        meterId: METER,
+        enabled: true,
+        minMonths: 3,
+        surcharges: [makeSurcharge()],
+        baseAmount: 30,
+        today: TODAY,
+      }),
+    ).toEqual([])
+  })
+
+  it("returns nothing when late fees are disabled", () => {
+    expect(
+      defaultSurchargeSelection({
+        bills: [JAN, FEB, MAR],
+        meterId: METER,
+        enabled: false,
+        minMonths: 3,
+        surcharges: [makeSurcharge()],
+        baseAmount: 30,
+        today: TODAY,
+      }),
+    ).toEqual([])
   })
 })
 
