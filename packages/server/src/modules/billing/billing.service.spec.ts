@@ -837,6 +837,7 @@ function makePayService(opts: PayOptions) {
     payment: { ...payment },
   };
   const savedSurcharges: Record<string, unknown>[] = [];
+  const deletedSurcharges: Record<string, unknown>[] = [];
 
   const overdueQb: Record<string, jest.Mock> = {};
   overdueQb.leftJoin = jest.fn(() => overdueQb);
@@ -900,9 +901,10 @@ function makePayService(opts: PayOptions) {
     save: jest.fn(async (data: Record<string, unknown>) => data),
   };
   const surchargesRepo = {
-    count: jest.fn(
-      async () => (store.payment.paymentSurcharges as unknown[])?.length ?? 0,
-    ),
+    delete: jest.fn(async (where: Record<string, unknown>) => {
+      deletedSurcharges.push(where);
+      return undefined;
+    }),
     create: jest.fn((data: Record<string, unknown>) => data),
     save: jest.fn(async (data: Record<string, unknown>) => {
       savedSurcharges.push(data);
@@ -1001,6 +1003,7 @@ function makePayService(opts: PayOptions) {
     service,
     store,
     savedSurcharges,
+    deletedSurcharges,
     dataSource,
     surchargeService,
     historyRepo,
@@ -1082,8 +1085,115 @@ describe('BillingService.pay surcharge selection', () => {
     expect(dataSource.transaction).not.toHaveBeenCalled();
   });
 
-  it('never rewrites surcharges persisted at generation time', async () => {
-    const { service, store, savedSurcharges, dataSource } = makePayService({
+  it('replaces the persisted snapshot when the selection changes', async () => {
+    const { service, store, savedSurcharges, surchargesRepo } = makePayService({
+      payment: makePayPaymentFixture({
+        total_amount: '40.00',
+        late_fee_amount: '10.00',
+        paymentSurcharges: [
+          { id: 'ps-1', surcharge_id: 's1', amount: '10.00' },
+        ],
+      }),
+      minMonths: 3,
+      overdueBills: [],
+      allSurcharges: payPool,
+    });
+
+    // Deselecting everything removes the fee — and needs NO eligibility check
+    // (removal is always allowed).
+    await service.pay('payment-1', {
+      amount: 30,
+      paymentMethod: 'cash',
+      surchargeIds: [],
+    });
+
+    expect(surchargesRepo.delete).toHaveBeenCalledWith({
+      payment_id: 'payment-1',
+    });
+    expect(savedSurcharges).toHaveLength(0);
+    expect(store.payment.late_fee_amount).toBe('0.00');
+    expect(store.payment.total_amount).toBe('30.00');
+    expect(store.payment.amount_paid).toBe('30.00');
+    expect(store.payment.status).toBe(PaymentStatus.PAID);
+  });
+
+  it('keeps persisted snapshot amounts when the selection keeps them', async () => {
+    const changedPool = [makeSurchargeFixture('s1', SurchargeType.FIXED, '15')];
+    const { service, store, savedSurcharges, surchargeService } =
+      makePayService({
+        payment: makePayPaymentFixture({
+          total_amount: '40.00',
+          late_fee_amount: '10.00',
+          paymentSurcharges: [
+            { id: 'ps-1', surcharge_id: 's1', amount: '10.00' },
+          ],
+        }),
+        minMonths: 3,
+        overdueBills: [],
+        allSurcharges: changedPool,
+      });
+
+    // The meter is NOT eligible (minMonths 3, no overdue bills) and the
+    // surcharge config changed after billing (15 now): keeping the persisted
+    // row is still allowed, needs no validation and keeps the snapshot amount.
+    await service.pay('payment-1', {
+      amount: 40,
+      paymentMethod: 'cash',
+      surchargeIds: ['s1'],
+    });
+
+    expect(surchargeService.findSelected).not.toHaveBeenCalled();
+    expect(savedSurcharges).toHaveLength(1);
+    expect(savedSurcharges[0]).toMatchObject({
+      payment_id: 'payment-1',
+      surcharge_id: 's1',
+      amount: '10.00',
+    });
+    expect(store.payment.late_fee_amount).toBe('10.00');
+    expect(store.payment.total_amount).toBe('40.00');
+    expect(store.payment.status).toBe(PaymentStatus.PAID);
+  });
+
+  it('allows keeping a persisted surcharge that has since been deactivated', async () => {
+    const inactivePool = [
+      {
+        ...makeSurchargeFixture('s1', SurchargeType.FIXED, '10'),
+        is_active: false,
+      },
+    ];
+    const { service, store, savedSurcharges, surchargeService } =
+      makePayService({
+        payment: makePayPaymentFixture({
+          total_amount: '40.00',
+          late_fee_amount: '10.00',
+          paymentSurcharges: [
+            { id: 'ps-1', surcharge_id: 's1', amount: '10.00' },
+          ],
+        }),
+        minMonths: 1,
+        overdueBills: [makeBillFixture('30', '0')],
+        allSurcharges: inactivePool,
+      });
+
+    await service.pay('payment-1', {
+      amount: 40,
+      paymentMethod: 'cash',
+      surchargeIds: ['s1'],
+    });
+
+    expect(surchargeService.findSelected).not.toHaveBeenCalled();
+    expect(savedSurcharges).toHaveLength(1);
+    expect(store.payment.late_fee_amount).toBe('10.00');
+    expect(store.payment.total_amount).toBe('40.00');
+    expect(store.payment.status).toBe(PaymentStatus.PAID);
+  });
+
+  it('adds a new surcharge alongside a persisted one', async () => {
+    const pool = [
+      makeSurchargeFixture('s1', SurchargeType.FIXED, '10'),
+      makeSurchargeFixture('s2', SurchargeType.FIXED, '5'),
+    ];
+    const { service, store, savedSurcharges } = makePayService({
       payment: makePayPaymentFixture({
         total_amount: '40.00',
         late_fee_amount: '10.00',
@@ -1093,21 +1203,80 @@ describe('BillingService.pay surcharge selection', () => {
       }),
       minMonths: 1,
       overdueBills: [makeBillFixture('30', '0')],
-      allSurcharges: payPool,
+      allSurcharges: pool,
     });
+
+    // 30 base + 10 (kept snapshot) + 5 (new, validated + eligible) = 45
+    await service.pay('payment-1', {
+      amount: 45,
+      paymentMethod: 'cash',
+      surchargeIds: ['s1', 's2'],
+    });
+
+    expect(savedSurcharges).toHaveLength(2);
+    expect(savedSurcharges.map((s) => [s.surcharge_id, s.amount])).toEqual([
+      ['s1', '10.00'],
+      ['s2', '5.00'],
+    ]);
+    expect(store.payment.late_fee_amount).toBe('15.00');
+    expect(store.payment.total_amount).toBe('45.00');
+    expect(store.payment.status).toBe(PaymentStatus.PAID);
+  });
+
+  it('rejects adding a new surcharge while not eligible, keeping the persisted one', async () => {
+    const pool = [
+      makeSurchargeFixture('s1', SurchargeType.FIXED, '10'),
+      makeSurchargeFixture('s2', SurchargeType.FIXED, '5'),
+    ];
+    const { service, store, savedSurcharges, dataSource } = makePayService({
+      payment: makePayPaymentFixture({
+        total_amount: '40.00',
+        late_fee_amount: '10.00',
+        paymentSurcharges: [
+          { id: 'ps-1', surcharge_id: 's1', amount: '10.00' },
+        ],
+      }),
+      minMonths: 3,
+      overdueBills: [],
+      allSurcharges: pool,
+    });
+
+    await expect(
+      service.pay('payment-1', {
+        amount: 45,
+        paymentMethod: 'cash',
+        surchargeIds: ['s1', 's2'],
+      }),
+    ).rejects.toMatchObject({ code: 'LATE_FEE_NOT_ELIGIBLE' });
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+    expect(savedSurcharges).toHaveLength(0);
+    expect(store.payment.late_fee_amount).toBe('10.00');
+    expect(store.payment.total_amount).toBe('40.00');
+  });
+
+  it('an explicit empty selection on a bill without fees changes nothing', async () => {
+    const { service, store, savedSurcharges, surchargeService } =
+      makePayService({
+        payment: makePayPaymentFixture(),
+        minMonths: 1,
+        overdueBills: [makeBillFixture('30', '0')],
+        defaults: payPool,
+        allSurcharges: payPool,
+      });
 
     await service.pay('payment-1', {
       amount: 10,
       paymentMethod: 'cash',
-      surchargeIds: ['s1'],
+      surchargeIds: [],
     });
 
+    expect(surchargeService.findSelected).not.toHaveBeenCalled();
+    expect(surchargeService.findDefaults).not.toHaveBeenCalled();
     expect(savedSurcharges).toHaveLength(0);
-    expect(store.payment.late_fee_amount).toBe('10.00');
-    expect(store.payment.total_amount).toBe('40.00');
-    // the payment itself is still recorded normally
-    expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+    expect(store.payment.late_fee_amount).toBe('0.00');
+    expect(store.payment.total_amount).toBe('30.00');
     expect(store.payment.amount_paid).toBe('10.00');
+    expect(store.payment.status).toBe(PaymentStatus.PARTIAL);
   });
 
   it('rejects a selection when the bill is not eligible', async () => {

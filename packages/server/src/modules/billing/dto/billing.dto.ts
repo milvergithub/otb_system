@@ -36,10 +36,11 @@ export class PayBillDto {
 
   /**
    * Explicit late-fee surcharge selection (ids chosen by the user).
-   * Generate: omitted field = legacy behaviour (all default active surcharges
-   * when eligible); empty array = none.
-   * Pay: applied only to bills that were generated WITHOUT surcharges; bills
-   * that already carry persisted surcharges are never rewritten.
+   * EDITABLE at pay time: present (even empty) = replace the bill's snapshot
+   * rows with this selection — persisted ids keep their snapshot amount, only
+   * new ids are validated (exists + active + eligibility); empty array removes
+   * the fee entirely. Omitted = keep the bill exactly as generated; no default
+   * is ever applied implicitly at pay time.
    */
   @IsOptional()
   @IsArray()

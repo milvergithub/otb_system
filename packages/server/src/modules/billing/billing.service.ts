@@ -448,7 +448,8 @@ export class BillingService {
   }
 
   /**
-   * Registers a payment against a bill, optionally changing applied discounts.
+   * Registers a payment against a bill, optionally changing applied discounts
+   * and editing the late-fee surcharge selection (add / change / remove).
    *
    * Responsibility snapshot: the financially responsible user comes from the
    * water-bill configuration (never from the authenticated registrant), the
@@ -466,15 +467,19 @@ export class BillingService {
     }
     await this.paymentMethodsService.validateCode(dto.paymentMethod);
 
-    let total = parseFloat(payment.total_amount);
     const alreadyPaid = parseFloat(payment.amount_paid);
-    const requestedDiscountIds: string[] = [];
-    let totalDiscount = 0;
+    const currentDiscount = parseFloat(payment.discount_amount);
+    const currentLateFee = parseFloat(payment.late_fee_amount);
+    // Original bill amount (before discounts and late fee). Discount
+    // percentages and new surcharge amounts are always calculated over this
+    // base, never over base + fee.
+    const originalAmount =
+      parseFloat(payment.total_amount) + currentDiscount - currentLateFee;
 
+    const requestedDiscountIds: string[] = dto.discountIds ?? [];
+    let totalDiscount = currentDiscount;
     if (dto.discountIds) {
-      const originalAmount = total + parseFloat(payment.discount_amount);
-
-      requestedDiscountIds.push(...dto.discountIds);
+      totalDiscount = 0;
       for (const discountId of requestedDiscountIds) {
         const discount = await this.discountService.findOne(discountId);
         totalDiscount += this.discountService.calculateDiscountAmount(
@@ -482,39 +487,63 @@ export class BillingService {
           discount,
         );
       }
-      total = Math.max(0, originalAmount - totalDiscount);
     }
 
-    // Late-fee selection at payment time: only bills generated WITHOUT
-    // surcharges may gain them here. Rows persisted at generation are frozen —
-    // a selection sent for such a bill is ignored, never rewritten
-    // (non-retroactive rule). The eligibility rules (late_fee_enabled +
-    // min overdue months of THIS meter) still apply; `payment.id` is excluded
-    // so the bill being paid never counts toward its own threshold.
-    const surchargesAlreadyApplied =
-      (payment.paymentSurcharges?.length ?? 0) > 0;
-    let surchargeSelection: {
-      surcharges: Surcharge[];
-      amounts: number[];
-      total: number;
-    } | null = null;
-    if (dto.surchargeIds?.length && !surchargesAlreadyApplied) {
-      const baseAmount =
-        parseFloat(payment.total_amount) +
-        parseFloat(payment.discount_amount) -
-        parseFloat(payment.late_fee_amount);
-      surchargeSelection = await this.resolveLateFee(
-        payment.consumption,
-        baseAmount,
-        payment.id,
-        dto.surchargeIds,
+    // Late-fee selection at payment time is EDITABLE: when `surchargeIds` is
+    // present (even empty) the bill's snapshot rows are replaced with the new
+    // selection — the user may add, change or remove the surcharge; when it is
+    // omitted the rows generated with the bill stay untouched (and no default
+    // is ever applied implicitly). Persisted ids keep their snapshot amount
+    // and are never re-validated (they may even be inactive by now); only NEW
+    // ids go through `resolveLateFee`, which enforces exists + active and the
+    // eligibility rules (late_fee_enabled + min overdue months of THIS meter,
+    // excluding this bill so it never counts toward its own threshold).
+    const surchargeIdsProvided = dto.surchargeIds !== undefined;
+    let surchargeEntries: { surchargeId: string; amount: number }[] | null =
+      null;
+    let newLateFeeTotal = currentLateFee;
+    if (surchargeIdsProvided) {
+      const requestedIds = [...new Set(dto.surchargeIds ?? [])];
+      const persistedAmountById = new Map(
+        (payment.paymentSurcharges ?? []).map((ps) => [
+          ps.surcharge_id,
+          parseFloat(ps.amount),
+        ]),
+      );
+      const newIds = requestedIds.filter((id) => !persistedAmountById.has(id));
+      const amountByNewId = new Map<string, number>();
+      if (newIds.length > 0) {
+        const resolved = await this.resolveLateFee(
+          payment.consumption,
+          originalAmount,
+          payment.id,
+          newIds,
+        );
+        resolved.surcharges.forEach((s, i) =>
+          amountByNewId.set(s.id, resolved.amounts[i]),
+        );
+      }
+      surchargeEntries = [];
+      for (const id of requestedIds) {
+        const amount = persistedAmountById.has(id)
+          ? persistedAmountById.get(id)
+          : amountByNewId.get(id);
+        if (amount !== undefined && amount > 0.001) {
+          surchargeEntries.push({ surchargeId: id, amount });
+        }
+      }
+      newLateFeeTotal = surchargeEntries.reduce(
+        (sum, entry) => sum + entry.amount,
+        0,
       );
     }
-    const surchargeTotal = surchargeSelection?.total ?? 0;
+
+    const totalAfterDiscount = Math.max(0, originalAmount - totalDiscount);
+    const newTotal = totalAfterDiscount + newLateFeeTotal;
 
     const newPaidTotal = alreadyPaid + dto.amount;
 
-    if (newPaidTotal > total + surchargeTotal + 0.001) {
+    if (newPaidTotal > newTotal + 0.001) {
       throw new AppError('PAYMENT_EXCEEDS_BALANCE');
     }
 
@@ -571,20 +600,8 @@ export class BillingService {
         throw new AppError('BILL_FULLY_PAID');
       }
 
-      // Re-checked inside the transaction: if another concurrent pay already
-      // persisted surcharges, this one must not touch them.
-      let selection = surchargeSelection;
-      if (selection) {
-        const existingCount = await surchargesRepo.count({
-          where: { payment_id: fresh.id },
-        });
-        if (existingCount > 0) selection = null;
-      }
-
-      if (dto.discountIds || selection) {
+      if (dto.discountIds || surchargeEntries) {
         if (dto.discountIds) {
-          const originalAmount =
-            parseFloat(fresh.total_amount) + parseFloat(fresh.discount_amount);
           await discountsRepo.delete({ payment_id: fresh.id });
 
           await this.applyMultipleDiscounts(
@@ -595,26 +612,31 @@ export class BillingService {
           );
         }
 
-        if (selection) {
-          await this.applySelectedSurcharges(
-            fresh.id,
-            selection.surcharges,
-            selection.amounts,
-            manager,
-          );
+        // Full replacement of the snapshot: delete every row and re-insert the
+        // kept + newly resolved ones with their amounts.
+        if (surchargeEntries) {
+          await surchargesRepo.delete({ payment_id: fresh.id });
+          for (const entry of surchargeEntries) {
+            await surchargesRepo.save(
+              surchargesRepo.create({
+                payment_id: fresh.id,
+                surcharge_id: entry.surchargeId,
+                amount: entry.amount.toFixed(2),
+              }),
+            );
+          }
         }
 
-        const finalTotal = total + (selection ? selection.total : 0);
         await paymentsRepo
           .createQueryBuilder()
           .update(Payment)
           .set({
-            total_amount: finalTotal.toFixed(2),
+            total_amount: newTotal.toFixed(2),
             ...(dto.discountIds
               ? { discount_amount: totalDiscount.toFixed(2) }
               : {}),
-            ...(selection
-              ? { late_fee_amount: selection.total.toFixed(2) }
+            ...(surchargeEntries
+              ? { late_fee_amount: newLateFeeTotal.toFixed(2) }
               : {}),
           })
           .where('id = :id', { id: fresh.id })

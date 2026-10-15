@@ -6,6 +6,7 @@ import {
   estimateBillAmount,
   isOverdueWithBalance,
   resolveLateFeePreview,
+  sumSelectedSurcharges,
 } from "@/lib/utils/lateFee"
 
 const TODAY = "2026-04-15"
@@ -293,6 +294,41 @@ describe("defaultSurchargeSelection", () => {
         today: TODAY,
       }),
     ).toEqual([])
+  })
+})
+
+describe("sumSelectedSurcharges", () => {
+  const candidates = [
+    makeSurcharge({ id: "fixed", type: "fixed", value: "10" }),
+    makeSurcharge({ id: "pct", type: "percentage", value: "2" }),
+    makeSurcharge({ id: "inactive", is_active: false }),
+  ]
+
+  it("sums fixed and percentage surcharges over the base", () => {
+    expect(
+      sumSelectedSurcharges(["fixed", "pct"], candidates, {}, 30),
+    ).toBeCloseTo(10.6)
+  })
+
+  it("prefers the persisted snapshot amount over the current configuration", () => {
+    // Config changed after billing: fixed now 15, snapshot keeps 10
+    expect(
+      sumSelectedSurcharges(["fixed"], candidates, { fixed: 10 }, 30),
+    ).toBe(10)
+  })
+
+  it("keeps persisted amounts for inactive surcharges that are not candidates", () => {
+    expect(
+      sumSelectedSurcharges(["gone"], [], { gone: 7.5 }, 30),
+    ).toBe(7.5)
+  })
+
+  it("ignores unknown ids without a persisted amount", () => {
+    expect(sumSelectedSurcharges(["ghost"], candidates, {}, 30)).toBe(0)
+  })
+
+  it("counts a deselected selection as zero", () => {
+    expect(sumSelectedSurcharges([], candidates, {}, 30)).toBe(0)
   })
 })
 

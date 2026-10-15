@@ -8,9 +8,8 @@ import { requiredString } from "@/lib/validation"
 import { getApiErrorMessage } from "@/lib/api"
 import { formatCurrency, monthNames } from "@/lib/utils"
 import {
-  defaultSurchargeSelection,
   resolveLateFeePreview,
-  surchargeAmount,
+  sumSelectedSurcharges,
 } from "@/lib/utils/lateFee"
 import type { Payment } from "@/lib/types"
 import {
@@ -111,16 +110,43 @@ export default function PayBillDialog({
   const [cropDialogOpen, setCropDialogOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Original bill amount (before discounts and late fee): the base for
+  // discount percentages and for every surcharge shown below.
   const originalAmount = useMemo(() => {
     if (!payment) return 0
-    return parseFloat(payment.total_amount) + parseFloat(payment.discount_amount)
+    return (
+      parseFloat(payment.total_amount) +
+      parseFloat(payment.discount_amount) -
+      parseFloat(payment.late_fee_amount)
+    )
   }, [payment])
 
-  // Surcharges snapshotted at generation time are read-only: the bill can no
-  // longer gain fees. A bill without them may still receive the selection
-  // while the meter qualifies, mirroring the backend's eligibility check
-  // (this payment is excluded from the overdue count, as `excludeId` does).
-  const hasPersistedSurcharges = (payment?.paymentSurcharges?.length ?? 0) > 0
+  // Persisted snapshot rows (if any): their ids are preselected, their amounts
+  // are frozen at generation, and — together with the active surcharges — they
+  // form the candidate list (a persisted surcharge may be inactive by now).
+  const persistedAmounts = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const ps of payment?.paymentSurcharges ?? []) {
+      map[ps.surcharge_id] = parseFloat(ps.amount)
+    }
+    return map
+  }, [payment])
+  const persistedIds = Object.keys(persistedAmounts)
+  const hasPersistedSurcharges = persistedIds.length > 0
+  const candidates = useMemo(() => {
+    const list = [...(surcharges ?? [])]
+    for (const ps of payment?.paymentSurcharges ?? []) {
+      if (ps.surcharge && !list.some((s) => s.id === ps.surcharge!.id)) {
+        list.push(ps.surcharge)
+      }
+    }
+    return list
+  }, [surcharges, payment])
+
+  // Eligibility only: may NEW surcharges be added to this bill? (Keeping or
+  // removing the persisted ones never requires eligibility — the backend
+  // enforces the same rule. This payment is excluded from the overdue count,
+  // as `excludeId` does on the server.)
   const lateFee = useMemo(() => {
     if (!payment) return null
     return resolveLateFeePreview({
@@ -130,21 +156,32 @@ export default function PayBillDialog({
       meterId: payment.consumption?.meter_id ?? "",
       enabled: settings?.late_fee_enabled === "true",
       minMonths,
-      surcharges,
+      surcharges: candidates,
       baseAmount: originalAmount,
-      selectedSurchargeIds: watchSurchargeIds ?? [],
     })
-  }, [
-    payment,
-    meterBills,
-    settings,
-    minMonths,
-    surcharges,
-    originalAmount,
-    watchSurchargeIds,
-  ])
-  const surchargeEditable =
-    !!payment && !hasPersistedSurcharges && !!lateFee?.eligible
+  }, [payment, meterBills, settings, minMonths, candidates, originalAmount])
+
+  const showSurchargeSection =
+    !!payment && (hasPersistedSurcharges || !!lateFee?.eligible)
+  // While not eligible, only the persisted rows may be kept/removed — new
+  // additions would be rejected by the server.
+  const disabledSurchargeIds =
+    hasPersistedSurcharges && !lateFee?.eligible
+      ? candidates
+          .filter((s) => !persistedIds.includes(s.id))
+          .map((s) => s.id)
+      : undefined
+
+  const selectedFeeTotal = useMemo(
+    () =>
+      sumSelectedSurcharges(
+        watchSurchargeIds ?? [],
+        candidates,
+        persistedAmounts,
+        originalAmount,
+      ),
+    [watchSurchargeIds, candidates, persistedAmounts, originalAmount],
+  )
 
   const recalcAmount = useCallback(
     (discountIds: string[] | undefined, surchargeIds?: string[]): number => {
@@ -167,28 +204,23 @@ export default function PayBillDialog({
           }
         }
       }
-      let surchargeTotal = 0
-      if (surchargeIds && surchargeIds.length > 0 && surcharges) {
-        for (const id of surchargeIds) {
-          const s = surcharges.find((x) => x.id === id)
-          if (s) surchargeTotal += surchargeAmount(s, originalAmount) ?? 0
-        }
-      }
+      const surchargeTotal = sumSelectedSurcharges(
+        surchargeIds ?? [],
+        candidates,
+        persistedAmounts,
+        originalAmount,
+      )
       return Math.max(
         0,
         originalAmount - totalDiscount + surchargeTotal - amountPaid,
       )
     },
-    [originalAmount, discounts, surcharges, payment],
+    [originalAmount, discounts, candidates, persistedAmounts, payment],
   )
 
   const discountedAmount = useMemo(
-    () =>
-      recalcAmount(
-        watchDiscountIds,
-        surchargeEditable ? watchSurchargeIds : undefined,
-      ),
-    [watchDiscountIds, surchargeEditable, watchSurchargeIds, recalcAmount],
+    () => recalcAmount(watchDiscountIds, watchSurchargeIds),
+    [watchDiscountIds, watchSurchargeIds, recalcAmount],
   )
 
   useEffect(() => {
@@ -198,51 +230,12 @@ export default function PayBillDialog({
       method: "cash",
       reference: "",
       discount_ids: payment.paymentDiscounts?.map((pd) => pd.discount_id) ?? [],
-      surcharge_ids: [],
+      // Persisted surcharges start selected; a bill without them starts with
+      // nothing — defaults are NEVER preselected at pay time.
+      surcharge_ids: payment.paymentSurcharges?.map((ps) => ps.surcharge_id) ?? [],
       collectorUserId: "",
     })
   }, [payment, form])
-
-  // Preselect the default active surcharges once the eligibility data is
-  // loaded; the ref keeps it once per payment so it never overrides toggles.
-  const surchargeInitRef = useRef<string | null>(null)
-  useEffect(() => {
-    if (!payment) {
-      surchargeInitRef.current = null
-      return
-    }
-    if (surchargeInitRef.current === payment.id) return
-    if (hasPersistedSurcharges) {
-      surchargeInitRef.current = payment.id
-      return
-    }
-    if (settings === undefined || surcharges === undefined) return
-    if (payment.consumption?.meter_id && meterBills === undefined) return
-    surchargeInitRef.current = payment.id
-    form.setValue(
-      "surcharge_ids",
-      defaultSurchargeSelection({
-        bills: (meterBills?.items ?? []).filter(
-          (bill) => bill.id !== payment.id,
-        ),
-        meterId: payment.consumption?.meter_id ?? "",
-        enabled: settings.late_fee_enabled === "true",
-        minMonths,
-        surcharges,
-        baseAmount: originalAmount,
-      }),
-      { shouldDirty: false },
-    )
-  }, [
-    payment,
-    hasPersistedSurcharges,
-    settings,
-    surcharges,
-    meterBills,
-    minMonths,
-    originalAmount,
-    form,
-  ])
 
   useEffect(() => {
     if (!payment) return
@@ -299,7 +292,8 @@ export default function PayBillDialog({
           paymentMethod: values.method,
           reference: values.reference || undefined,
           discountIds: values.discount_ids ?? [],
-          surchargeIds: surchargeEditable ? (values.surcharge_ids ?? []) : undefined,
+          // Always explicit: [] removes the fee, ids replace the snapshot.
+          surchargeIds: values.surcharge_ids ?? [],
           evidenceBase64: croppedBase64 ?? undefined,
           collectorUserId: values.collectorUserId || undefined,
         },
@@ -410,54 +404,29 @@ export default function PayBillDialog({
                 {t("common.noDiscounts")}
               </p>
             )}
+            </div>
           </div>
-          {surchargeEditable ? (
+          {showSurchargeSection ? (
             <div className="space-y-2">
               <Label>{t("billing.lateFee")}</Label>
               <SurchargeSelectList
-                surcharges={surcharges ?? []}
+                surcharges={candidates}
                 selectedIds={watchSurchargeIds ?? []}
                 onToggle={toggleSurcharge}
                 baseAmount={originalAmount}
                 unknownAmountLabel={t("consumption.surchargeCalculated")}
+                persistedAmounts={persistedAmounts}
+                disabledIds={disabledSurchargeIds}
               />
-              {(lateFee?.total ?? 0) > 0 ? (
+              {selectedFeeTotal > 0 ? (
                 <p className="text-sm text-destructive">
                   {t("billing.totalSurcharged", {
-                    amount: formatCurrency(lateFee!.total),
+                    amount: formatCurrency(selectedFeeTotal),
                   })}
                 </p>
               ) : null}
             </div>
-          ) : hasPersistedSurcharges &&
-            payment?.paymentSurcharges?.length ? (
-            <div className="space-y-2">
-              <Label>{t("billing.lateFee")}</Label>
-              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-1">
-                {payment.paymentSurcharges.map((ps) => (
-                  <div
-                    key={ps.id}
-                    className="flex items-center justify-between gap-3 text-sm"
-                  >
-                    <span>
-                      {ps.surcharge?.name ?? ps.surcharge_id} —{" "}
-                      {ps.surcharge?.type === "fixed"
-                        ? formatCurrency(ps.surcharge.value)
-                        : `${ps.surcharge?.value}%`}
-                    </span>
-                    <span className="font-medium text-destructive">
-                      +{formatCurrency(ps.amount)}
-                    </span>
-                  </div>
-                ))}
-                <div className="flex items-center justify-between gap-3 border-t pt-2 text-sm font-semibold text-destructive">
-                  <span>{t("consumption.surchargeTotal")}</span>
-                  <span>{`+${formatCurrency(payment.late_fee_amount)}`}</span>
-                </div>
-              </div>
-            </div>
           ) : null}
-          </div>
           <div className="space-y-2">
             <Label>{t("billing.evidence")}</Label>
             <input

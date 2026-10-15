@@ -147,3 +147,24 @@ export function defaultSurchargeSelection(
   const preview = resolveLateFeePreview(options)
   return preview.eligible ? preview.items.map((item) => item.surcharge.id) : []
 }
+
+/**
+ * Total of the currently selected surcharges. Ids present in
+ * `persistedAmounts` (rows snapshotted when the bill was generated) keep their
+ * stored amount even if the surcharge configuration changed afterwards —
+ * mirroring the backend pay rule. Unknown ids contribute nothing.
+ */
+export function sumSelectedSurcharges(
+  selectedIds: string[],
+  candidates: Surcharge[],
+  persistedAmounts: Record<string, number>,
+  baseAmount: number | null,
+): number {
+  return selectedIds.reduce((sum, id) => {
+    const persisted = persistedAmounts[id]
+    if (persisted !== undefined) return sum + persisted
+    const surcharge = candidates.find((s) => s.id === id)
+    if (!surcharge) return sum
+    return sum + (surchargeAmount(surcharge, baseAmount) ?? 0)
+  }, 0)
+}

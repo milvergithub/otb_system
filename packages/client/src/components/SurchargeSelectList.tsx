@@ -12,6 +12,10 @@ interface SurchargeSelectListProps {
   baseAmount: number | null
   /** Label shown when the amount cannot be estimated yet. */
   unknownAmountLabel?: string
+  /** Snapshot amounts recorded when the bill was generated (pay flow). */
+  persistedAmounts?: Record<string, number>
+  /** Ids the user cannot change (rendered disabled). */
+  disabledIds?: string[]
 }
 
 export default function SurchargeSelectList({
@@ -20,6 +24,8 @@ export default function SurchargeSelectList({
   onToggle,
   baseAmount,
   unknownAmountLabel,
+  persistedAmounts,
+  disabledIds,
 }: SurchargeSelectListProps) {
   const { t } = useTranslation()
 
@@ -32,15 +38,23 @@ export default function SurchargeSelectList({
   return (
     <div className="rounded-md border p-3 space-y-2 max-h-40 overflow-y-auto">
       {surcharges.map((surcharge) => {
-        const amount = surchargeAmount(surcharge, baseAmount)
+        const amount =
+          persistedAmounts?.[surcharge.id] ??
+          surchargeAmount(surcharge, baseAmount)
+        const disabled = disabledIds?.includes(surcharge.id) ?? false
         return (
           <label
             key={surcharge.id}
-            className="flex items-start gap-2 cursor-pointer"
+            className={
+              disabled
+                ? "flex items-start gap-2 opacity-60"
+                : "flex items-start gap-2 cursor-pointer"
+            }
           >
             <Checkbox
               checked={selectedIds.includes(surcharge.id)}
               onCheckedChange={() => onToggle(surcharge.id)}
+              disabled={disabled}
               className="mt-0.5"
             />
             <span className="flex-1 min-w-0">
