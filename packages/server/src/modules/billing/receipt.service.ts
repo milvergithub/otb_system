@@ -19,9 +19,12 @@ export interface PaymentReceiptData {
   expirationDate: string;
   status: string;
   period: string;
+  baseAmount: string;
   totalPaid: string;
   totalAmount: string;
   lateFeeAmount: string;
+  discountLines: { label: string; amount: string }[];
+  surchargeLines: { label: string; amount: string }[];
   history: { date: string; amount: string; method: string }[];
 }
 
@@ -42,6 +45,10 @@ export class ReceiptService {
         'consumption.meter.member',
         'consumption.meter.type',
         'history',
+        'paymentDiscounts',
+        'paymentDiscounts.discount',
+        'paymentSurcharges',
+        'paymentSurcharges.surcharge',
       ],
       withDeleted: true,
     });
@@ -59,6 +66,45 @@ export class ReceiptService {
         .filter(Boolean) as string[],
     );
 
+    const baseAmountNum =
+      parseFloat(String(payment.total_amount)) +
+      parseFloat(String(payment.discount_amount ?? 0)) -
+      parseFloat(String(payment.late_fee_amount ?? 0));
+
+    const discountLines = (payment.paymentDiscounts ?? [])
+      .filter((pd) => pd && pd.amount && parseFloat(String(pd.amount)) > 0)
+      .map((pd) => {
+        const d = pd.discount;
+        if (d?.type === 'percentage') {
+          const label = `${d.name} (${d.value}%)`;
+          return {
+            label,
+            amount: `-${parseFloat(String(pd.amount)).toFixed(2)} Bs`,
+          };
+        }
+        return {
+          label: d?.name || 'Descuento',
+          amount: `-${parseFloat(String(pd.amount)).toFixed(2)} Bs`,
+        };
+      });
+
+    const surchargeLines = (payment.paymentSurcharges ?? [])
+      .filter((ps) => ps && ps.amount && parseFloat(String(ps.amount)) > 0)
+      .map((ps) => {
+        const s = ps.surcharge;
+        if (s?.type === 'percentage') {
+          const label = `${s.name} (${s.value}%)`;
+          return {
+            label,
+            amount: `+${parseFloat(String(ps.amount)).toFixed(2)} Bs`,
+          };
+        }
+        return {
+          label: s?.name || 'Recargo',
+          amount: `+${parseFloat(String(ps.amount)).toFixed(2)} Bs`,
+        };
+      });
+
     const data: PaymentReceiptData = {
       fullName: `${member.first_name} ${member.last_name}`,
       address: member.address || '-',
@@ -70,9 +116,12 @@ export class ReceiptService {
       expirationDate: this.formatDate(payment.due_date),
       status: this.statusLabel(payment.status),
       period: `${this.monthName(consumption.month)} ${consumption.year}`,
+      baseAmount: `${baseAmountNum.toFixed(2)} Bs`,
       totalPaid: `${parseFloat(String(payment.amount_paid)).toFixed(2)} Bs`,
       totalAmount: `${parseFloat(String(payment.total_amount)).toFixed(2)} Bs`,
       lateFeeAmount: `${parseFloat(String(payment.late_fee_amount ?? '0')).toFixed(2)} Bs`,
+      discountLines,
+      surchargeLines,
       history: (payment.history ?? [])
         .sort(
           (a, b) =>
@@ -198,6 +247,15 @@ export class ReceiptService {
     this.drawLabeledValue(
       page,
       font,
+      'Subtotal/Original:',
+      data.baseAmount,
+      395,
+      528,
+      fontSize,
+    );
+    this.drawLabeledValue(
+      page,
+      font,
       'Recargo mora:',
       data.lateFeeAmount,
       395,
@@ -210,7 +268,7 @@ export class ReceiptService {
       'Pagado:',
       data.totalPaid,
       400,
-      528,
+      492,
       fontSize,
     );
     this.drawLabeledValue(
@@ -219,61 +277,148 @@ export class ReceiptService {
       'Total:',
       data.totalAmount,
       395,
-      510,
+      474,
       12,
       fontBold,
     );
 
-    // HISTORIAL DE PAGOS
-    if (data.history.length > 0) {
-      page.drawText('FECHA', {
+    // DESCUENTOS Y CARGOS APLICADOS
+    let detailY = 450;
+    const detailFontSize = 8;
+    if (data.discountLines.length > 0) {
+      page.drawText('DESCUENTOS APLICADOS', {
         x: 150,
-        y: 430,
-        size: 9,
+        y: detailY,
+        size: 8,
         font: fontBold,
         color: textColor,
       });
-      page.drawText('MONTO', {
-        x: 300,
-        y: 430,
-        size: 9,
-        font: fontBold,
-        color: textColor,
-      });
-      page.drawText('MÉTODO', {
-        x: 400,
-        y: 430,
-        size: 9,
-        font: fontBold,
-        color: textColor,
-      });
-
-      let rowY = 414;
-      for (const entry of data.history) {
-        page.drawText(entry.date, {
-          x: 150,
-          y: rowY,
-          size: fontSize,
+      detailY -= 12;
+      for (const d of data.discountLines) {
+        if (d.label.length > 40) {
+          page.drawText(d.label.substring(0, 40), {
+            x: 150,
+            y: detailY,
+            size: detailFontSize,
+            font,
+            color: textColor,
+          });
+        } else {
+          page.drawText(d.label, {
+            x: 150,
+            y: detailY,
+            size: detailFontSize,
+            font,
+            color: textColor,
+          });
+        }
+        page.drawText(d.amount, {
+          x: 330,
+          y: detailY,
+          size: detailFontSize,
           font,
           color: textColor,
         });
-        page.drawText(entry.amount, {
-          x: 300,
-          y: rowY,
-          size: fontSize,
-          font,
-          color: textColor,
-        });
-        page.drawText(entry.method, {
-          x: 400,
-          y: rowY,
-          size: fontSize,
-          font,
-          color: textColor,
-        });
-        rowY -= 14;
-        if (rowY < 40) break;
+        detailY -= 11;
+        if (detailY < 380) break;
       }
+    }
+    if (data.surchargeLines.length > 0) {
+      page.drawText('CARGOS/RECARGOS APLICADOS', {
+        x: 150,
+        y: detailY,
+        size: 8,
+        font: fontBold,
+        color: textColor,
+      });
+      detailY -= 12;
+      for (const s of data.surchargeLines) {
+        if (s.label.length > 40) {
+          page.drawText(s.label.substring(0, 40), {
+            x: 150,
+            y: detailY,
+            size: detailFontSize,
+            font,
+            color: textColor,
+          });
+        } else {
+          page.drawText(s.label, {
+            x: 150,
+            y: detailY,
+            size: detailFontSize,
+            font,
+            color: textColor,
+          });
+        }
+        page.drawText(s.amount, {
+          x: 330,
+          y: detailY,
+          size: detailFontSize,
+          font,
+          color: textColor,
+        });
+        detailY -= 11;
+        if (detailY < 380) break;
+      }
+    }
+    if (data.discountLines.length === 0 && data.surchargeLines.length === 0) {
+      page.drawText('SIN DESCUENTOS NI RECARGOS ADICIONALES', {
+        x: 150,
+        y: detailY,
+        size: 8,
+        font: fontBold,
+        color: textColor,
+      });
+    }
+
+    // HISTORIAL DE PAGOS
+    page.drawText('FECHA', {
+      x: 150,
+      y: 430,
+      size: 9,
+      font: fontBold,
+      color: textColor,
+    });
+    page.drawText('MONTO', {
+      x: 300,
+      y: 430,
+      size: 9,
+      font: fontBold,
+      color: textColor,
+    });
+    page.drawText('MÉTODO', {
+      x: 400,
+      y: 430,
+      size: 9,
+      font: fontBold,
+      color: textColor,
+    });
+
+    let rowY = 414;
+    for (const entry of data.history) {
+      page.drawText(entry.date, {
+        x: 150,
+        y: rowY,
+        size: fontSize,
+        font,
+        color: textColor,
+      });
+      page.drawText(entry.amount, {
+        x: 300,
+        y: rowY,
+        size: fontSize,
+        font,
+        color: textColor,
+      });
+      page.drawText(entry.method, {
+        x: 400,
+        y: rowY,
+        size: fontSize,
+        font,
+        color: textColor,
+      });
+      rowY -= 14;
+      if (rowY < 40) break;
     }
 
     const bytes = await pdfDoc.save();

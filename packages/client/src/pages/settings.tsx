@@ -1,7 +1,20 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { Save, Settings as SettingsIcon, Gauge, Map, HandCoins, Percent, TrendingUp, MessageSquare, Boxes, Wallet, Tags, CreditCard } from "lucide-react"
+import {
+    Save,
+    Settings as SettingsIcon,
+    Gauge,
+    Map,
+    HandCoins,
+    Percent,
+    TrendingUp,
+    MessageSquare,
+    Boxes,
+    Wallet,
+    Tags,
+    CreditCard
+} from "lucide-react"
 import { getApiErrorMessage } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useSettings, useUpdateSettings } from "@/hooks/settings"
@@ -11,6 +24,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ComboboxSelect } from "@/components/ui/combobox"
+import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import MeterTypesPanel from "./meters/MeterTypesPanel"
 import ZoneTypesPanel from "./zones/ZoneTypesPanel"
@@ -28,365 +42,377 @@ import Can from "@/components/Can"
 import { toast } from "sonner"
 
 const SETTING_LABELS: Record<string, { label: string; description: string }> = {
-  payment_due_day: {
-    label: "settings.payment_due_day.label",
-    description: "settings.payment_due_day.description",
-  },
-  late_fee_enabled: {
-    label: "settings.lateFee.enabled.label",
-    description: "settings.lateFee.enabled.description",
-  },
-  late_fee_min_months: {
-    label: "settings.lateFee.minMonths.label",
-    description: "settings.lateFee.minMonths.description",
-  },
-  organization_name: {
-    label: "settings.organizationName.label",
-    description: "settings.organizationName.description",
-  },
-  currency: {
-    label: "settings.currency.label",
-    description: "settings.currency.description",
-  },
+    payment_due_day: {
+        label: "settings.payment_due_day.label",
+        description: "settings.payment_due_day.description",
+    },
+    late_fee_enabled: {
+        label: "settings.lateFee.enabled.label",
+        description: "settings.lateFee.enabled.description",
+    },
+    late_fee_min_months: {
+        label: "settings.lateFee.minMonths.label",
+        description: "settings.lateFee.minMonths.description",
+    },
+    organization_name: {
+        label: "settings.organizationName.label",
+        description: "settings.organizationName.description",
+    },
+    currency: {
+        label: "settings.currency.label",
+        description: "settings.currency.description",
+    },
 }
 
 const NUMBER_KEYS = ["payment_due_day", "late_fee_min_months"]
 const USER_SETTING_KEYS = [
-  "water_bill_responsible_user_id",
-  "water_share_responsible_user_id",
+    "water_bill_responsible_user_id",
+    "water_share_responsible_user_id",
 ]
 const OPENWA_KEYS = [
-  "openwa_api_key",
-  "openwa_consumption_template_id",
-  "openwa_welcome_template_id",
-  "openwa_meter_registered_template_id",
+    "openwa_api_key",
+    "openwa_consumption_template_id",
+    "openwa_welcome_template_id",
+    "openwa_meter_registered_template_id",
 ]
 
 export default function SettingsPage() {
-  const { t } = useTranslation()
-  const { hasPermission } = useAuth()
-  const canUpdate = hasPermission("settings.update")
-  const [activeTab, setActiveTab] = useState("general")
+    const {t} = useTranslation()
+    const {hasPermission} = useAuth()
+    const canUpdate = hasPermission("settings.update")
+    const [activeTab, setActiveTab] = useState("general")
 
-  const { data: settings, isLoading } = useSettings()
-  const canPickUsers = hasPermission("users.read")
-  const { data: users } = useSearchUsers(undefined, canPickUsers)
+    const {data: settings, isLoading} = useSettings()
+    const canPickUsers = hasPermission("users.read")
+    const {data: users} = useSearchUsers(undefined, canPickUsers)
 
-  const updateMutation = useUpdateSettings()
+    const updateMutation = useUpdateSettings()
 
-  const form = useForm<Record<string, string>>({ defaultValues: {} })
-  const loadedRef = useRef(false)
+    const form = useForm<Record<string, string>>({defaultValues: {}})
+    const loadedRef = useRef(false)
 
-  useEffect(() => {
-    if (settings && !loadedRef.current) {
-      form.reset(settings)
-      loadedRef.current = true
+    useEffect(() => {
+        if (settings && !loadedRef.current) {
+            form.reset(settings)
+            loadedRef.current = true
+        }
+    }, [settings, form])
+
+    function handleSubmit(e: FormEvent) {
+        e.preventDefault()
+        form.handleSubmit((values) => {
+            updateMutation.mutate(values, {
+                onSuccess: () => toast.success(t("settings.saved")),
+                onError: (err) => toast.error(getApiErrorMessage(err)),
+            })
+        })()
     }
-  }, [settings, form])
 
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    form.handleSubmit((values) => {
-      updateMutation.mutate(values, {
-        onSuccess: () => toast.success(t("settings.saved")),
-        onError: (err) => toast.error(getApiErrorMessage(err)),
-      })
-    })()
-  }
+    if (isLoading) {
+        return (
+            <div className="space-y-4">
+                <Skeleton className="h-8 w-40"/>
+                <Skeleton className="h-40"/>
+            </div>
+        )
+    }
 
-  if (isLoading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-40" />
-      </div>
-    )
-  }
+        <div className="flex flex-col">
+            <h1 className="text-2xl font-bold">{t("settings.title")}</h1>
+            <p className="text-sm text-muted-foreground">
+                {t("settings.subtitle")}
+            </p>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList>
+                    <Can permission="settings.read">
+                        <TabsTrigger value="general" className="gap-2">
+                            <SettingsIcon className="size-4"/>
+                            {t("settings.general")}
+                        </TabsTrigger>
+                    </Can>
+                    <Can permission="settings.read">
+                        <TabsTrigger value="whatsapp" className="gap-2">
+                            <MessageSquare className="size-4"/>
+                            {t("settings.whatsapp.tab")}
+                        </TabsTrigger>
+                    </Can>
+                    <Can permission="meter_types.read">
+                        <TabsTrigger value="meterTypes" className="gap-2">
+                            <Gauge className="size-4"/>
+                            {t("settings.meterTypes")}
+                        </TabsTrigger>
+                    </Can>
+                    <Can permission="zone_types.read">
+                        <TabsTrigger value="zoneTypes" className="gap-2">
+                            <Map className="size-4"/>
+                            {t("settings.zoneTypes")}
+                        </TabsTrigger>
+                    </Can>
+                    <Can permission="memberTypes.read">
+                        <TabsTrigger value="memberTypes" className="gap-2">
+                            <Tags className="size-4"/>
+                            {t("settings.memberTypes")}
+                        </TabsTrigger>
+                    </Can>
+                    <Can permission="payment_methods.read">
+                        <TabsTrigger value="paymentMethods" className="gap-2">
+                            <CreditCard className="size-4"/>
+                            {t("settings.paymentMethods.tab")}
+                        </TabsTrigger>
+                    </Can>
+                    <Can permission="shares.read">
+                        <TabsTrigger value="shares" className="gap-2">
+                            <HandCoins className="size-4"/>
+                            {t("settings.shares")}
+                        </TabsTrigger>
+                    </Can>
+                    <Can permission="discounts.read">
+                        <TabsTrigger value="discounts" className="gap-2">
+                            <Percent className="size-4"/>
+                            {t("settings.discounts")}
+                        </TabsTrigger>
+                    </Can>
+                    <Can permission="surcharges.read">
+                        <TabsTrigger value="surcharges" className="gap-2">
+                            <Percent className="size-4"/>
+                            {t("settings.surcharges")}
+                        </TabsTrigger>
+                    </Can>
+                    <Can permission="tariffs.read">
+                        <TabsTrigger value="tariffs" className="gap-2">
+                            <TrendingUp className="size-4"/>
+                            {t("settings.tariffs")}
+                        </TabsTrigger>
+                    </Can>
+                    <Can permission="assets.read">
+                        <TabsTrigger value="assetCategories" className="gap-2">
+                            <Boxes className="size-4"/>
+                            {t("settings.assetCategories")}
+                        </TabsTrigger>
+                    </Can>
+                    <Can permission="assets.read">
+                        <TabsTrigger value="assetLocations" className="gap-2">
+                            <Boxes className="size-4"/>
+                            {t("settings.assetLocations")}
+                        </TabsTrigger>
+                    </Can>
+                    <Can permission="finances.read">
+                        <TabsTrigger value="financeCategories" className="gap-2">
+                            <Wallet className="size-4"/>
+                            {t("settings.financeCategories")}
+                        </TabsTrigger>
+                    </Can>
+                </TabsList>
+                <Can permission="settings.read">
+                    <TabsContent value="general">
+                        <div className="mt-4 space-y-4">
+                            <form onSubmit={handleSubmit} noValidate className="space-y-4">
+                                {Object.keys(settings ?? {}).filter((key) => !OPENWA_KEYS.includes(key) && !(canPickUsers && USER_SETTING_KEYS.includes(key))).map((key) => {
+                                    const meta = SETTING_LABELS[key]
+                                    const isNumber = NUMBER_KEYS.includes(key)
+                                    return (
+                                        <div key={key} className="space-y-2">
+                                            <Label htmlFor={key}>
+                                                {meta ? t(meta.label) : key}
+                                            </Label>
+                                            {key === "late_fee_enabled" ? (
+                                                <Controller
+                                                    control={form.control}
+                                                    name={key}
+                                                    render={({field}) => (
+                                                        <div className="flex items-center gap-2">
+                                                            <Switch
+                                                                id={key}
+                                                                checked={field.value === "true"}
+                                                                onCheckedChange={(checked) => field.onChange(checked ? "true" : "false")}
+                                                                disabled={!canUpdate}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                />
+                                            ) : (
+                                                <Input
+                                                    id={key}
+                                                    type={isNumber ? "number" : "text"}
+                                                    step={isNumber ? "0.01" : undefined}
+                                                    min={key === "payment_due_day" ? 1 : undefined}
+                                                    max={key === "payment_due_day" ? 28 : undefined}
+                                                    disabled={!canUpdate}
+                                                    {...form.register(key)}
+                                                />
+                                            )}
+                                            <p className="text-xs text-muted-foreground">
+                                                {meta ? t(meta.description) : null}
+                                            </p>
+                                        </div>
+                                    )
+                                })}
+                                {canPickUsers ? (
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label>{t("settings.waterBillResponsible.label")}</Label>
+                                            <Controller
+                                                control={form.control}
+                                                name="water_bill_responsible_user_id"
+                                                render={({field}) => (
+                                                    <ComboboxSelect
+                                                        value={field.value ?? ""}
+                                                        onValueChange={(v) => field.onChange(v)}
+                                                        options={[
+                                                            {label: t("finances.noResponsible"), value: ""},
+                                                            ...(users ?? []).map((u) => ({
+                                                                label: u.full_name,
+                                                                value: u.id,
+                                                            })),
+                                                        ]}
+                                                        placeholder={t("common.select")}
+                                                        searchPlaceholder={t("common.search")}
+                                                        disabled={!canUpdate}
+                                                    />
+                                                )}
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                {t("settings.waterBillResponsible.description")}
+                                            </p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>{t("settings.waterShareResponsible.label")}</Label>
+                                            <Controller
+                                                control={form.control}
+                                                name="water_share_responsible_user_id"
+                                                render={({field}) => (
+                                                    <ComboboxSelect
+                                                        value={field.value ?? ""}
+                                                        onValueChange={(v) => field.onChange(v)}
+                                                        options={[
+                                                            {label: t("finances.noResponsible"), value: ""},
+                                                            ...(users ?? []).map((u) => ({
+                                                                label: u.full_name,
+                                                                value: u.id,
+                                                            })),
+                                                        ]}
+                                                        placeholder={t("common.select")}
+                                                        searchPlaceholder={t("common.search")}
+                                                        disabled={!canUpdate}
+                                                    />
+                                                )}
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                {t("settings.waterShareResponsible.description")}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : null}
+                                {canUpdate ? (
+                                    <div className="flex justify-end">
+                                        <Button
+                                            type="submit"
+                                            disabled={!form.formState.isDirty || updateMutation.isPending}
+                                        >
+                                            <Save className="mr-2 size-4"/>
+                                            {updateMutation.isPending ? t("common.saving") : t("settings.saveSettings")}
+                                        </Button>
+                                    </div>
+                                ) : null}
+                            </form>
+                        </div>
+                    </TabsContent>
+                </Can>
 
-  return (
-      <div className="min-w-0 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">{t("settings.title")}</h1>
-        <p className="text-sm text-muted-foreground">
-          {t("settings.subtitle")}
-        </p>
-      </div>
+                <Can permission="settings.read">
+                    <TabsContent value="whatsapp">
+                        <WhatsAppSettingsPanel/>
+                    </TabsContent>
+                </Can>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="w-full min-w-0 overflow-x-auto">
-          <TabsList>
-            <Can permission="settings.read">
-              <TabsTrigger value="general" className="gap-2">
-                <SettingsIcon className="size-4" />
-                {t("settings.general")}
-              </TabsTrigger>
-            </Can>
-            <Can permission="settings.read">
-              <TabsTrigger value="whatsapp" className="gap-2">
-                <MessageSquare className="size-4" />
-                {t("settings.whatsapp.tab")}
-              </TabsTrigger>
-            </Can>
-            <Can permission="meter_types.read">
-              <TabsTrigger value="meterTypes" className="gap-2">
-                <Gauge className="size-4" />
-                {t("settings.meterTypes")}
-              </TabsTrigger>
-            </Can>
-            <Can permission="zone_types.read">
-              <TabsTrigger value="zoneTypes" className="gap-2">
-                <Map className="size-4" />
-                {t("settings.zoneTypes")}
-              </TabsTrigger>
-            </Can>
-            <Can permission="memberTypes.read">
-              <TabsTrigger value="memberTypes" className="gap-2">
-                <Tags className="size-4" />
-                {t("settings.memberTypes")}
-              </TabsTrigger>
-            </Can>
-            <Can permission="payment_methods.read">
-              <TabsTrigger value="paymentMethods" className="gap-2">
-                <CreditCard className="size-4" />
-                {t("settings.paymentMethods.tab")}
-              </TabsTrigger>
-            </Can>
-            <Can permission="shares.read">
-              <TabsTrigger value="shares" className="gap-2">
-                <HandCoins className="size-4" />
-                {t("settings.shares")}
-              </TabsTrigger>
-            </Can>
-            <Can permission="discounts.read">
-              <TabsTrigger value="discounts" className="gap-2">
-                <Percent className="size-4" />
-                {t("settings.discounts")}
-              </TabsTrigger>
-            </Can>
-            <Can permission="surcharges.read">
-              <TabsTrigger value="surcharges" className="gap-2">
-                <Percent className="size-4" />
-                {t("settings.surcharges")}
-              </TabsTrigger>
-            </Can>
-            <Can permission="tariffs.read">
-              <TabsTrigger value="tariffs" className="gap-2">
-                <TrendingUp className="size-4" />
-                {t("settings.tariffs")}
-              </TabsTrigger>
-            </Can>
-            <Can permission="assets.read">
-              <TabsTrigger value="assetCategories" className="gap-2">
-                <Boxes className="size-4" />
-                {t("settings.assetCategories")}
-              </TabsTrigger>
-            </Can>
-            <Can permission="assets.read">
-              <TabsTrigger value="assetLocations" className="gap-2">
-                <Boxes className="size-4" />
-                {t("settings.assetLocations")}
-              </TabsTrigger>
-            </Can>
-            <Can permission="finances.read">
-              <TabsTrigger value="financeCategories" className="gap-2">
-                <Wallet className="size-4" />
-                {t("settings.financeCategories")}
-              </TabsTrigger>
-            </Can>
-          </TabsList>
+                <Can permission="meter_types.read">
+                    <TabsContent value="meterTypes">
+                        <div className="mt-4">
+                            <MeterTypesPanel/>
+                        </div>
+                    </TabsContent>
+                </Can>
+
+                <Can permission="zone_types.read">
+                    <TabsContent value="zoneTypes">
+                        <div className="mt-4">
+                            <ZoneTypesPanel/>
+                        </div>
+                    </TabsContent>
+                </Can>
+
+                <Can permission="memberTypes.read">
+                    <TabsContent value="memberTypes">
+                        <div className="mt-4">
+                            <MemberTypesPanel/>
+                        </div>
+                    </TabsContent>
+                </Can>
+
+                <Can permission="payment_methods.read">
+                    <TabsContent value="paymentMethods">
+                        <div className="mt-4">
+                            <PaymentMethodsPanel/>
+                        </div>
+                    </TabsContent>
+                </Can>
+
+                <Can permission="shares.read">
+                    <TabsContent value="shares">
+                        <div className="mt-4">
+                            <SharesPage/>
+                        </div>
+                    </TabsContent>
+                </Can>
+
+                <Can permission="discounts.read">
+                    <TabsContent value="discounts">
+                        <div className="mt-4">
+                            <DiscountsPage/>
+                        </div>
+                    </TabsContent>
+                </Can>
+                <Can permission="surcharges.read">
+                    <TabsContent value="surcharges">
+                        <div className="mt-4">
+                            <SurchargesPage/>
+                        </div>
+                    </TabsContent>
+                </Can>
+
+                <Can permission="tariffs.read">
+                    <TabsContent value="tariffs">
+                        <div className="mt-4">
+                            <TariffsPage/>
+                        </div>
+                    </TabsContent>
+                </Can>
+
+                <Can permission="assets.read">
+                    <TabsContent value="assetCategories">
+                        <div className="mt-4">
+                            <AssetCategoriesPanel/>
+                        </div>
+                    </TabsContent>
+                </Can>
+
+                <Can permission="assets.read">
+                    <TabsContent value="assetLocations">
+                        <div className="mt-4">
+                            <AssetLocationsPanel/>
+                        </div>
+                    </TabsContent>
+                </Can>
+
+                <Can permission="finances.read">
+                    <TabsContent value="financeCategories">
+                        <div className="mt-4">
+                            <FinanceCategoriesPanel/>
+                        </div>
+                    </TabsContent>
+                </Can>
+            </Tabs>
         </div>
-        <Can permission="settings.read">
-          <TabsContent value="general" className="min-w-0">
-            <div className="mt-4 space-y-4">
-              <form onSubmit={handleSubmit} noValidate className="space-y-4">
-                {Object.keys(settings ?? {}).filter((key) => !OPENWA_KEYS.includes(key) && !(canPickUsers && USER_SETTING_KEYS.includes(key))).map((key) => {
-                  const meta = SETTING_LABELS[key]
-                  const isNumber = NUMBER_KEYS.includes(key)
-                  return (
-                    <div key={key} className="space-y-2">
-                      <Label htmlFor={key}>
-                        {meta ? t(meta.label) : key}
-                      </Label>
-                      <Input
-                        id={key}
-                        type={isNumber ? "number" : "text"}
-                        step={isNumber ? "0.01" : undefined}
-                        min={key === "payment_due_day" ? 1 : undefined}
-                        max={key === "payment_due_day" ? 28 : undefined}
-                        disabled={!canUpdate}
-                        {...form.register(key)}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {meta ? t(meta.description) : null}
-                      </p>
-                    </div>
-                  )
-                })}
-                {canPickUsers ? (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>{t("settings.waterBillResponsible.label")}</Label>
-                      <Controller
-                        control={form.control}
-                        name="water_bill_responsible_user_id"
-                        render={({ field }) => (
-                          <ComboboxSelect
-                            value={field.value ?? ""}
-                            onValueChange={(v) => field.onChange(v)}
-                            options={[
-                              { label: t("finances.noResponsible"), value: "" },
-                              ...(users ?? []).map((u) => ({
-                                label: u.full_name,
-                                value: u.id,
-                              })),
-                            ]}
-                            placeholder={t("common.select")}
-                            searchPlaceholder={t("common.search")}
-                            disabled={!canUpdate}
-                          />
-                        )}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {t("settings.waterBillResponsible.description")}
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{t("settings.waterShareResponsible.label")}</Label>
-                      <Controller
-                        control={form.control}
-                        name="water_share_responsible_user_id"
-                        render={({ field }) => (
-                          <ComboboxSelect
-                            value={field.value ?? ""}
-                            onValueChange={(v) => field.onChange(v)}
-                            options={[
-                              { label: t("finances.noResponsible"), value: "" },
-                              ...(users ?? []).map((u) => ({
-                                label: u.full_name,
-                                value: u.id,
-                              })),
-                            ]}
-                            placeholder={t("common.select")}
-                            searchPlaceholder={t("common.search")}
-                            disabled={!canUpdate}
-                          />
-                        )}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {t("settings.waterShareResponsible.description")}
-                      </p>
-                    </div>
-                  </div>
-                ) : null}
-                {canUpdate ? (
-                  <div className="flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={!form.formState.isDirty || updateMutation.isPending}
-                    >
-                      <Save className="mr-2 size-4" />
-                      {updateMutation.isPending ? t("common.saving") : t("settings.saveSettings")}
-                    </Button>
-                  </div>
-                ) : null}
-              </form>
-            </div>
-          </TabsContent>
-        </Can>
-
-        <Can permission="settings.read">
-          <TabsContent value="whatsapp" className="min-w-0">
-            <WhatsAppSettingsPanel />
-          </TabsContent>
-        </Can>
-
-        <Can permission="meter_types.read">
-          <TabsContent value="meterTypes" className="min-w-0">
-            <div className="mt-4">
-              <MeterTypesPanel />
-            </div>
-          </TabsContent>
-        </Can>
-
-        <Can permission="zone_types.read">
-          <TabsContent value="zoneTypes" className="min-w-0">
-            <div className="mt-4">
-              <ZoneTypesPanel />
-            </div>
-          </TabsContent>
-        </Can>
-
-        <Can permission="memberTypes.read">
-          <TabsContent value="memberTypes" className="min-w-0">
-            <div className="mt-4">
-              <MemberTypesPanel />
-            </div>
-          </TabsContent>
-        </Can>
-
-        <Can permission="payment_methods.read">
-          <TabsContent value="paymentMethods" className="min-w-0">
-            <div className="mt-4">
-              <PaymentMethodsPanel />
-            </div>
-          </TabsContent>
-        </Can>
-
-        <Can permission="shares.read">
-          <TabsContent value="shares" className="min-w-0">
-            <div className="mt-4">
-              <SharesPage />
-            </div>
-          </TabsContent>
-        </Can>
-
-        <Can permission="discounts.read">
-          <TabsContent value="discounts" className="min-w-0">
-            <div className="mt-4">
-              <DiscountsPage />
-            </div>
-          </TabsContent>
-        </Can>
-        <Can permission="surcharges.read">
-          <TabsContent value="surcharges" className="min-w-0">
-            <div className="mt-4">
-              <SurchargesPage />
-            </div>
-          </TabsContent>
-        </Can>
-
-        <Can permission="tariffs.read">
-          <TabsContent value="tariffs" className="min-w-0">
-            <div className="mt-4">
-              <TariffsPage />
-            </div>
-          </TabsContent>
-        </Can>
-
-        <Can permission="assets.read">
-          <TabsContent value="assetCategories" className="min-w-0">
-            <div className="mt-4">
-              <AssetCategoriesPanel />
-            </div>
-          </TabsContent>
-        </Can>
-
-        <Can permission="assets.read">
-          <TabsContent value="assetLocations" className="min-w-0">
-            <div className="mt-4">
-              <AssetLocationsPanel />
-            </div>
-          </TabsContent>
-        </Can>
-
-        <Can permission="finances.read">
-          <TabsContent value="financeCategories" className="min-w-0">
-            <div className="mt-4">
-              <FinanceCategoriesPanel />
-            </div>
-          </TabsContent>
-        </Can>
-      </Tabs>
-    </div>
-  )
+    )
 }
