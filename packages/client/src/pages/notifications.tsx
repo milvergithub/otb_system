@@ -1,17 +1,18 @@
+import { useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { Bell, CheckCheck, Mail, MailCheck, MailOpen } from "lucide-react"
+import { Bell, CheckCheck, Mail, MailCheck, MailOpen, Search } from "lucide-react"
 import { getApiErrorMessage } from "@/lib/api"
 import { formatDate } from "@/lib/utils"
-import {
-  useNotifications,
-  useMarkNotificationRead,
-  useMarkAllRead,
-} from "@/hooks/notifications"
+import type { AppNotification } from "@/lib/types"
+import { useSearchNotifications, useMarkNotificationRead, useMarkAllRead, useUnreadCount } from "@/hooks/notifications"
+import { useDebounce } from "@/hooks/use-debounce"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { RowActions } from "@/components/ui/row-actions"
-import { Skeleton } from "@/components/ui/skeleton"
+import { DataTable } from "@/components/ui/data-table"
+import { DataTablePagination } from "@/components/ui/data-table-pagination"
 import { toast } from "sonner"
 
 const TYPE_LABEL: Record<string, string> = {
@@ -31,13 +32,24 @@ const TYPE_VARIANT: Record<string, "default" | "destructive" | "outline" | "seco
 export default function NotificationsPage() {
   const { t } = useTranslation()
 
-  const { data: notifications, isLoading } = useNotifications()
+  const [page, setPage] = useState(1)
+  const [searchInput, setSearchInput] = useState("")
+  const debouncedSearch = useDebounce(searchInput.trim(), 300)
+  const [search, setSearch] = useState(debouncedSearch)
+  if (search !== debouncedSearch) {
+    setSearch(debouncedSearch)
+    setPage(1)
+  }
+
+  const { data, isLoading } = useSearchNotifications({
+    page,
+    search,
+  })
 
   const markReadMutation = useMarkNotificationRead()
-
   const markAllMutation = useMarkAllRead()
 
-  const unread = notifications?.filter((n) => !n.is_read).length ?? 0
+  const unread = useUnreadCount().data ?? 0
 
   function handleMarkAll() {
     markAllMutation.mutate(undefined, {
@@ -51,6 +63,8 @@ export default function NotificationsPage() {
       onError: (err) => toast.error(getApiErrorMessage(err)),
     })
   }
+
+  const items = data?.items ?? []
 
   return (
     <div className="space-y-6">
@@ -73,13 +87,27 @@ export default function NotificationsPage() {
         ) : null}
       </div>
 
-      {isLoading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-24" />
-          ))}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder={t("common.search")}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
         </div>
-      ) : !notifications?.length ? (
+      </div>
+
+      {isLoading ? (
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-8 animate-pulse rounded bg-muted" />
+            ))}
+          </CardContent>
+        </Card>
+      ) : items.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <Bell className="mb-3 size-8 text-muted-foreground" />
@@ -90,62 +118,99 @@ export default function NotificationsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {notifications.map((n) => (
-            <Card
-              key={n.id}
-              className={n.is_read ? "opacity-70" : undefined}
-            >
-              <CardContent className="flex items-start gap-4 p-4">
-                <div
-                  className={`mt-0.5 rounded-md p-2 ${
-                    n.is_read
-                      ? "bg-muted text-muted-foreground"
-                      : "bg-primary/10 text-primary"
-                  }`}
-                >
-                  {n.is_read ? (
-                    <MailOpen className="size-4" />
-                  ) : (
-                    <Mail className="size-4" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">{n.title}</p>
+        <Card>
+          <CardContent className="p-0">
+            <DataTable<AppNotification>
+              columns={[
+                {
+                  key: "type",
+                  label: t("notifications.typeLabel"),
+                  render: (n) => (
                     <Badge variant={TYPE_VARIANT[n.type]}>
                       {t(TYPE_LABEL[n.type] ?? `notifications.type.${n.type}`)}
                     </Badge>
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {n.message}
-                  </p>
-                  <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
-                    <span>
+                  ),
+                },
+                {
+                  key: "title",
+                  label: t("notifications.title"),
+                  render: (n) => (
+                    <span className={n.is_read ? "opacity-70" : "font-medium"}>
+                      {n.title}
+                    </span>
+                  ),
+                },
+                {
+                  key: "message",
+                  label: t("notifications.message"),
+                  render: (n) => (
+                    <span className="text-muted-foreground">
+                      {n.message}
+                    </span>
+                  ),
+                },
+                {
+                  key: "member",
+                  label: t("notifications.member"),
+                  render: (n) => (
+                    <span className="text-muted-foreground">
                       {n.member
                         ? `${n.member.first_name} ${n.member.last_name}`
-                        : ""}
+                        : "—"}
                     </span>
-                    <span>{formatDate(n.created_at)}</span>
-                  </div>
-                </div>
-                {!n.is_read ? (
-                  <RowActions
-                    items={[
-                      {
-                        label: t("notifications.markRead"),
-                        icon: <MailCheck className="size-4" />,
-                        permission: "notifications.update",
-                        onClick: () => handleMarkRead(n.id),
-                      },
-                    ]}
-                  />
-                ) : null}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  ),
+                },
+                {
+                  key: "created_at",
+                  label: t("notifications.date"),
+                  render: (n) => (
+                    <span className="text-muted-foreground text-xs">
+                      {formatDate(n.created_at)}
+                    </span>
+                  ),
+                },
+                {
+                  key: "actions",
+                  label: "",
+                  className: "w-10",
+                  render: (n) =>
+                    !n.is_read ? (
+                      <RowActions
+                        items={[
+                          {
+                            label: t("notifications.markRead"),
+                            icon: <MailOpen className="size-4" />,
+                            permission: "notifications.update",
+                            onClick: () => handleMarkRead(n.id),
+                          },
+                        ]}
+                      />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        {t("notifications.read")}
+                      </span>
+                    ),
+                },
+              ]}
+              data={items}
+              isLoading={isLoading}
+              emptyIcon={<Bell className="mx-auto size-6 text-muted-foreground" />}
+              emptyText={t("notifications.empty")}
+              rowKey={(n) => n.id}
+            />
+          </CardContent>
+        </Card>
       )}
+
+      {data ? (
+        <DataTablePagination
+          page={data.page}
+          totalPages={data.totalPages}
+          total={data.total}
+          onPageChange={setPage}
+          noun={t("notifications.title")}
+        />
+      ) : null}
     </div>
   )
 }

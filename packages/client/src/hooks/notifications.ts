@@ -2,12 +2,54 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/lib/api"
 import { ApiPath } from "@/lib/apiPath"
 import { queryKeys } from "@/lib/utils/query"
-import type { AppNotification } from "@/lib/types"
+import type { AppNotification, Paginated } from "@/lib/types"
+
+export interface SearchNotificationsParams {
+  page?: number
+  search?: string
+  memberId?: string
+  isRead?: boolean
+  type?: AppNotification["type"]
+  sortBy?: string
+  sortOrder?: "ASC" | "DESC"
+}
 
 export function useNotifications() {
   return useQuery<AppNotification[]>({
     queryKey: queryKeys.notifications.all,
     queryFn: () => api.get(ApiPath.Notifications.BASE).then((r) => r.data),
+  })
+}
+
+export function useSearchNotifications(params: SearchNotificationsParams = {}) {
+  const page = params.page ?? 1
+  return useQuery<Paginated<AppNotification>>({
+    queryKey: [
+      "notifications",
+      "search",
+      page,
+      params.search ?? "",
+      params.memberId ?? "",
+      params.isRead ?? "",
+      params.type ?? "",
+      params.sortBy ?? "",
+      params.sortOrder ?? "",
+    ],
+    queryFn: () =>
+      api
+        .get(ApiPath.Notifications.BASE, {
+          params: {
+            page,
+            limit: 10,
+            search: params.search || undefined,
+            memberId: params.memberId || undefined,
+            isRead: params.isRead,
+            type: params.type || undefined,
+            sortBy: params.sortBy || undefined,
+            sortOrder: params.sortOrder || undefined,
+          },
+        })
+        .then((r) => r.data),
   })
 }
 

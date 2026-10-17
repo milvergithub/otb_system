@@ -72,7 +72,8 @@
     "description": "Descripción",
     "created": "Creado",
     "deleted": "Eliminado",
-    "clearFilters": "Limpiar filtros"
+    "clearFilters": "Limpiar filtros",
+    "more": "Más"
   },
   "pwa": {
     "title": "Instalar aplicación",

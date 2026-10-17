@@ -46,9 +46,15 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarRail,
-  SidebarSeparator,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
+
+interface NavItem {
+  to: string
+  label: string
+  icon: typeof Users
+  permission?: string
+}
 
 const NAV_ITEMS: NavItem[] = [
   { to: "/", label: "nav.dashboard", icon: LayoutDashboard, permission: "reports.dashboard" },
@@ -64,16 +70,6 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/reports", label: "nav.reports", icon: FileText, permission: "reports.read" },
   { to: "/notifications", label: "nav.notifications", icon: Bell, permission: "notifications.read" },
   { to: "/settings", label: "nav.settings", icon: Settings, permission: "settings.read" },
-]
-
-interface NavItem {
-  to: string
-  label: string
-  icon: typeof Users
-  permission?: string
-}
-
-const ADMIN_NAV_ITEMS: NavItem[] = [
   { to: "/roles", label: "nav.roles", icon: Shield, permission: "roles.read" },
   { to: "/users", label: "nav.users", icon: UserCog, permission: "users.read" },
   { to: "/audit", label: "nav.auditLogs", icon: History, permission: "audit.read" },
@@ -109,9 +105,6 @@ function SidebarNav() {
   const visibleNavItems = NAV_ITEMS.filter((item) =>
     !item.permission || hasPermission(item.permission),
   )
-  const visibleAdminItems = ADMIN_NAV_ITEMS.filter((item) =>
-    hasPermission(item.permission ?? ""),
-  )
   return (
     <>
       <SidebarMenu>
@@ -119,16 +112,6 @@ function SidebarNav() {
           <SidebarNavItem key={item.to} item={item} />
         ))}
       </SidebarMenu>
-      {visibleAdminItems.length > 0 && (
-        <>
-          <SidebarSeparator />
-          <SidebarMenu>
-            {visibleAdminItems.map((item) => (
-              <SidebarNavItem key={item.to} item={item} />
-            ))}
-          </SidebarMenu>
-        </>
-      )}
     </>
   )
 }

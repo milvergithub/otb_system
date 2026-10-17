@@ -266,26 +266,28 @@ export default function MetersPage() {
                 onChange={(e) => setSearchInput(e.target.value)}
               />
             </div>
-            <ComboboxSelect
-              value={statusFilter}
-              onValueChange={(v) => { setStatusFilter(v); setPage(1) }}
-              placeholder={t("meters.status")}
-              className="w-40"
-              options={[
-                { label: t("meters.allStatuses"), value: "" },
-                ...Object.entries(STATUS_LABEL).map(([k, v]) => ({ label: t(v), value: k })),
-              ]}
-            />
-            <ComboboxSelect
-              value={typeFilter}
-              onValueChange={(v) => { setTypeFilter(v); setPage(1) }}
-              placeholder={t("meters.type")}
-              className="w-40"
-              options={[
-                { label: t("meters.allTypes"), value: "" },
-                ...(meterTypes?.map((mt) => ({ label: mt.name, value: mt.id })) ?? []),
-              ]}
-            />
+            <div className="flex flex-row gap-2">
+                <ComboboxSelect
+                    value={statusFilter}
+                    onValueChange={(v) => { setStatusFilter(v); setPage(1) }}
+                    placeholder={t("meters.status")}
+                    className="md:w-40 sm:w-1/2"
+                    options={[
+                        { label: t("meters.allStatuses"), value: "" },
+                        ...Object.entries(STATUS_LABEL).map(([k, v]) => ({ label: t(v), value: k })),
+                    ]}
+                />
+                <ComboboxSelect
+                    value={typeFilter}
+                    onValueChange={(v) => { setTypeFilter(v); setPage(1) }}
+                    placeholder={t("meters.type")}
+                    className="md:w-40 sm:w-1/2"
+                    options={[
+                        { label: t("meters.allTypes"), value: "" },
+                        ...(meterTypes?.map((mt) => ({ label: mt.name, value: mt.id })) ?? []),
+                    ]}
+                />
+            </div>
           </div>
 
           <Card>
@@ -407,17 +409,20 @@ export default function MetersPage() {
                   className="h-full w-full"
                 >
                     <LayersControl position="topright">
-                        <LayersControl.BaseLayer checked name="Mapa">
+                        <LayersControl.BaseLayer checked name="Satélite">
                             <TileLayer
-                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                attribution="&copy; OpenStreetMap contributors"
+                                url={`https://api.maptiler.com/maps/hybrid-v4/{z}/{x}/{y}.png?key=${import.meta.env.VITE_MAPTILER_API_KEY}`}
+                                attribution="Tiles &copy; Esri"
+                                maxZoom={22}
+                                maxNativeZoom={22}
                             />
                         </LayersControl.BaseLayer>
-
-                        <LayersControl.BaseLayer name="Satélite">
+                        <LayersControl.BaseLayer name="MapTiler">
                             <TileLayer
-                                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                                attribution="Tiles &copy; Esri"
+                                url={`https://api.maptiler.com/maps/openstreetmap/{z}/{x}/{y}.png?key=${import.meta.env.VITE_MAPTILER_API_KEY}`}
+                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://www.maptiler.com/">MapTiler</a>'
+                                maxZoom={22}
+                                maxNativeZoom={22}
                             />
                         </LayersControl.BaseLayer>
                     </LayersControl>

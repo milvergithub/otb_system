@@ -25,7 +25,7 @@ import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ComboboxSelect } from "@/components/ui/combobox"
 import { Switch } from "@/components/ui/switch"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ResponsiveTabs } from "@/components/ui/responsive-tabs"
 import MeterTypesPanel from "./meters/MeterTypesPanel"
 import ZoneTypesPanel from "./zones/ZoneTypesPanel"
 import AssetCategoriesPanel from "./assets/AssetCategoriesPanel"
@@ -80,7 +80,6 @@ export default function SettingsPage() {
     const {t} = useTranslation()
     const {hasPermission} = useAuth()
     const canUpdate = hasPermission("settings.update")
-    const [activeTab, setActiveTab] = useState("general")
 
     const {data: settings, isLoading} = useSettings()
     const canPickUsers = hasPermission("users.read")
@@ -118,95 +117,23 @@ export default function SettingsPage() {
     }
 
     return (
-        <div className="flex flex-col">
-            <h1 className="text-2xl font-bold">{t("settings.title")}</h1>
-            <p className="text-sm text-muted-foreground">
-                {t("settings.subtitle")}
-            </p>
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList>
-                    <Can permission="settings.read">
-                        <TabsTrigger value="general" className="gap-2">
-                            <SettingsIcon className="size-4"/>
-                            {t("settings.general")}
-                        </TabsTrigger>
-                    </Can>
-                    <Can permission="settings.read">
-                        <TabsTrigger value="whatsapp" className="gap-2">
-                            <MessageSquare className="size-4"/>
-                            {t("settings.whatsapp.tab")}
-                        </TabsTrigger>
-                    </Can>
-                    <Can permission="meter_types.read">
-                        <TabsTrigger value="meterTypes" className="gap-2">
-                            <Gauge className="size-4"/>
-                            {t("settings.meterTypes")}
-                        </TabsTrigger>
-                    </Can>
-                    <Can permission="zone_types.read">
-                        <TabsTrigger value="zoneTypes" className="gap-2">
-                            <Map className="size-4"/>
-                            {t("settings.zoneTypes")}
-                        </TabsTrigger>
-                    </Can>
-                    <Can permission="memberTypes.read">
-                        <TabsTrigger value="memberTypes" className="gap-2">
-                            <Tags className="size-4"/>
-                            {t("settings.memberTypes")}
-                        </TabsTrigger>
-                    </Can>
-                    <Can permission="payment_methods.read">
-                        <TabsTrigger value="paymentMethods" className="gap-2">
-                            <CreditCard className="size-4"/>
-                            {t("settings.paymentMethods.tab")}
-                        </TabsTrigger>
-                    </Can>
-                    <Can permission="shares.read">
-                        <TabsTrigger value="shares" className="gap-2">
-                            <HandCoins className="size-4"/>
-                            {t("settings.shares")}
-                        </TabsTrigger>
-                    </Can>
-                    <Can permission="discounts.read">
-                        <TabsTrigger value="discounts" className="gap-2">
-                            <Percent className="size-4"/>
-                            {t("settings.discounts")}
-                        </TabsTrigger>
-                    </Can>
-                    <Can permission="surcharges.read">
-                        <TabsTrigger value="surcharges" className="gap-2">
-                            <Percent className="size-4"/>
-                            {t("settings.surcharges")}
-                        </TabsTrigger>
-                    </Can>
-                    <Can permission="tariffs.read">
-                        <TabsTrigger value="tariffs" className="gap-2">
-                            <TrendingUp className="size-4"/>
-                            {t("settings.tariffs")}
-                        </TabsTrigger>
-                    </Can>
-                    <Can permission="assets.read">
-                        <TabsTrigger value="assetCategories" className="gap-2">
-                            <Boxes className="size-4"/>
-                            {t("settings.assetCategories")}
-                        </TabsTrigger>
-                    </Can>
-                    <Can permission="assets.read">
-                        <TabsTrigger value="assetLocations" className="gap-2">
-                            <Boxes className="size-4"/>
-                            {t("settings.assetLocations")}
-                        </TabsTrigger>
-                    </Can>
-                    <Can permission="finances.read">
-                        <TabsTrigger value="financeCategories" className="gap-2">
-                            <Wallet className="size-4"/>
-                            {t("settings.financeCategories")}
-                        </TabsTrigger>
-                    </Can>
-                </TabsList>
-                <Can permission="settings.read">
-                    <TabsContent value="general">
-                        <div className="mt-4 space-y-4">
+        <div className="space-y-6">
+            <div>
+                <h1 className="text-2xl font-bold">{t("settings.title")}</h1>
+                <p className="text-sm text-muted-foreground">
+                    {t("settings.subtitle")}
+                </p>
+            </div>
+
+            <ResponsiveTabs
+                tabs={[
+  ...(hasPermission("settings.read") ? [{
+    value: "general",
+    label: t("settings.general"),
+    icon: <SettingsIcon className="size-4" />,
+    content: (
+      <>
+<div className="mt-4 space-y-4">
                             <form onSubmit={handleSubmit} noValidate className="space-y-4">
                                 {Object.keys(settings ?? {}).filter((key) => !OPENWA_KEYS.includes(key) && !(canPickUsers && USER_SETTING_KEYS.includes(key))).map((key) => {
                                     const meta = SETTING_LABELS[key]
@@ -317,102 +244,158 @@ export default function SettingsPage() {
                                 ) : null}
                             </form>
                         </div>
-                    </TabsContent>
-                </Can>
-
-                <Can permission="settings.read">
-                    <TabsContent value="whatsapp">
-                        <WhatsAppSettingsPanel/>
-                    </TabsContent>
-                </Can>
-
-                <Can permission="meter_types.read">
-                    <TabsContent value="meterTypes">
-                        <div className="mt-4">
+      </>
+    ),
+  }] : []),
+  ...(hasPermission("settings.read") ? [{
+    value: "whatsapp",
+    label: t("settings.whatsapp.tab"),
+    icon: <MessageSquare className="size-4" />,
+    content: (
+      <>
+<WhatsAppSettingsPanel/>
+      </>
+    ),
+  }] : []),
+  ...(hasPermission("meter_types.read") ? [{
+    value: "meterTypes",
+    label: t("settings.meterTypes"),
+    icon: <Gauge className="size-4" />,
+    content: (
+      <>
+<div className="mt-4">
                             <MeterTypesPanel/>
                         </div>
-                    </TabsContent>
-                </Can>
-
-                <Can permission="zone_types.read">
-                    <TabsContent value="zoneTypes">
-                        <div className="mt-4">
+      </>
+    ),
+  }] : []),
+  ...(hasPermission("zone_types.read") ? [{
+    value: "zoneTypes",
+    label: t("settings.zoneTypes"),
+    icon: <Map className="size-4" />,
+    content: (
+      <>
+<div className="mt-4">
                             <ZoneTypesPanel/>
                         </div>
-                    </TabsContent>
-                </Can>
-
-                <Can permission="memberTypes.read">
-                    <TabsContent value="memberTypes">
-                        <div className="mt-4">
+      </>
+    ),
+  }] : []),
+  ...(hasPermission("member_types.read") ? [{
+    value: "memberTypes",
+    label: t("settings.memberTypes"),
+    icon: <Tags className="size-4" />,
+    content: (
+      <>
+<div className="mt-4">
                             <MemberTypesPanel/>
                         </div>
-                    </TabsContent>
-                </Can>
-
-                <Can permission="payment_methods.read">
-                    <TabsContent value="paymentMethods">
-                        <div className="mt-4">
+      </>
+    ),
+  }] : []),
+  ...(hasPermission("payment_methods.read") ? [{
+    value: "paymentMethods",
+    label: t("settings.paymentMethods.tab"),
+    icon: <CreditCard className="size-4" />,
+    content: (
+      <>
+<div className="mt-4">
                             <PaymentMethodsPanel/>
                         </div>
-                    </TabsContent>
-                </Can>
-
-                <Can permission="shares.read">
-                    <TabsContent value="shares">
-                        <div className="mt-4">
+      </>
+    ),
+  }] : []),
+  ...(hasPermission("shares.read") ? [{
+    value: "shares",
+    label: t("settings.shares"),
+    icon: <HandCoins className="size-4" />,
+    content: (
+      <>
+<div className="mt-4">
                             <SharesPage/>
                         </div>
-                    </TabsContent>
-                </Can>
-
-                <Can permission="discounts.read">
-                    <TabsContent value="discounts">
-                        <div className="mt-4">
+      </>
+    ),
+  }] : []),
+  ...(hasPermission("discounts.read") ? [{
+    value: "discounts",
+    label: t("settings.discounts"),
+    icon: <Percent className="size-4" />,
+    content: (
+      <>
+<div className="mt-4">
                             <DiscountsPage/>
                         </div>
-                    </TabsContent>
-                </Can>
-                <Can permission="surcharges.read">
-                    <TabsContent value="surcharges">
-                        <div className="mt-4">
+      </>
+    ),
+  }] : []),
+  ...(hasPermission("surcharges.read") ? [{
+    value: "surcharges",
+    label: t("settings.surcharges"),
+    icon: <Percent className="size-4" />,
+    content: (
+      <>
+<div className="mt-4">
                             <SurchargesPage/>
                         </div>
-                    </TabsContent>
-                </Can>
-
-                <Can permission="tariffs.read">
-                    <TabsContent value="tariffs">
-                        <div className="mt-4">
+      </>
+    ),
+  }] : []),
+  ...(hasPermission("tariffs.read") ? [{
+    value: "tariffs",
+    label: t("settings.tariffs"),
+    icon: <TrendingUp className="size-4" />,
+    content: (
+      <>
+<div className="mt-4">
                             <TariffsPage/>
                         </div>
-                    </TabsContent>
-                </Can>
-
-                <Can permission="assets.read">
-                    <TabsContent value="assetCategories">
-                        <div className="mt-4">
+      </>
+    ),
+  }] : []),
+  ...(hasPermission("assets.read") ? [{
+    value: "assetCategories",
+    label: t("settings.assetCategories"),
+    icon: <Boxes className="size-4" />,
+    content: (
+      <>
+<div className="mt-4">
                             <AssetCategoriesPanel/>
                         </div>
-                    </TabsContent>
-                </Can>
-
-                <Can permission="assets.read">
-                    <TabsContent value="assetLocations">
-                        <div className="mt-4">
+      </>
+    ),
+  }] : []),
+  ...(hasPermission("assets.read") ? [{
+    value: "assetLocations",
+    label: t("settings.assetLocations"),
+    icon: <Boxes className="size-4" />,
+    content: (
+      <>
+<div className="mt-4">
                             <AssetLocationsPanel/>
                         </div>
-                    </TabsContent>
-                </Can>
-
-                <Can permission="finances.read">
-                    <TabsContent value="financeCategories">
-                        <div className="mt-4">
+      </>
+    ),
+  }] : []),
+  ...(hasPermission("finances.read") ? [{
+    value: "financeCategories",
+    label: t("settings.financeCategories"),
+    icon: <Wallet className="size-4" />,
+    content: (
+      <>
+<div className="mt-4">
                             <FinanceCategoriesPanel/>
                         </div>
-                    </TabsContent>
-                </Can>
-            </Tabs>
+      </>
+    ),
+  }] : []),
+                ]}
+                defaultValue="general"
+                className="w-full"
+                listClassName="w-full"
+                contentClassName="mt-4"
+                aria-label={t("settings.title")}
+            />
         </div>
     )
 }

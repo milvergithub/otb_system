@@ -191,26 +191,27 @@ export default function MembersPage() {
             </Can>
           </TabsList>
         </Tabs>
-
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder={t("members.searchPlaceholder")}
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-          />
-        </div>
-        <ComboboxSelect
-          value={memberTypeFilter}
-          onValueChange={(v) => {
-            setMemberTypeFilter(v)
-            setPage(1)
-          }}
-          placeholder={t("memberTypes.filterBy")}
-          className="w-full sm:w-56"
-          options={memberTypeFilterOptions}
-        />
+          <div className="flex flex-row gap-2">
+              <div className="relative w-full max-w-sm sm:w-1/2">
+                  <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                      className="pl-9"
+                      placeholder={t("members.searchPlaceholder")}
+                      value={searchInput}
+                      onChange={(e) => setSearchInput(e.target.value)}
+                  />
+              </div>
+              <ComboboxSelect
+                  value={memberTypeFilter}
+                  onValueChange={(v) => {
+                      setMemberTypeFilter(v)
+                      setPage(1)
+                  }}
+                  placeholder={t("memberTypes.filterBy")}
+                  className="w-full sm:w-1/2 md:w-56"
+                  options={memberTypeFilterOptions}
+              />
+          </div>
       </div>
 
       <Card>
